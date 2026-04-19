@@ -1,0 +1,364 @@
+id: uno
+back:
+  pattern: uno
+cards:
+  - id: uno_r_0
+    label: "0"
+    color: "#ef4444"
+    uc: r
+    uf: "0"
+    copies: 1
+  - id: uno_r_1
+    label: "1"
+    color: "#ef4444"
+    uc: r
+    uf: "1"
+    copies: 2
+  - id: uno_r_2
+    label: "2"
+    color: "#ef4444"
+    uc: r
+    uf: "2"
+    copies: 2
+  - id: uno_r_3
+    label: "3"
+    color: "#ef4444"
+    uc: r
+    uf: "3"
+    copies: 2
+  - id: uno_r_4
+    label: "4"
+    color: "#ef4444"
+    uc: r
+    uf: "4"
+    copies: 2
+  - id: uno_r_5
+    label: "5"
+    color: "#ef4444"
+    uc: r
+    uf: "5"
+    copies: 2
+  - id: uno_r_6
+    label: "6"
+    color: "#ef4444"
+    uc: r
+    uf: "6"
+    copies: 2
+  - id: uno_r_7
+    label: "7"
+    color: "#ef4444"
+    uc: r
+    uf: "7"
+    copies: 2
+  - id: uno_r_8
+    label: "8"
+    color: "#ef4444"
+    uc: r
+    uf: "8"
+    copies: 2
+  - id: uno_r_9
+    label: "9"
+    color: "#ef4444"
+    uc: r
+    uf: "9"
+    copies: 2
+  - id: uno_r_sk
+    label: "⊘"
+    color: "#ef4444"
+    uc: r
+    uf: "sk"
+    copies: 2
+  - id: uno_r_rev
+    label: "↺"
+    color: "#ef4444"
+    uc: r
+    uf: "rev"
+    copies: 2
+  - id: uno_r_d2
+    label: "+2"
+    color: "#ef4444"
+    uc: r
+    uf: "d2"
+    copies: 2
+  - id: uno_y_0
+    label: "0"
+    color: "#ca8a04"
+    uc: y
+    uf: "0"
+    copies: 1
+  - id: uno_y_1
+    label: "1"
+    color: "#ca8a04"
+    uc: y
+    uf: "1"
+    copies: 2
+  - id: uno_y_2
+    label: "2"
+    color: "#ca8a04"
+    uc: y
+    uf: "2"
+    copies: 2
+  - id: uno_y_3
+    label: "3"
+    color: "#ca8a04"
+    uc: y
+    uf: "3"
+    copies: 2
+  - id: uno_y_4
+    label: "4"
+    color: "#ca8a04"
+    uc: y
+    uf: "4"
+    copies: 2
+  - id: uno_y_5
+    label: "5"
+    color: "#ca8a04"
+    uc: y
+    uf: "5"
+    copies: 2
+  - id: uno_y_6
+    label: "6"
+    color: "#ca8a04"
+    uc: y
+    uf: "6"
+    copies: 2
+  - id: uno_y_7
+    label: "7"
+    color: "#ca8a04"
+    uc: y
+    uf: "7"
+    copies: 2
+  - id: uno_y_8
+    label: "8"
+    color: "#ca8a04"
+    uc: y
+    uf: "8"
+    copies: 2
+  - id: uno_y_9
+    label: "9"
+    color: "#ca8a04"
+    uc: y
+    uf: "9"
+    copies: 2
+  - id: uno_y_sk
+    label: "⊘"
+    color: "#ca8a04"
+    uc: y
+    uf: "sk"
+    copies: 2
+  - id: uno_y_rev
+    label: "↺"
+    color: "#ca8a04"
+    uc: y
+    uf: "rev"
+    copies: 2
+  - id: uno_y_d2
+    label: "+2"
+    color: "#ca8a04"
+    uc: y
+    uf: "d2"
+    copies: 2
+  - id: uno_g_0
+    label: "0"
+    color: "#16a34a"
+    uc: g
+    uf: "0"
+    copies: 1
+  - id: uno_g_1
+    label: "1"
+    color: "#16a34a"
+    uc: g
+    uf: "1"
+    copies: 2
+  - id: uno_g_2
+    label: "2"
+    color: "#16a34a"
+    uc: g
+    uf: "2"
+    copies: 2
+  - id: uno_g_3
+    label: "3"
+    color: "#16a34a"
+    uc: g
+    uf: "3"
+    copies: 2
+  - id: uno_g_4
+    label: "4"
+    color: "#16a34a"
+    uc: g
+    uf: "4"
+    copies: 2
+  - id: uno_g_5
+    label: "5"
+    color: "#16a34a"
+    uc: g
+    uf: "5"
+    copies: 2
+  - id: uno_g_6
+    label: "6"
+    color: "#16a34a"
+    uc: g
+    uf: "6"
+    copies: 2
+  - id: uno_g_7
+    label: "7"
+    color: "#16a34a"
+    uc: g
+    uf: "7"
+    copies: 2
+  - id: uno_g_8
+    label: "8"
+    color: "#16a34a"
+    uc: g
+    uf: "8"
+    copies: 2
+  - id: uno_g_9
+    label: "9"
+    color: "#16a34a"
+    uc: g
+    uf: "9"
+    copies: 2
+  - id: uno_g_sk
+    label: "⊘"
+    color: "#16a34a"
+    uc: g
+    uf: "sk"
+    copies: 2
+  - id: uno_g_rev
+    label: "↺"
+    color: "#16a34a"
+    uc: g
+    uf: "rev"
+    copies: 2
+  - id: uno_g_d2
+    label: "+2"
+    color: "#16a34a"
+    uc: g
+    uf: "d2"
+    copies: 2
+  - id: uno_b_0
+    label: "0"
+    color: "#2563eb"
+    uc: b
+    uf: "0"
+    copies: 1
+  - id: uno_b_1
+    label: "1"
+    color: "#2563eb"
+    uc: b
+    uf: "1"
+    copies: 2
+  - id: uno_b_2
+    label: "2"
+    color: "#2563eb"
+    uc: b
+    uf: "2"
+    copies: 2
+  - id: uno_b_3
+    label: "3"
+    color: "#2563eb"
+    uc: b
+    uf: "3"
+    copies: 2
+  - id: uno_b_4
+    label: "4"
+    color: "#2563eb"
+    uc: b
+    uf: "4"
+    copies: 2
+  - id: uno_b_5
+    label: "5"
+    color: "#2563eb"
+    uc: b
+    uf: "5"
+    copies: 2
+  - id: uno_b_6
+    label: "6"
+    color: "#2563eb"
+    uc: b
+    uf: "6"
+    copies: 2
+  - id: uno_b_7
+    label: "7"
+    color: "#2563eb"
+    uc: b
+    uf: "7"
+    copies: 2
+  - id: uno_b_8
+    label: "8"
+    color: "#2563eb"
+    uc: b
+    uf: "8"
+    copies: 2
+  - id: uno_b_9
+    label: "9"
+    color: "#2563eb"
+    uc: b
+    uf: "9"
+    copies: 2
+  - id: uno_b_sk
+    label: "⊘"
+    color: "#2563eb"
+    uc: b
+    uf: "sk"
+    copies: 2
+  - id: uno_b_rev
+    label: "↺"
+    color: "#2563eb"
+    uc: b
+    uf: "rev"
+    copies: 2
+  - id: uno_b_d2
+    label: "+2"
+    color: "#2563eb"
+    uc: b
+    uf: "d2"
+    copies: 2
+  - id: uno_w_wi_0
+    label: "Wild"
+    color: "#6366f1"
+    uc: w
+    uf: "wi"
+    copies: 1
+  - id: uno_w_wi_1
+    label: "Wild"
+    color: "#6366f1"
+    uc: w
+    uf: "wi"
+    copies: 1
+  - id: uno_w_wi_2
+    label: "Wild"
+    color: "#6366f1"
+    uc: w
+    uf: "wi"
+    copies: 1
+  - id: uno_w_wi_3
+    label: "Wild"
+    color: "#6366f1"
+    uc: w
+    uf: "wi"
+    copies: 1
+  - id: uno_w_w4_0
+    label: "+4"
+    color: "#1e1b4b"
+    uc: w
+    uf: "w4"
+    copies: 1
+  - id: uno_w_w4_1
+    label: "+4"
+    color: "#1e1b4b"
+    uc: w
+    uf: "w4"
+    copies: 1
+  - id: uno_w_w4_2
+    label: "+4"
+    color: "#1e1b4b"
+    uc: w
+    uf: "w4"
+    copies: 1
+  - id: uno_w_w4_3
+    label: "+4"
+    color: "#1e1b4b"
+    uc: w
+    uf: "w4"
+    copies: 1

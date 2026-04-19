@@ -1,0 +1,14 @@
+id: poker-draw
+name: Poker (5-card draw)
+module: poker-draw
+deck: standard-52
+players:
+  human: 1
+  ai: 1
+match:
+  enabled: true
+  startingStack: 500
+  targetScore: 2000
+  winnerIs: highest
+  scoringMode: chips
+  scoreLabel: Chips

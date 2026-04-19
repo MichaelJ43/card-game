@@ -1,0 +1,14 @@
+id: red-dog
+name: Red Dog (quick duel)
+module: high-card-duel
+deck: standard-52
+players:
+  human: 1
+  ai: 1
+match:
+  enabled: true
+  startingStack: 150
+  targetScore: 500
+  winnerIs: highest
+  scoringMode: chips
+  scoreLabel: Chips

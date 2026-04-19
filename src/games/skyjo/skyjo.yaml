@@ -1,0 +1,14 @@
+id: skyjo
+name: Skyjo
+module: skyjo
+deck: skyjo
+players:
+  human: 1
+  ai: 1
+match:
+  enabled: true
+  targetScore: 100
+  winnerIs: lowest
+  endCondition: anyAtOrAbove
+ai:
+  strategy: simple

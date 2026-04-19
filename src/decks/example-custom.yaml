@@ -1,0 +1,38 @@
+id: example-custom
+back:
+  pattern: custom-stars
+cards:
+  - id: STAR_A
+    label: '★'
+    color: '#f59e0b'
+    value: 1
+  - id: STAR_B
+    label: '★'
+    color: '#3b82f6'
+    value: 2
+  - id: MOON
+    label: '🌙'
+    color: '#8b5cf6'
+    value: 3
+  - id: SUN
+    label: '☀'
+    color: '#eab308'
+    value: 4
+  - id: BOLT
+    label: '⚡'
+    color: '#06b6d4'
+    value: 5
+  - id: CLOVER
+    label: '☘'
+    color: '#22c55e'
+    value: 6
+  - id: RED_DUP
+    label: R
+    color: '#ef4444'
+    value: 10
+    copies: 2
+  - id: WILD
+    label: '?'
+    color: '#a855f7'
+    value: 7
+    copies: 2

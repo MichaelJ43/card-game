@@ -1,0 +1,9 @@
+id: war
+name: War
+module: war
+deck: standard-52
+players:
+  human: 1
+  ai: 1
+ai:
+  strategy: simple

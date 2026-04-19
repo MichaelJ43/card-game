@@ -1,0 +1,14 @@
+id: blackjack
+name: Blackjack
+module: blackjack
+deck: standard-52
+players:
+  human: 1
+  ai: 1
+match:
+  enabled: true
+  startingStack: 100
+  targetScore: 300
+  winnerIs: highest
+  scoringMode: chips
+  scoreLabel: Chips

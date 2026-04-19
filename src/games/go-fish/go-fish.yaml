@@ -1,0 +1,10 @@
+id: go-fish
+name: Go Fish
+module: go-fish
+deck: standard-52
+players:
+  human: 1
+  ai: 3
+ai:
+  strategy: simple
+  memory: false

@@ -1,0 +1,14 @@
+id: casino-blackjack
+name: Casino Blackjack
+module: blackjack
+deck: standard-52
+players:
+  human: 1
+  ai: 1
+match:
+  enabled: true
+  startingStack: 200
+  targetScore: 600
+  winnerIs: highest
+  scoringMode: chips
+  scoreLabel: Chips

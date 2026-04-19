@@ -1,0 +1,11 @@
+/** Side-effect imports register game modules */
+import './games/war'
+import './games/demo-custom'
+import './games/go-fish'
+import './games/skyjo'
+import './games/blackjack'
+import './games/baccarat'
+import './games/crazy-eights'
+import './games/poker-draw'
+import './games/high-card-duel'
+import './games/uno'

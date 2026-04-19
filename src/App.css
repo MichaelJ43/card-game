@@ -1,0 +1,345 @@
+.app {
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 2.5rem;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.app__header {
+  margin-bottom: 1rem;
+}
+
+.app__title {
+  font-size: 1.75rem;
+  margin: 0 0 0.35rem;
+  letter-spacing: -0.02em;
+}
+
+.app__subtitle {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  opacity: 0.85;
+}
+
+.app__toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  align-items: stretch;
+}
+
+/* Left column (controls + difficulty) beside score; score top-aligned so it grows downward */
+.app__toolbarMain {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 1rem 1.5rem;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.app__toolbarLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.app__toolbarRow--controls {
+  width: 100%;
+}
+
+.app__toolbarControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+  width: 100%;
+  min-width: 0;
+}
+
+.app__toolbarScores {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  min-width: min(100%, 17rem);
+  text-align: right;
+}
+
+.app__toolbarRow--diff {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+  align-items: flex-end;
+}
+
+@media (max-width: 52rem) {
+  .app__toolbarMain {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .app__toolbarScores {
+    text-align: left;
+    align-self: stretch;
+    max-width: none;
+  }
+}
+
+.app__toolbarActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+}
+
+.app__toolbarActionsLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: inherit;
+}
+
+.app__toolbarActionsBtns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.app__btnToolbar {
+  padding: 0.42rem 0.85rem;
+  min-height: 2.25rem;
+  box-sizing: border-box;
+}
+
+.app__label--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.app__select--diff {
+  min-width: 6.5rem;
+  font-size: 0.82rem;
+}
+
+.app__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.app__select {
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border, #2e303a);
+  background: var(--bg, #16171d);
+  color: var(--text-h, #f3f4f6);
+  min-width: 12rem;
+}
+
+.app__inputNumber {
+  font: inherit;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border, #2e303a);
+  background: var(--bg, #16171d);
+  color: var(--text-h, #f3f4f6);
+  width: 4.25rem;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.app__inputNumber:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.app__btnPrimary,
+.app__btnSecondary {
+  font: inherit;
+  padding: 0.5rem 1rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--border, #2e303a);
+  cursor: pointer;
+}
+
+.app__btnPrimary {
+  background: var(--accent-bg, rgba(192, 132, 252, 0.2));
+  border-color: var(--accent-border, rgba(192, 132, 252, 0.5));
+  color: var(--text-h, #f3f4f6);
+  font-weight: 600;
+}
+
+.app__btnPrimary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.app__btnSecondary {
+  background: transparent;
+  color: var(--text-h, #f3f4f6);
+}
+
+.app__status {
+  margin: 0 0 1.25rem;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+/* Borderless cumulative scoreboard (toolbar when match active) */
+.matchCumulative {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--text-h, #f3f4f6);
+}
+
+.matchCumulative__table {
+  border-collapse: collapse;
+  margin: 0;
+  text-align: right;
+}
+
+.matchCumulative__table caption {
+  caption-side: top;
+  text-align: inherit;
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  padding: 0 0 0.35rem;
+}
+
+.matchCumulative__table th,
+.matchCumulative__table td {
+  border: none;
+  padding: 0.15rem 0 0.15rem 0.65rem;
+  font-weight: 400;
+}
+
+.matchCumulative__table th:first-child,
+.matchCumulative__table td:first-child {
+  padding-left: 0;
+  text-align: left;
+}
+
+.matchCumulative__table thead th {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+  padding-bottom: 0.25rem;
+}
+
+.matchCumulative__meta {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  opacity: 0.82;
+  max-width: 16rem;
+  text-align: right;
+}
+
+.matchCumulative--toolbar {
+  font-size: 0.78rem;
+}
+
+.matchCumulative--toolbar .matchCumulative__table caption {
+  font-size: 0.68rem;
+  padding-bottom: 0.28rem;
+}
+
+.matchCumulative--toolbar .matchCumulative__table th,
+.matchCumulative--toolbar .matchCumulative__table td {
+  padding: 0.08rem 0 0.08rem 0.5rem;
+}
+
+.matchCumulative--toolbar .matchCumulative__meta {
+  margin-top: 0.3rem;
+  font-size: 0.68rem;
+  max-width: 20rem;
+  margin-left: auto;
+}
+
+@media (max-width: 52rem) {
+  .matchCumulative--toolbar .matchCumulative__meta {
+    margin-left: 0;
+    max-width: none;
+  }
+}
+
+.app__matchPreview {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  opacity: 0.92;
+  text-align: center;
+}
+
+.app__matchActions {
+  margin: 0 0 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+.app__actions {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.app__customActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  justify-content: center;
+  max-width: 36rem;
+}
+
+.app__goFish {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+}
+
+.app__tableIntentHint {
+  flex: 1 1 100%;
+  margin: 0;
+  max-width: 42rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  opacity: 0.88;
+}
+
+.app__skyjo {
+  width: 100%;
+  max-width: 42rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.app__footer {
+  margin-top: 2rem;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.app__footer code {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.85em;
+}

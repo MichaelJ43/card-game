@@ -1,0 +1,12 @@
+id: uno
+name: Uno
+module: uno
+deck: uno
+players:
+  human: 1
+  ai: 1
+match:
+  enabled: true
+  targetScore: 500
+  winnerIs: highest
+  scoreLabel: Points

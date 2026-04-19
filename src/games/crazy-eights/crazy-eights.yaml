@@ -1,0 +1,12 @@
+id: crazy-eights
+name: Crazy Eights
+module: crazy-eights
+deck: standard-52
+players:
+  human: 1
+  ai: 1
+match:
+  enabled: true
+  targetScore: 7
+  winnerIs: highest
+  scoreLabel: Points

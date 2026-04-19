@@ -1,0 +1,14 @@
+id: high-card-duel
+name: High-card duel
+module: high-card-duel
+deck: standard-52
+players:
+  human: 1
+  ai: 1
+match:
+  enabled: true
+  startingStack: 100
+  targetScore: 400
+  winnerIs: highest
+  scoringMode: chips
+  scoreLabel: Chips

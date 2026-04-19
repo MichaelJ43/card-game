@@ -1,0 +1,9 @@
+id: demo-custom
+name: Custom deck duel
+module: demo-custom
+deck: example-custom
+players:
+  human: 1
+  ai: 1
+ai:
+  strategy: random

@@ -1,0 +1,355 @@
+.tableView {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  align-items: stretch;
+  text-align: left;
+  width: 100%;
+  max-width: min(100%, 72rem);
+  margin: 0 auto;
+}
+
+.tableView__stacksRow {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.tableView__stacksRow:not(.tableView__stacksRow--tri) > .tableView__zone {
+  flex: 1 1 12rem;
+  min-width: min(100%, 11rem);
+  max-width: 100%;
+}
+
+.tableView__stacksRow .tableView__cards--stack {
+  min-width: 6rem;
+  min-height: 8.75rem;
+}
+
+/* Draw | Pending | Discard — equal flex on outer columns, fixed pending; cap discard column when scores shown */
+.tableView__stacksRow--tri {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.tableView__stacksRow--tri .tableView__stackCol--draw {
+  flex: 1 1 12rem;
+  min-width: min(100%, 11rem);
+}
+
+.tableView__stacksRow--tri .tableView__stackCol--pending {
+  flex: 0 0 8.25rem;
+  width: 8.25rem;
+  max-width: 100%;
+}
+
+.tableView__stacksRow--tri .tableView__stackCol--discardColumn {
+  flex: 1 1 12rem;
+  min-width: min(100%, 11rem);
+}
+
+@media (max-width: 52rem) {
+  .tableView__stacksRow--tri {
+    flex-direction: column;
+  }
+
+  .tableView__stacksRow--tri .tableView__stackCol--pending {
+    flex: 0 1 auto;
+    width: min(100%, 8.5rem);
+    align-self: center;
+  }
+}
+
+.tableView__stackCol--draw,
+.tableView__stackCol--discard {
+  min-width: 0;
+}
+
+.tableView__stackCol--discardColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.tableView__discardZoneStretch {
+  align-self: stretch;
+  width: 100%;
+}
+
+.tableView__stackCol--pending {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tableView__zone--drawSplit .tableView__drawSplitBody {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.tableView__drawSplitHalf--meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  border: 1px dashed var(--border, #2e303a);
+  min-height: 5.5rem;
+  background: rgba(15, 23, 42, 0.25);
+}
+
+.tableView__drawSplitHalfLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+
+.tableView__drawSplitHalf--pile {
+  min-width: 0;
+}
+
+.tableView__drawSplitHalf--pile .tableView__cards--stack {
+  min-height: 8.75rem;
+}
+
+.tableView__zone--pendingSlot {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 7.25rem;
+  box-sizing: border-box;
+}
+
+.tableView__zone--pendingSelectFlip {
+  box-shadow: 0 0 0 2px var(--focus, rgba(147, 197, 253, 0.65));
+  border-radius: 0.75rem;
+}
+
+.tableView__cards--pendingSlot {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 6.75rem;
+  padding: 0.35rem 0 0.15rem;
+  box-sizing: border-box;
+}
+
+.tableView__cards--pendingSlot .tableView__cardSlot {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Match CardView.css poker size exactly (avoid aspect-ratio squish in narrow grid tracks) */
+.tableView__cards--pendingSlot .card {
+  width: 4.75rem;
+  height: 6.75rem;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.tableView__pendingEmpty {
+  opacity: 0.4;
+  font-size: 1.35rem;
+  line-height: 6.75rem;
+  min-height: 6.75rem;
+  text-align: center;
+  user-select: none;
+}
+
+.tableView__gridsWrap {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 1rem 1.25rem;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+/* Fixed max width so a lone wrapped grid (e.g. 4th player) does not stretch to full row width */
+.tableView__gridsWrap > .tableView__zone--grid {
+  flex: 0 1 22rem;
+  min-width: 0;
+  max-width: min(100%, 22rem);
+  box-sizing: border-box;
+}
+
+.tableView__zone--grid {
+  container-type: inline-size;
+  container-name: gridzone;
+}
+
+.tableView__zone--activeTurn {
+  outline: 2px solid #eab308;
+  outline-offset: 2px;
+  border-radius: 0.8rem;
+}
+
+.tableView__zone {
+  background: var(--zone-bg, rgba(15, 23, 42, 0.35));
+  border: 1px solid var(--border, #2e303a);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem 1rem;
+}
+
+.tableView__zoneTitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.65rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-h, #f3f4f6);
+}
+
+.tableView__count {
+  font-weight: 400;
+  opacity: 0.75;
+  font-size: 0.85rem;
+}
+
+.tableView__cards {
+  display: flex;
+  min-height: 7rem;
+  position: relative;
+}
+
+.tableView__cards--spread {
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: flex-end;
+}
+
+.tableView__spreadEmptyHit {
+  align-self: stretch;
+  width: 100%;
+  min-height: 6.75rem;
+  margin: 0;
+  padding: 0;
+  border: 1px dashed var(--border, #2e303a);
+  border-radius: 0.5rem;
+  background: rgba(15, 23, 42, 0.2);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.tableView__spreadEmptyHit:hover {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.tableView__spreadEmptyHit:focus-visible {
+  outline: 2px solid var(--focus, #93c5fd);
+  outline-offset: 2px;
+}
+
+.tableView__cards--stack {
+  position: relative;
+  padding-left: 0.5rem;
+  padding-top: 0.5rem;
+  min-width: 7.5rem;
+  min-height: 10.5rem;
+}
+
+.tableView__stackHit {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+.tableView__stackHit:focus-visible {
+  outline: 2px solid var(--focus, #93c5fd);
+  outline-offset: 2px;
+}
+
+.tableView__zone--interactive.tableView__zone[data-zone-kind='stack'] .tableView__cards--stack {
+  cursor: pointer;
+}
+
+.tableView__cardHit {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+}
+
+.tableView__cardHit:focus-visible {
+  outline: 2px solid var(--focus, #93c5fd);
+  outline-offset: 2px;
+  border-radius: 0.35rem;
+}
+
+.tableView__zone--interactive .tableView__cards--grid .tableView__cardSlot,
+.tableView__zone--interactive .tableView__cards--spread .tableView__cardSlot {
+  cursor: pointer;
+}
+
+.tableView__cards--grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(0.25rem, 1.5cqi, 0.45rem);
+  width: 100%;
+  max-width: none;
+}
+
+.tableView__cards--grid .tableView__cardSlot {
+  position: relative;
+  min-width: 0;
+}
+
+.tableView__cards--grid .tableView__cardSlot .card {
+  box-sizing: border-box;
+  width: min(4.75rem, 100%);
+  height: auto;
+  aspect-ratio: 4.75 / 6.75;
+  flex-shrink: 1;
+}
+
+.tableView__cards--grid .tableView__cardSlot .card--skyjoSlot {
+  width: min(4.75rem, 100%);
+  height: auto;
+  aspect-ratio: 4.75 / 6.75;
+  min-height: unset;
+}
+
+.tableView__cards--grid .card--skyjo .card__skyjoValue {
+  font-size: clamp(0.95rem, 11cqi, 1.75rem);
+}
+
+.tableView__cardSlot {
+  position: relative;
+}
+
+.tableView__cards--stack .tableView__cardSlot {
+  position: absolute;
+  left: 0;
+  top: 0;
+}

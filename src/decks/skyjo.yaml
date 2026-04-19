@@ -1,0 +1,20 @@
+# Official-style distribution: 150 cards, values −2 … 12
+id: skyjo
+back:
+  pattern: skyjo
+skyjoDistribution:
+  - { value: -2, count: 5 }
+  - { value: -1, count: 10 }
+  - { value: 0, count: 15 }
+  - { value: 1, count: 10 }
+  - { value: 2, count: 10 }
+  - { value: 3, count: 10 }
+  - { value: 4, count: 10 }
+  - { value: 5, count: 10 }
+  - { value: 6, count: 10 }
+  - { value: 7, count: 10 }
+  - { value: 8, count: 10 }
+  - { value: 9, count: 10 }
+  - { value: 10, count: 10 }
+  - { value: 11, count: 10 }
+  - { value: 12, count: 10 }
