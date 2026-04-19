@@ -433,6 +433,8 @@ function App() {
         if (g.phase === 'roundOver' || g.currentPlayer === 0) return prev
         const act = prev.module.selectAiAction(prev.table, prev.gameState, g.currentPlayer, Math.random, {
           difficulty: difficultyForAiPlayer(prev, g.currentPlayer),
+          matchCumulativeScores: prev.match?.cumulativeScores,
+          matchTargetScore: prev.match?.config.targetScore,
         })
         if (!act) return prev
         const r = prev.module.applyAction(prev.table, prev.gameState, act)
