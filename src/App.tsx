@@ -5,6 +5,7 @@ import { type MatchState } from './core/match'
 import { playerSeatLabel } from './core/playerLabels'
 import { createSession, startNextMatchRound, type CreateSessionOptions, type GameSession } from './session'
 import { GAME_IDS } from './data/manifests'
+import { rulesTextForGame } from './data/rulesSources'
 import {
   clampAiOpponentCount,
   gameSupportsConfigurableAi,
@@ -12,6 +13,7 @@ import {
   MAX_AI_OPPONENTS,
   normalizeAiDifficultiesForCount,
 } from './session/playerConfig'
+import { RulesModal } from './ui/RulesModal'
 import { TableView, type ActiveTurnHighlight, type TableIntent } from './ui/TableView'
 import { skyjoDumpUiStepShouldReset, type SkyjoDumpUiStep } from './ui/tableUiFlow'
 import type { GameAction } from './core/types'
@@ -162,6 +164,7 @@ function App() {
   const [gfAwaitingOpponent, setGfAwaitingOpponent] = useState(false)
   const [gfRank, setGfRank] = useState('A')
   const [skyjoDumpStep, setSkyjoDumpStep] = useState<SkyjoDumpUiStep>('idle')
+  const [rulesOpen, setRulesOpen] = useState(false)
 
   const makeDealOptions = useCallback(
     (
@@ -631,6 +634,13 @@ function App() {
                       <button type="button" className="app__btnToolbar app__btnSecondary" onClick={startOrNewDeal}>
                         {session ? 'New deal' : 'Start deal'}
                       </button>
+                      <button
+                        type="button"
+                        className="app__btnSecondary app__btnToolbar"
+                        onClick={() => setRulesOpen(true)}
+                      >
+                        Rules
+                      </button>
                       <button type="button" className="app__btnSecondary app__btnToolbar" onClick={endGame}>
                         End game
                       </button>
@@ -817,6 +827,8 @@ function App() {
           </footer>
         </>
       )}
+
+      <RulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} markdown={rulesTextForGame(gameId)} />
     </div>
   )
 }
