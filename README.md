@@ -25,6 +25,8 @@ Then open the URL Vite prints (usually `http://localhost:5173`).
 
 Choosing another entry in the **Game** menu updates the selection only; press **Start deal** (or **New deal** when a hand is already on the table) to shuffle and play.
 
+Use **Rules** (next to **End game**) to open a modal with the in-app rules for the **currently selected** game (you can read them before **Start deal**).
+
 Production build and local preview of the built assets:
 
 ```bash
@@ -68,7 +70,8 @@ Pick a game from the in-app **Game** menu. Each row links to a short note in [`d
 | [`src/games/<name>/`](src/games/) | Manifest YAML + `index.ts` game module per title or family. |
 | [`src/core/`](src/core/) | Table model, deck parsing, match state, registry. |
 | [`src/data/manifests.ts`](src/data/manifests.ts) | Wires game and deck ids to bundled YAML. |
-| [`docs/`](docs/) | Per-game markdown notes (rules as implemented in-app). |
+| [`src/rules/`](src/rules/) | In-app rules copy (markdown) shown in the **Rules** modal; see [`src/data/rulesSources.ts`](src/data/rulesSources.ts). |
+| [`docs/`](docs/) | Longer per-game notes (repo docs; can diverge slightly from the modal text). |
 
 ## Contributing
 
