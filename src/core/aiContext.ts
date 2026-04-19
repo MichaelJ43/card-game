@@ -6,6 +6,10 @@ export const AI_DIFFICULTY_OPTIONS: readonly AiDifficulty[] = ['easy', 'medium',
 /** Passed to {@link import('./gameModule').GameModule.selectAiAction} for the current AI seat. */
 export interface SelectAiContext {
   difficulty: AiDifficulty
+  /** Cumulative match totals before this round (same length as seats). Used by Skyjo for finisher double penalty. */
+  matchCumulativeScores?: readonly number[]
+  /** Match end threshold (e.g. 100). */
+  matchTargetScore?: number
 }
 
 export function normalizeAiDifficulty(v: unknown): AiDifficulty {

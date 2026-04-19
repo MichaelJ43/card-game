@@ -1,4 +1,3 @@
-import type { AiDifficulty } from '../../core/aiContext'
 import type { ApplyResult, GameModule, GameModuleContext, SelectAiContext } from '../../core/gameModule'
 import type { CardInstance, GameAction, GameManifestYaml } from '../../core/types'
 import type { CardTemplate } from '../../core/types'
@@ -261,6 +260,108 @@ function allNonSlotFaceUp(table: TableState, p: number): boolean {
   return true
 }
 
+/** Expected round total for a player using known face-up cells and `evUnknown` for face-down. */
+function estimatedRoundScoreForPlayer(
+  table: TableState,
+  p: number,
+  templates: Record<string, CardTemplate>,
+  evUnknown: number,
+): number {
+  let s = 0
+  for (const c of table.zones[gridZone(p)]!.cards) {
+    if (!c || isSlot(c.templateId)) continue
+    s += c.faceUp ? cardValue(templates, c.templateId) : evUnknown
+  }
+  return s
+}
+
+/** Soft estimate of P(round score is strictly worse than the best opponent estimate → finisher doubled). */
+function softProbFinisherNotLowest(myRaw: number, minOtherEst: number): number {
+  if (myRaw <= 0) return 0
+  const margin = myRaw - minOtherEst
+  if (margin <= -3) return 0
+  if (margin >= 14) return 1
+  return (margin + 3) / 17
+}
+
+/**
+ * Expected pain from the finisher double rule: duplicate round points × risk, scaled by how high we
+ * already are vs match target (nearing 100 hurts more in lowest-total-wins races).
+ */
+function expectedFinisherDoublePain(
+  myRaw: number,
+  minOtherEst: number,
+  cumulativeBefore: number,
+  targetScore: number,
+): number {
+  const p = softProbFinisherNotLowest(myRaw, minOtherEst)
+  const duplicateRound = p * myRaw
+  const T = Math.max(35, targetScore)
+  const c = Math.max(0, cumulativeBefore)
+  const nearEnd = (c / T) ** 1.28
+  return duplicateRound * (1 + 2.1 * nearEnd)
+}
+
+type PendingSimAction =
+  | { type: 'skyjoSwapDrawn'; gridIndex: number }
+  | { type: 'skyjoDumpDraw'; flipIndex: number }
+
+/**
+ * If this pending swap/dump would finish the grid (Skyjo), estimate expected extra cumulative
+ * damage from being doubled when not lowest (round duplicate), weighted by match standing.
+ */
+function pendingActionFinisherPenalty(
+  table: TableState,
+  templates: Record<string, CardTemplate>,
+  playerIndex: number,
+  pending: CardInstance,
+  action: PendingSimAction,
+  pCount: number,
+  evUnknown: number,
+  cumulative: number,
+  target: number,
+  skyjoFinisher: number | null,
+): number {
+  if (skyjoFinisher !== null) return 0
+  const t = cloneTable(table)
+  ensureSlotTemplate(t.templates)
+  const tpl = t.templates
+  const g = t.zones[gridZone(playerIndex)]!.cards
+  const pend = structuredClone(pending)
+  pend.faceUp = true
+
+  if (action.type === 'skyjoSwapDrawn') {
+    const i = action.gridIndex
+    const old = g[i]!
+    const oldCl = structuredClone(old)
+    g[i] = pend
+    pushDiscard(t, oldCl)
+  } else {
+    const i = action.flipIndex
+    const targetCell = g[i]!
+    if (!targetCell || isSlot(targetCell.templateId) || targetCell.faceUp) return 0
+    pushDiscard(t, structuredClone(pend))
+    targetCell.faceUp = true
+  }
+
+  for (let k = 0; k < 8; k++) {
+    const cm = clearMatchingColumns(t, playerIndex, tpl)
+    if (!cm) break
+  }
+
+  if (!allNonSlotFaceUp(t, playerIndex)) return 0
+
+  const myRaw = roundScoreForPlayer(t, tpl, playerIndex)
+  let minOther = Infinity
+  for (let op = 0; op < pCount; op++) {
+    if (op === playerIndex) continue
+    minOther = Math.min(minOther, estimatedRoundScoreForPlayer(table, op, templates, evUnknown))
+  }
+  if (!Number.isFinite(minOther)) minOther = evUnknown * 6
+
+  return expectedFinisherDoublePain(myRaw, minOther, cumulative, target)
+}
+
 function starterFromOpening(table: TableState, templates: Record<string, CardTemplate>, pCount: number): number {
   let best = -Infinity
   let leader = 0
@@ -343,9 +444,12 @@ function selectAiSkyjo(
   gameState: SkyjoGameState,
   playerIndex: number,
   rng: () => number,
-  difficulty: AiDifficulty,
+  context: SelectAiContext,
   legal: GameAction[],
 ): GameAction {
+  const { difficulty, matchCumulativeScores, matchTargetScore } = context
+  const myCum = matchCumulativeScores?.[playerIndex] ?? 0
+  const matchTarget = matchTargetScore ?? 100
   const templates = table.templates
   const g = table.zones[gridZone(playerIndex)]!.cards
 
@@ -361,6 +465,7 @@ function selectAiSkyjo(
     const comp = remainingUnknownComposition(table, templates, pCount)
     const evUnknown = expectedUnknownCardValue(comp.counts, comp.total)
     const nextP = (playerIndex + 1) % pCount
+    const pending = gameState.pendingDraw!
 
     const swaps = legal.filter((a): a is Extract<GameAction, { type: 'skyjoSwapDrawn' }> => a.type === 'skyjoSwapDrawn')
     const dumps = legal.filter((a): a is Extract<GameAction, { type: 'skyjoDumpDraw' }> => a.type === 'skyjoDumpDraw')
@@ -380,6 +485,19 @@ function selectAiSkyjo(
       const oldToDiscard = c.faceUp ? cardValue(templates, c.templateId) : evUnknown
       const helpsNext = maxDiscardPlacementMerit(table, nextP, templates, oldToDiscard)
       score += helpsNext * 0.45
+      const finishPen = pendingActionFinisherPenalty(
+        table,
+        templates,
+        playerIndex,
+        pending,
+        { type: 'skyjoSwapDrawn', gridIndex: i },
+        pCount,
+        evUnknown,
+        myCum,
+        matchTarget,
+        gameState.skyjoFinisher,
+      )
+      score += finishPen * 0.62
       if (score < bestScore) {
         bestScore = score
         best = a
@@ -399,6 +517,7 @@ function selectAiSkyjo(
 
       let bestDump = dumps[0]!
       let dumpRank = -Infinity
+      let dumpFpen = 0
       for (const a of dumps) {
         const i = a.flipIndex
         const [x, y, z] = columnIndices(i % COLS)
@@ -423,9 +542,23 @@ function selectAiSkyjo(
         ) {
           rank += 50
         }
-        if (rank > dumpRank) {
-          dumpRank = rank
+        const fpen = pendingActionFinisherPenalty(
+          table,
+          templates,
+          playerIndex,
+          pending,
+          { type: 'skyjoDumpDraw', flipIndex: i },
+          pCount,
+          evUnknown,
+          myCum,
+          matchTarget,
+          gameState.skyjoFinisher,
+        )
+        const adjRank = rank - fpen * 0.95
+        if (adjRank > dumpRank) {
+          dumpRank = adjRank
           bestDump = a
+          dumpFpen = fpen
         }
       }
 
@@ -437,10 +570,11 @@ function selectAiSkyjo(
           (pv >= 6 && minSwapDelta >= 1.5) ||
           (pv >= 5 && minSwapDelta >= 3)
         const dumpFeedsNext = pv <= 4 && giftPv > 2.25
-        if (useDump && !dumpFeedsNext) {
+        const dumpTooRisky = dumpFpen * 0.62 > 14 && minSwapDelta <= 2
+        if (useDump && !dumpFeedsNext && !dumpTooRisky) {
           return bestDump
         }
-        if (useDump && dumpFeedsNext && pv >= 9) {
+        if (useDump && dumpFeedsNext && pv >= 9 && !dumpTooRisky) {
           return bestDump
         }
       }
@@ -455,6 +589,7 @@ function selectAiSkyjo(
     const comp = remainingUnknownComposition(table, templates, pCount)
     const evUnknown = expectedUnknownCardValue(comp.counts, comp.total)
     const nextP = (playerIndex + 1) % pCount
+    const pending = gameState.pendingDraw!
     let bestSwap = 0
     let bestGain = -Infinity
     for (let i = 0; i < GRID; i++) {
@@ -463,7 +598,19 @@ function selectAiSkyjo(
       const oldEst = estimatedCellContribution(templates, c)
       const oldToDiscard = c.faceUp ? cardValue(templates, c.templateId) : evUnknown
       const helpsNext = maxDiscardPlacementMerit(table, nextP, templates, oldToDiscard)
-      const gain = oldEst - pv - helpsNext * 0.22
+      const finishPen = pendingActionFinisherPenalty(
+        table,
+        templates,
+        playerIndex,
+        pending,
+        { type: 'skyjoSwapDrawn', gridIndex: i },
+        pCount,
+        evUnknown,
+        myCum,
+        matchTarget,
+        gameState.skyjoFinisher,
+      )
+      const gain = oldEst - pv - helpsNext * 0.22 - finishPen * 0.34
       const bonus = completesColumnTriple(table, playerIndex, templates, i, pv) ? 6 : 0
       if (gain + bonus > bestGain) {
         bestGain = gain + bonus
@@ -473,7 +620,26 @@ function selectAiSkyjo(
     const dumpTh = difficulty === 'easy' ? 11 : 7
     if (!gameState.pendingFromDiscard && pv > dumpTh) {
       const dumps = legal.filter((a) => a.type === 'skyjoDumpDraw')
-      if (dumps.length > 0) return dumps[Math.floor(rng() * dumps.length)]!
+      if (dumps.length > 0) {
+        const scored = dumps.map((a) => ({
+          a,
+          pen: pendingActionFinisherPenalty(
+            table,
+            templates,
+            playerIndex,
+            pending,
+            { type: 'skyjoDumpDraw', flipIndex: a.flipIndex },
+            pCount,
+            evUnknown,
+            myCum,
+            matchTarget,
+            gameState.skyjoFinisher,
+          ),
+        }))
+        scored.sort((x, y) => x.pen - y.pen)
+        if (rng() < 0.55) return scored[0]!.a
+        return dumps[Math.floor(rng() * dumps.length)]!
+      }
     }
     return { type: 'skyjoSwapDrawn', gridIndex: bestSwap }
   }
@@ -884,7 +1050,7 @@ const skyjoModule: GameModule<SkyjoGameState> = {
     if (gameState.currentPlayer !== playerIndex) return null
     const legal = buildLegalActions(table, gameState)
     if (legal.length === 0) return null
-    return selectAiSkyjo(table, gameState, playerIndex, rng, context.difficulty, legal)
+    return selectAiSkyjo(table, gameState, playerIndex, rng, context, legal)
   },
 
   statusText(_table, gameState) {
