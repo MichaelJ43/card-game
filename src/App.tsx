@@ -5,7 +5,7 @@ import { type MatchState } from './core/match'
 import { playerSeatLabel } from './core/playerLabels'
 import { createSession, startNextMatchRound, type CreateSessionOptions, type GameSession } from './session'
 import { GAME_IDS } from './data/manifests'
-import { rulesTextForGame } from './data/rulesSources'
+import { rulesTextForGame, type RulesGameId } from './data/rulesSources'
 import {
   clampAiOpponentCount,
   gameSupportsConfigurableAi,
@@ -828,7 +828,11 @@ function App() {
         </>
       )}
 
-      <RulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} markdown={rulesTextForGame(gameId)} />
+      <RulesModal
+        open={rulesOpen}
+        onClose={() => setRulesOpen(false)}
+        markdown={rulesTextForGame(gameId as RulesGameId)}
+      />
     </div>
   )
 }
