@@ -157,9 +157,7 @@ function App() {
   const [gameId, setGameId] = useState<(typeof GAME_IDS)[number]>('war')
   const [aiOpponents, setAiOpponents] = useState(1)
   const [aiDifficulties, setAiDifficulties] = useState<AiDifficulty[]>(['medium'])
-  const [session, setSession] = useState<GameSession>(() =>
-    createSession('war', Math.random, undefined, { aiCount: 1, aiDifficulties: ['medium'] }),
-  )
+  const [session, setSession] = useState<GameSession | null>(null)
 
   const [gfAwaitingOpponent, setGfAwaitingOpponent] = useState(false)
   const [gfRank, setGfRank] = useState('A')
@@ -184,10 +182,9 @@ function App() {
     [gameId, aiOpponents, aiDifficulties],
   )
 
-  const reset = useCallback(
-    (id: (typeof GAME_IDS)[number]) => {
-      setGameId(id)
-      setSession(createSession(id, Math.random, undefined, makeDealOptions(undefined, id)))
+  const applyFreshDeal = useCallback(
+    (id: (typeof GAME_IDS)[number], options?: CreateSessionOptions) => {
+      setSession(createSession(id, Math.random, undefined, options ?? makeDealOptions(undefined, id)))
       setGfAwaitingOpponent(false)
       setGfRank('A')
       setSkyjoDumpStep('idle')
@@ -195,7 +192,20 @@ function App() {
     [makeDealOptions],
   )
 
+  const onGameIdChange = useCallback((id: (typeof GAME_IDS)[number]) => {
+    setGameId(id)
+    setSession(null)
+    setGfAwaitingOpponent(false)
+    setGfRank('A')
+    setSkyjoDumpStep('idle')
+  }, [])
+
+  const startOrNewDeal = useCallback(() => {
+    applyFreshDeal(gameId)
+  }, [gameId, applyFreshDeal])
+
   const endGame = useCallback(() => {
+    if (!session) return
     if (
       !window.confirm(
         'End this session? The table clears, any match progress is abandoned, and AI count and difficulty settings unlock.',
@@ -207,9 +217,10 @@ function App() {
     setSkyjoDumpStep('idle')
     setGfAwaitingOpponent(false)
     setGfRank('A')
-  }, [gameId, makeDealOptions])
+  }, [session, gameId, makeDealOptions])
 
   const onNextMatchRound = useCallback(() => {
+    if (!session) return
     try {
       const next = startNextMatchRound(session, gameId)
       setSession(next)
@@ -220,6 +231,7 @@ function App() {
 
   const dispatchAction = useCallback((action: GameAction) => {
     setSession((prev) => {
+      if (!prev) return prev
       const result = prev.module.applyAction(prev.table, prev.gameState, action)
       if (result.error) {
         window.alert(result.error)
@@ -233,9 +245,13 @@ function App() {
     })
   }, [])
 
-  const status = useMemo(() => session.module.statusText(session.table, session.gameState), [session])
+  const status = useMemo(() => {
+    if (!session) return ''
+    return session.module.statusText(session.table, session.gameState)
+  }, [session])
 
   const canAdvanceMatch = useMemo(() => {
+    if (!session) return false
     const m = session.match
     if (!m?.config || m.complete) return false
     const mod = session.module
@@ -246,6 +262,7 @@ function App() {
   }, [session])
 
   const matchPreviewTotals = useMemo(() => {
+    if (!session) return null
     const m = session.match
     if (!m?.config || m.complete) return null
     const mod = session.module
@@ -261,7 +278,10 @@ function App() {
     dispatchAction({ type: 'step' })
   }, [dispatchAction])
 
-  const legal = session.module.getLegalActions(session.table, session.gameState)
+  const legal = useMemo(() => {
+    if (!session) return [] as GameAction[]
+    return session.module.getLegalActions(session.table, session.gameState)
+  }, [session])
 
   const legalCustomActions = useMemo(
     () => legal.filter((a): a is Extract<GameAction, { type: 'custom' }> => a.type === 'custom'),
@@ -269,6 +289,7 @@ function App() {
   )
 
   const hidePlayRoundButton = useMemo(() => {
+    if (!session) return false
     const m = session.manifest.module
     return (
       m === 'go-fish' ||
@@ -280,9 +301,10 @@ function App() {
       m === 'crazy-eights' ||
       m === 'uno'
     )
-  }, [session.manifest.module])
+  }, [session])
 
   const activeTurnHighlight = useMemo((): ActiveTurnHighlight | undefined => {
+    if (!session) return undefined
     if (isSkyjoSession(session) && session.gameState.phase !== 'roundOver') {
       return { playerIndex: session.gameState.currentPlayer, zoneIdPrefix: 'grid' }
     }
@@ -305,7 +327,7 @@ function App() {
   }, [session])
 
   const humanRanks = useMemo(() => {
-    if (!isGoFishSession(session)) return [] as string[]
+    if (!session || !isGoFishSession(session)) return [] as string[]
     const hz = session.table.zones['hand:0']?.cards ?? []
     const s = new Set<string>()
     for (const c of hz) {
@@ -316,13 +338,14 @@ function App() {
   }, [session])
 
   useEffect(() => {
+    if (!session) return
     if (!isGoFishSession(session)) return
     const gs = session.gameState
     if (gs.phase !== 'playing' || gs.currentPlayer === 0) return
 
     const handle = window.setTimeout(() => {
       setSession((prev) => {
-        if (!isGoFishSession(prev)) return prev
+        if (!prev || !isGoFishSession(prev)) return prev
         const g = prev.gameState
         if (g.phase !== 'playing' || g.currentPlayer === 0) return prev
         const act = prev.module.selectAiAction(prev.table, prev.gameState, g.currentPlayer, Math.random, {
@@ -339,13 +362,14 @@ function App() {
   }, [session])
 
   useEffect(() => {
+    if (!session) return
     if (!isCrazyEightsSession(session)) return
     const gs = session.gameState as { phase?: string; currentPlayer?: number }
     if (gs.phase !== 'play' || gs.currentPlayer === 0) return
 
     const handle = window.setTimeout(() => {
       setSession((prev) => {
-        if (!isCrazyEightsSession(prev)) return prev
+        if (!prev || !isCrazyEightsSession(prev)) return prev
         const g = prev.gameState as { phase?: string; currentPlayer?: number }
         if (g.phase !== 'play' || g.currentPlayer === 0) return prev
         const act = prev.module.selectAiAction(
@@ -366,13 +390,14 @@ function App() {
   }, [session])
 
   useEffect(() => {
+    if (!session) return
     if (!isUnoSession(session)) return
     const gs = session.gameState as { phase?: string; currentPlayer?: number }
     if (gs.phase !== 'play' || gs.currentPlayer === 0) return
 
     const handle = window.setTimeout(() => {
       setSession((prev) => {
-        if (!isUnoSession(prev)) return prev
+        if (!prev || !isUnoSession(prev)) return prev
         const g = prev.gameState as { phase?: string; currentPlayer?: number }
         if (g.phase !== 'play' || g.currentPlayer === 0) return prev
         const act = prev.module.selectAiAction(
@@ -393,13 +418,14 @@ function App() {
   }, [session])
 
   useEffect(() => {
+    if (!session) return
     if (!isSkyjoSession(session)) return
     const gs = session.gameState
     if (gs.phase === 'roundOver' || gs.currentPlayer === 0) return
 
     const handle = window.setTimeout(() => {
       setSession((prev) => {
-        if (!isSkyjoSession(prev)) return prev
+        if (!prev || !isSkyjoSession(prev)) return prev
         const g = prev.gameState
         if (g.phase === 'roundOver' || g.currentPlayer === 0) return prev
         const act = prev.module.selectAiAction(prev.table, prev.gameState, g.currentPlayer, Math.random, {
@@ -416,6 +442,7 @@ function App() {
   }, [session])
 
   useEffect(() => {
+    if (!session) return
     if (!isSkyjoSession(session)) return
     if (skyjoDumpUiStepShouldReset(session.gameState)) {
       setSkyjoDumpStep('idle')
@@ -431,6 +458,7 @@ function App() {
   }, [aiOpponents])
 
   useEffect(() => {
+    if (!session) return
     if (!isGoFishSession(session)) return
     const g = session.gameState
     if (g.phase !== 'playing' || g.currentPlayer !== 0) {
@@ -438,9 +466,10 @@ function App() {
     }
   }, [session])
 
-  const aiCountLocked = Boolean(session.match && !session.match.complete)
+  const aiCountLocked = Boolean(session?.match && !session.match.complete)
 
   const tableIntentZones = useMemo((): readonly string[] | undefined => {
+    if (!session) return undefined
     if (isSkyjoSession(session) && session.gameState.phase !== 'roundOver' && session.gameState.currentPlayer === 0) {
       const gs = session.gameState
       if (gs.pendingDraw) {
@@ -461,6 +490,7 @@ function App() {
 
   const handleTableIntent = useCallback(
     (intent: TableIntent) => {
+      if (!session) return
       if (isSkyjoSession(session)) {
         const gs = session.gameState
         if (gs.phase === 'roundOver' || gs.currentPlayer !== 0) return
@@ -564,7 +594,7 @@ function App() {
                     <select
                       className="app__select"
                       value={gameId}
-                      onChange={(e) => reset(e.target.value as (typeof GAME_IDS)[number])}
+                      onChange={(e) => onGameIdChange(e.target.value as (typeof GAME_IDS)[number])}
                     >
                       {GAME_IDS.map((id) => (
                         <option key={id} value={id}>
@@ -586,7 +616,7 @@ function App() {
                         title={
                           aiCountLocked
                             ? 'Finish or advance the match before changing player count.'
-                            : `1–${MAX_AI_OPPONENTS} computer players (${1 + aiOpponents} total). Applies on New deal.`
+                            : `1–${MAX_AI_OPPONENTS} computer players (${1 + aiOpponents} total). Applies on Start deal / New deal.`
                         }
                         onChange={(e) => {
                           const n = clampAiOpponentCount(gameId, Number(e.target.value))
@@ -598,8 +628,8 @@ function App() {
                   <div className="app__toolbarActions">
                     <span className="app__toolbarActionsLabel">Actions</span>
                     <div className="app__toolbarActionsBtns">
-                      <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => reset(gameId)}>
-                        New deal
+                      <button type="button" className="app__btnToolbar app__btnSecondary" onClick={startOrNewDeal}>
+                        {session ? 'New deal' : 'Start deal'}
                       </button>
                       <button type="button" className="app__btnSecondary app__btnToolbar" onClick={endGame}>
                         End game
@@ -623,22 +653,25 @@ function App() {
                             : 'Locked for this deal. Changing starts a new deal.'
                         }
                         onChange={(e) => {
+                          const v = normalizeAiDifficulty(e.target.value)
                           if (
+                            session &&
                             !window.confirm(
                               'Changing AI difficulty starts a new deal. Progress for this hand is lost. Continue?',
                             )
                           ) {
                             return
                           }
-                          const v = normalizeAiDifficulty(e.target.value)
                           const next = [...aiDifficulties]
                           next[i] = v
                           while (next.length < aiOpponents) next.push('medium')
                           setAiDifficulties(next)
-                          setSession(createSession(gameId, Math.random, undefined, makeDealOptions(undefined, gameId, next)))
-                          setSkyjoDumpStep('idle')
-                          setGfAwaitingOpponent(false)
-                          setGfRank('A')
+                          if (session) {
+                            setSession(createSession(gameId, Math.random, undefined, makeDealOptions(undefined, gameId, next)))
+                            setSkyjoDumpStep('idle')
+                            setGfAwaitingOpponent(false)
+                            setGfRank('A')
+                          }
                         }}
                       >
                         {AI_DIFFICULTY_OPTIONS.map((opt) => (
@@ -652,7 +685,7 @@ function App() {
                 </div>
               )}
             </div>
-            {session.match && (
+            {session?.match && (
               <div className="app__toolbarScores">
                 <MatchCumulativePanel
                   match={session.match}
@@ -669,108 +702,121 @@ function App() {
         </div>
       </header>
 
-      <p className="app__status" role="status">
-        {status}
-      </p>
-
-      {matchPreviewTotals && session.match && !session.match.complete && (
-        <p className="app__matchPreview" role="status">
-          Totals if you merge this round:{' '}
-          {matchPreviewTotals.map((s, i) => (
-            <span key={i}>
-              {playerSeatLabel(i)}: {s}
-              {i < matchPreviewTotals.length - 1 ? ' · ' : ''}
-            </span>
-          ))}
+      {!session && (
+        <p className="app__lobbyHint" role="status">
+          Select a game, adjust AI options if needed, then press <strong>Start deal</strong>.
         </p>
       )}
-      {canAdvanceMatch && (
-        <div className="app__matchActions">
-          <button type="button" className="app__btnPrimary" onClick={onNextMatchRound}>
-            Next round (apply scores)
-          </button>
-        </div>
-      )}
 
-      <TableView
-        table={session.table}
-        humanPlayerIndex={0}
-        onTableIntent={tableIntentZones ? handleTableIntent : undefined}
-        intentZoneAllowlist={tableIntentZones}
-        pendingStacksColumn={
-          isSkyjoSession(session)
-            ? {
-                card: session.gameState.pendingDraw,
-                skyjoDumpStep: session.gameState.currentPlayer === 0 ? skyjoDumpStep : 'idle',
-              }
-            : undefined
-        }
-        activeTurnHighlight={activeTurnHighlight}
-      />
+      {session && (
+        <>
+          <p className="app__status" role="status">
+            {status}
+          </p>
 
-      <div className="app__actions">
-        {gameId === 'go-fish' && isGoFishSession(session) && session.gameState.phase === 'playing' && session.gameState.currentPlayer === 0 && (
-          <div className="app__goFish">
-            <p className="app__tableIntentHint">
-              {gfAwaitingOpponent
-                ? 'Click an opponent’s hand or books pile to ask for that rank.'
-                : 'Click a card in your hand to choose the rank, then click an opponent’s hand or books.'}
+          {matchPreviewTotals && session.match && !session.match.complete && (
+            <p className="app__matchPreview" role="status">
+              Totals if you merge this round:{' '}
+              {matchPreviewTotals.map((s, i) => (
+                <span key={i}>
+                  {playerSeatLabel(i)}: {s}
+                  {i < matchPreviewTotals.length - 1 ? ' · ' : ''}
+                </span>
+              ))}
             </p>
-            {legal.some((a) => a.type === 'goFishPass') && (
-              <button type="button" className="app__btnSecondary" onClick={() => dispatchAction({ type: 'goFishPass' })}>
-                Pass turn
+          )}
+          {canAdvanceMatch && (
+            <div className="app__matchActions">
+              <button type="button" className="app__btnPrimary" onClick={onNextMatchRound}>
+                Next round (apply scores)
               </button>
-            )}
-          </div>
-        )}
-
-        {gameId === 'skyjo' &&
-          isSkyjoSession(session) &&
-          session.gameState.phase !== 'roundOver' &&
-          session.gameState.currentPlayer === 0 && (
-            <div className="app__skyjo">
-              <p className="app__tableIntentHint">
-                Draw from the deck (left). With a pending card from the deck, click the discard pile to start dump
-                &amp; flip, then a face-down grid card — or Shift+click a face-down card to do it in one step. Click
-                the grid to swap, or (no pending) click the grid to take the visible discard. Pending from the
-                discard pile must be placed (no dump).
-              </p>
             </div>
           )}
 
-        {legalCustomActions.length > 0 && (
-          <div className="app__customActions" role="group" aria-label="Game actions">
-            {legalCustomActions.map((a) => (
+          <TableView
+            table={session.table}
+            humanPlayerIndex={0}
+            onTableIntent={tableIntentZones ? handleTableIntent : undefined}
+            intentZoneAllowlist={tableIntentZones}
+            pendingStacksColumn={
+              isSkyjoSession(session)
+                ? {
+                    card: session.gameState.pendingDraw,
+                    skyjoDumpStep: session.gameState.currentPlayer === 0 ? skyjoDumpStep : 'idle',
+                  }
+                : undefined
+            }
+            activeTurnHighlight={activeTurnHighlight}
+          />
+
+          <div className="app__actions">
+            {gameId === 'go-fish' &&
+              isGoFishSession(session) &&
+              session.gameState.phase === 'playing' &&
+              session.gameState.currentPlayer === 0 && (
+                <div className="app__goFish">
+                  <p className="app__tableIntentHint">
+                    {gfAwaitingOpponent
+                      ? 'Click an opponent’s hand or books pile to ask for that rank.'
+                      : 'Click a card in your hand to choose the rank, then click an opponent’s hand or books.'}
+                  </p>
+                  {legal.some((a) => a.type === 'goFishPass') && (
+                    <button type="button" className="app__btnSecondary" onClick={() => dispatchAction({ type: 'goFishPass' })}>
+                      Pass turn
+                    </button>
+                  )}
+                </div>
+              )}
+
+            {gameId === 'skyjo' &&
+              isSkyjoSession(session) &&
+              session.gameState.phase !== 'roundOver' &&
+              session.gameState.currentPlayer === 0 && (
+                <div className="app__skyjo">
+                  <p className="app__tableIntentHint">
+                    Draw from the deck (left). With a pending card from the deck, click the discard pile to start dump
+                    &amp; flip, then a face-down grid card — or Shift+click a face-down card to do it in one step. Click
+                    the grid to swap, or (no pending) click the grid to take the visible discard. Pending from the
+                    discard pile must be placed (no dump).
+                  </p>
+                </div>
+              )}
+
+            {legalCustomActions.length > 0 && (
+              <div className="app__customActions" role="group" aria-label="Game actions">
+                {legalCustomActions.map((a) => (
+                  <button
+                    key={customActionKey(a)}
+                    type="button"
+                    className="app__btnSecondary"
+                    onClick={() => dispatchAction(a)}
+                  >
+                    {labelCustomAction(a)}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {gameId !== 'go-fish' && gameId !== 'skyjo' && !hidePlayRoundButton && (
               <button
-                key={customActionKey(a)}
                 type="button"
-                className="app__btnSecondary"
-                onClick={() => dispatchAction(a)}
+                className="app__btnPrimary"
+                onClick={onPrimary}
+                disabled={legal.length === 0}
               >
-                {labelCustomAction(a)}
+                {primaryLabel}
               </button>
-            ))}
+            )}
           </div>
-        )}
 
-        {gameId !== 'go-fish' && gameId !== 'skyjo' && !hidePlayRoundButton && (
-          <button
-            type="button"
-            className="app__btnPrimary"
-            onClick={onPrimary}
-            disabled={legal.length === 0}
-          >
-            {primaryLabel}
-          </button>
-        )}
-      </div>
-
-      <footer className="app__footer">
-        <span>
-          {session.manifest.name} — deck <code>{session.manifest.deck}</code> — module{' '}
-          <code>{session.manifest.module}</code>
-        </span>
-      </footer>
+          <footer className="app__footer">
+            <span>
+              {session.manifest.name} — deck <code>{session.manifest.deck}</code> — module{' '}
+              <code>{session.manifest.module}</code>
+            </span>
+          </footer>
+        </>
+      )}
     </div>
   )
 }
