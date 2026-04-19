@@ -188,6 +188,13 @@
   color: var(--text-h, #f3f4f6);
 }
 
+.app__lobbyHint {
+  margin: 0 0 1.25rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  opacity: 0.88;
+}
+
 .app__status {
   margin: 0 0 1.25rem;
   font-size: 0.95rem;

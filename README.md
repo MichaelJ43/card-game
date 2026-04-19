@@ -23,6 +23,8 @@ npm run dev
 
 Then open the URL Vite prints (usually `http://localhost:5173`).
 
+Choosing another entry in the **Game** menu updates the selection only; press **Start deal** (or **New deal** when a hand is already on the table) to shuffle and play.
+
 Production build and local preview of the built assets:
 
 ```bash
