@@ -69,6 +69,148 @@ function columnIndices(c: number): [number, number, number] {
   return [c, c + COLS, c + 2 * COLS]
 }
 
+/** Population mean of the Skyjo deck (−2…12, 150 cards). Used to value unknown grid cells. */
+const SKYJO_DECK_MEAN = 760 / 150
+
+/** Official-style 150-card counts; used for unknown-pile composition. */
+const SKYJO_INITIAL_COUNTS: Readonly<Record<number, number>> = {
+  [-2]: 5,
+  [-1]: 10,
+  [0]: 15,
+  [1]: 10,
+  [2]: 10,
+  [3]: 10,
+  [4]: 10,
+  [5]: 10,
+  [6]: 10,
+  [7]: 10,
+  [8]: 10,
+  [9]: 10,
+  [10]: 10,
+  [11]: 10,
+  [12]: 10,
+}
+
+/** Remaining multiset for cards still face-down on grids or in the draw pile (not known individually). */
+function remainingUnknownComposition(
+  table: TableState,
+  templates: Record<string, CardTemplate>,
+  pCount: number,
+): { counts: Record<number, number>; total: number } {
+  const counts: Record<number, number> = { ...SKYJO_INITIAL_COUNTS }
+  const dec = (v: number) => {
+    counts[v] = (counts[v] ?? 0) - 1
+  }
+  for (const c of table.zones.discard?.cards ?? []) {
+    if (!c || isSlot(c.templateId)) continue
+    dec(cardValue(templates, c.templateId))
+  }
+  for (let p = 0; p < pCount; p++) {
+    for (const c of table.zones[gridZone(p)]!.cards) {
+      if (!c || isSlot(c.templateId)) continue
+      if (c.faceUp) dec(cardValue(templates, c.templateId))
+    }
+  }
+  let total = 0
+  for (const k of Object.keys(counts)) {
+    const n = counts[Number(k)] ?? 0
+    if (n > 0) total += n
+  }
+  return { counts, total }
+}
+
+function expectedUnknownCardValue(counts: Record<number, number>, total: number): number {
+  if (total <= 0) return SKYJO_DECK_MEAN
+  let s = 0
+  for (const [k, n] of Object.entries(counts)) {
+    if (n <= 0) continue
+    s += Number(k) * n
+  }
+  return s / total
+}
+
+/** Average face-up card value on a player’s grid (null if none face-up). */
+function avgFaceUpOnGrid(table: TableState, playerIndex: number, templates: Record<string, CardTemplate>): number | null {
+  const g = table.zones[gridZone(playerIndex)]!.cards
+  let s = 0
+  let n = 0
+  for (const c of g) {
+    if (!c || isSlot(c.templateId) || !c.faceUp) continue
+    s += cardValue(templates, c.templateId)
+    n++
+  }
+  return n > 0 ? s / n : null
+}
+
+/**
+ * Heuristic: how “easy” it is to see value `dv` on the discard again soon — from global counts,
+ * shedding bias (highs get swapped off), and the previous player’s visible average (low visible
+ * ⇒ more hidden mass, often higher, likely to be discarded later).
+ */
+function rediscardPressureForValue(
+  dv: number,
+  counts: Record<number, number>,
+  total: number,
+  prevPlayerAvgFace: number | null,
+): number {
+  if (total <= 0) return 0
+  const share = (counts[dv] ?? 0) / total
+  const shedBoost = 1 + Math.max(0, dv) / 9
+  const prevBoost =
+    prevPlayerAvgFace !== null
+      ? 1 + (Math.max(0, SKYJO_DECK_MEAN - prevPlayerAvgFace) / SKYJO_DECK_MEAN) * 0.55
+      : 1
+  return share * shedBoost * prevBoost
+}
+
+function estimatedCellContribution(templates: Record<string, CardTemplate>, c: CardInstance | undefined): number {
+  if (!c || isSlot(c.templateId)) return 0
+  if (c.faceUp) return cardValue(templates, c.templateId)
+  return SKYJO_DECK_MEAN
+}
+
+/** 1 if placing `placeVal` at `placeIdx` completes a face-up triple in that column. */
+function completesColumnTriple(
+  table: TableState,
+  playerIndex: number,
+  templates: Record<string, CardTemplate>,
+  placeIdx: number,
+  placeVal: number,
+): boolean {
+  const col = placeIdx % COLS
+  const [a, b, d] = columnIndices(col)
+  const g = table.zones[gridZone(playerIndex)]!.cards
+  const vals: number[] = []
+  for (const idx of [a, b, d]) {
+    if (idx === placeIdx) {
+      vals.push(placeVal)
+      continue
+    }
+    const card = g[idx]
+    if (!card || isSlot(card.templateId) || !card.faceUp) return false
+    vals.push(cardValue(templates, card.templateId))
+  }
+  return vals[0] === vals[1] && vals[1] === vals[2]
+}
+
+/** Best (oldEst − dv): positive means discard replaces something worse than dv. */
+function maxDiscardPlacementMerit(
+  table: TableState,
+  playerIndex: number,
+  templates: Record<string, CardTemplate>,
+  dv: number,
+): number {
+  const g = table.zones[gridZone(playerIndex)]!.cards
+  let best = -Infinity
+  for (let i = 0; i < GRID; i++) {
+    const c = g[i]
+    if (!c || isSlot(c.templateId)) continue
+    const oldEst = estimatedCellContribution(templates, c)
+    best = Math.max(best, oldEst - dv)
+  }
+  return best
+}
+
 function makeSlot(): CardInstance {
   return { instanceId: crypto.randomUUID(), templateId: SLOT, faceUp: true }
 }
@@ -205,45 +347,190 @@ function selectAiSkyjo(
   legal: GameAction[],
 ): GameAction {
   const templates = table.templates
+  const g = table.zones[gridZone(playerIndex)]!.cards
 
-  const mediumPending = (): GameAction => {
+  const takeDiscardAction = (): GameAction => {
+    const take = legal.find((a) => a.type === 'skyjoTakeDiscard')
+    return take ?? { type: 'skyjoTakeDiscard', gridIndex: 0 }
+  }
+
+  /** Lower score is better (estimated increase to grid sum, minus bonuses). */
+  const bestPendingActionHard = (): GameAction => {
     const pv = cardValue(templates, gameState.pendingDraw!.templateId)
-    const g = table.zones[gridZone(playerIndex)]!.cards
+    const pCount = gameState.playerCount
+    const comp = remainingUnknownComposition(table, templates, pCount)
+    const evUnknown = expectedUnknownCardValue(comp.counts, comp.total)
+    const nextP = (playerIndex + 1) % pCount
+
+    const swaps = legal.filter((a): a is Extract<GameAction, { type: 'skyjoSwapDrawn' }> => a.type === 'skyjoSwapDrawn')
+    const dumps = legal.filter((a): a is Extract<GameAction, { type: 'skyjoDumpDraw' }> => a.type === 'skyjoDumpDraw')
+
+    let best: GameAction = swaps[0] ?? dumps[0]!
+    let bestScore = Infinity
+
+    for (const a of swaps) {
+      const i = a.gridIndex
+      const c = g[i]
+      if (!c || isSlot(c.templateId)) continue
+      const oldEst = estimatedCellContribution(templates, c)
+      let score = pv - oldEst
+      if (completesColumnTriple(table, playerIndex, templates, i, pv)) {
+        score -= 24
+      }
+      const oldToDiscard = c.faceUp ? cardValue(templates, c.templateId) : evUnknown
+      const helpsNext = maxDiscardPlacementMerit(table, nextP, templates, oldToDiscard)
+      score += helpsNext * 0.45
+      if (score < bestScore) {
+        bestScore = score
+        best = a
+      }
+    }
+
+    if (!gameState.pendingFromDiscard && dumps.length > 0) {
+      const minSwapDelta = swaps.reduce((acc, a) => {
+        const c = g[a.gridIndex]
+        if (!c || isSlot(c.templateId)) return acc
+        const oldEst = estimatedCellContribution(templates, c)
+        return Math.min(acc, pv - oldEst)
+      }, Infinity)
+
+      /** Swap clearly lowers expected sum — keep the card on the grid. */
+      const swapIsStrong = Number.isFinite(minSwapDelta) && minSwapDelta <= -2
+
+      let bestDump = dumps[0]!
+      let dumpRank = -Infinity
+      for (const a of dumps) {
+        const i = a.flipIndex
+        const [x, y, z] = columnIndices(i % COLS)
+        let rank = 0
+        for (const idx of [x, y, z]) {
+          if (idx === i) continue
+          const card = g[idx]
+          if (!card || isSlot(card.templateId) || !card.faceUp) continue
+          rank += cardValue(templates, card.templateId)
+        }
+        const peers = [x, y, z].filter((idx) => idx !== i)
+        const v0 = g[peers[0]!]
+        const v1 = g[peers[1]!]
+        if (
+          v0 &&
+          v1 &&
+          !isSlot(v0.templateId) &&
+          !isSlot(v1.templateId) &&
+          v0.faceUp &&
+          v1.faceUp &&
+          cardValue(templates, v0.templateId) === cardValue(templates, v1.templateId)
+        ) {
+          rank += 50
+        }
+        if (rank > dumpRank) {
+          dumpRank = rank
+          bestDump = a
+        }
+      }
+
+      if (!swapIsStrong) {
+        const giftPv = maxDiscardPlacementMerit(table, nextP, templates, pv)
+        const useDump =
+          pv >= 10 ||
+          (pv >= 8 && minSwapDelta >= 0) ||
+          (pv >= 6 && minSwapDelta >= 1.5) ||
+          (pv >= 5 && minSwapDelta >= 3)
+        const dumpFeedsNext = pv <= 4 && giftPv > 2.25
+        if (useDump && !dumpFeedsNext) {
+          return bestDump
+        }
+        if (useDump && dumpFeedsNext && pv >= 9) {
+          return bestDump
+        }
+      }
+    }
+
+    return best
+  }
+
+  const pendingActionMedium = (): GameAction => {
+    const pv = cardValue(templates, gameState.pendingDraw!.templateId)
+    const pCount = gameState.playerCount
+    const comp = remainingUnknownComposition(table, templates, pCount)
+    const evUnknown = expectedUnknownCardValue(comp.counts, comp.total)
+    const nextP = (playerIndex + 1) % pCount
     let bestSwap = 0
-    let bestScore = -Infinity
+    let bestGain = -Infinity
     for (let i = 0; i < GRID; i++) {
       const c = g[i]
       if (!c || isSlot(c.templateId)) continue
-      const oldv = cardValue(templates, c.templateId)
-      const gain = pv - (c.faceUp ? oldv : 0)
-      if (gain > bestScore) {
-        bestScore = gain
+      const oldEst = estimatedCellContribution(templates, c)
+      const oldToDiscard = c.faceUp ? cardValue(templates, c.templateId) : evUnknown
+      const helpsNext = maxDiscardPlacementMerit(table, nextP, templates, oldToDiscard)
+      const gain = oldEst - pv - helpsNext * 0.22
+      const bonus = completesColumnTriple(table, playerIndex, templates, i, pv) ? 6 : 0
+      if (gain + bonus > bestGain) {
+        bestGain = gain + bonus
         bestSwap = i
       }
     }
-    const dumpTh = difficulty === 'hard' ? 6 : difficulty === 'easy' ? 12 : 8
+    const dumpTh = difficulty === 'easy' ? 11 : 7
     if (!gameState.pendingFromDiscard && pv > dumpTh) {
-      const faceDownIdx = g.findIndex((c) => c && !isSlot(c.templateId) && !c.faceUp)
-      if (faceDownIdx >= 0) {
-        return { type: 'skyjoDumpDraw', flipIndex: faceDownIdx }
-      }
+      const dumps = legal.filter((a) => a.type === 'skyjoDumpDraw')
+      if (dumps.length > 0) return dumps[Math.floor(rng() * dumps.length)]!
     }
     return { type: 'skyjoSwapDrawn', gridIndex: bestSwap }
   }
 
-  const mediumNoPending = (): GameAction => {
+  const noPendingHard = (): GameAction => {
     const disc = topDiscard(table)
-    const dv = disc ? cardValue(table.templates, disc.templateId) : 999
-    const takeMax = difficulty === 'hard' ? 4 : 2
-    if (disc && dv <= takeMax) {
-      return { type: 'skyjoTakeDiscard', gridIndex: Math.floor(rng() * GRID) }
+    const dv = disc ? cardValue(templates, disc.templateId) : 999
+    const drawAvail = table.zones.draw!.cards.length > 0
+    const pCount = gameState.playerCount
+    const comp = remainingUnknownComposition(table, templates, pCount)
+    const evUnknown = expectedUnknownCardValue(comp.counts, comp.total)
+    const prevP = (playerIndex - 1 + pCount) % pCount
+    const nextP = (playerIndex + 1) % pCount
+    const avgPrev = avgFaceUpOnGrid(table, prevP, templates)
+
+    let takeMerit = disc ? maxDiscardPlacementMerit(table, playerIndex, templates, dv) : -Infinity
+    const drawMerit = maxDiscardPlacementMerit(table, playerIndex, templates, evUnknown)
+
+    const takeActions = legal.filter((a) => a.type === 'skyjoTakeDiscard')
+    if (disc && takeActions.length > 0) {
+      const giftNextIfWeDraw = maxDiscardPlacementMerit(table, nextP, templates, dv)
+      takeMerit += giftNextIfWeDraw * 0.42
+      const red = rediscardPressureForValue(dv, comp.counts, comp.total, avgPrev)
+      takeMerit -= red * 2.8
+      if (dv <= 2) return takeDiscardAction()
+      if (takeMerit >= drawMerit + 0.25 && dv <= evUnknown + 1.2) return takeDiscardAction()
+      if (dv <= 4 && takeMerit >= -0.5) return takeDiscardAction()
     }
+    if (drawAvail) {
+      return { type: 'skyjoDraw', from: 'deck' }
+    }
+    if (takeActions.length > 0) return takeDiscardAction()
+    return legal[Math.floor(rng() * legal.length)]!
+  }
+
+  const noPendingMedium = (): GameAction => {
+    const disc = topDiscard(table)
+    const dv = disc ? cardValue(templates, disc.templateId) : 999
+    const pCount = gameState.playerCount
+    const comp = remainingUnknownComposition(table, templates, pCount)
+    const evUnknown = expectedUnknownCardValue(comp.counts, comp.total)
+    const prevP = (playerIndex - 1 + pCount) % pCount
+    const nextP = (playerIndex + 1) % pCount
+    const avgPrev = avgFaceUpOnGrid(table, prevP, templates)
+
+    let takeMerit = disc ? maxDiscardPlacementMerit(table, playerIndex, templates, dv) : -Infinity
+    const drawMerit = maxDiscardPlacementMerit(table, playerIndex, templates, evUnknown)
+    if (disc) {
+      takeMerit += maxDiscardPlacementMerit(table, nextP, templates, dv) * 0.28
+      takeMerit -= rediscardPressureForValue(dv, comp.counts, comp.total, avgPrev) * 1.6
+    }
+    if (disc && dv <= 3) return takeDiscardAction()
+    if (disc && dv <= 6 && takeMerit >= Math.max(1.2, drawMerit - 0.2)) return takeDiscardAction()
     if (table.zones.draw!.cards.length > 0) {
       return { type: 'skyjoDraw', from: 'deck' }
     }
-    if (disc) {
-      return { type: 'skyjoTakeDiscard', gridIndex: Math.floor(rng() * GRID) }
-    }
+    if (disc) return takeDiscardAction()
     return legal[Math.floor(rng() * legal.length)]!
   }
 
@@ -254,7 +541,8 @@ function selectAiSkyjo(
       const pool = [...swaps, ...dumps]
       if (pool.length > 0) return pool[Math.floor(rng() * pool.length)]!
     }
-    return mediumPending()
+    if (difficulty === 'hard') return bestPendingActionHard()
+    return pendingActionMedium()
   }
 
   if (difficulty === 'easy' && rng() < 0.35 && table.zones.draw!.cards.length > 0) {
@@ -262,14 +550,14 @@ function selectAiSkyjo(
   }
 
   if (difficulty === 'hard') {
-    return mediumNoPending()
+    return noPendingHard()
   }
 
   if (difficulty === 'easy' && rng() < 0.42) {
     return legal[Math.floor(rng() * legal.length)]!
   }
 
-  return mediumNoPending()
+  return noPendingMedium()
 }
 
 /** Face-up all real cards so the table matches scoring and the UI can show values after round over. */
