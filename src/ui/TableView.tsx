@@ -148,7 +148,7 @@ export function TableView({
 }: TableViewProps) {
   const order = table.zoneOrder.length ? table.zoneOrder : Object.keys(table.zones)
   const layoutGroups = useMemo(() => buildLayoutGroups(order, table.zones), [order, table.zones])
-  const intentsEnabled = typeof onTableIntent === 'function' && intentZoneAllowlist?.length
+  const intentsEnabled = typeof onTableIntent === 'function' && !!intentZoneAllowlist?.length
 
   const emitCard = (zoneId: string, cardIndex: number, e: MouseEvent<HTMLButtonElement>) => {
     if (!intentsEnabled || !zoneAllowsIntent(zoneId, intentZoneAllowlist)) return
@@ -203,15 +203,16 @@ export function TableView({
           const tmpl = table.templates[card.templateId]
           const inner = <CardView card={card} template={tmpl} showFace={showFace} />
           return (
-            <div
-              key={card.instanceId}
-              className="tableView__cardSlot"
-              style={{
-                zIndex: idx,
-                transform: `translate(${Math.min(idx, 5) * 2}px, ${Math.min(idx, 5) * -1}px)`,
-              }}
-            >
-              {inner}
+            <div key={card.instanceId} className="tableView__cardSlot tableView__cardSlot--enter">
+              <div
+                className="tableView__cardSlotPose"
+                style={{
+                  zIndex: idx,
+                  transform: `translate(${Math.min(idx, 5) * 2}px, ${Math.min(idx, 5) * -1}px)`,
+                }}
+              >
+                {inner}
+              </div>
             </div>
           )
         })}
@@ -291,29 +292,29 @@ export function TableView({
               const showFace = shouldShowFaceForViewer(zone, card, idx, humanPlayerIndex)
               const tmpl = table.templates[card.templateId]
               const cardInteractive = zoneInteractive && zone.kind !== 'stack'
-              const inner = <CardView card={card} template={tmpl} showFace={showFace} />
+              const inner = (
+                <CardView card={card} template={tmpl} showFace={showFace} presentationOnly={cardInteractive} />
+              )
+              const poseStyle =
+                zone.kind === 'grid'
+                  ? undefined
+                  : { transform: `rotate(${-12 + idx * 8}deg) translateY(${idx * 2}px)` }
               return (
-                <div
-                  key={card.instanceId}
-                  className="tableView__cardSlot"
-                  style={
-                    zone.kind === 'grid'
-                      ? undefined
-                      : { transform: `rotate(${-12 + idx * 8}deg) translateY(${idx * 2}px)` }
-                  }
-                >
-                  {cardInteractive ? (
-                    <button
-                      type="button"
-                      className="tableView__cardHit"
-                      aria-label={`${label} card ${idx + 1}`}
-                      onClick={(e) => emitCard(zid, idx, e)}
-                    >
-                      {inner}
-                    </button>
-                  ) : (
-                    inner
-                  )}
+                <div key={card.instanceId} className="tableView__cardSlot tableView__cardSlot--enter">
+                  <div className="tableView__cardSlotPose" style={poseStyle}>
+                    {cardInteractive ? (
+                      <button
+                        type="button"
+                        className="tableView__cardHit"
+                        aria-label={`${label} card ${idx + 1}`}
+                        onClick={(e) => emitCard(zid, idx, e)}
+                      >
+                        {inner}
+                      </button>
+                    ) : (
+                      inner
+                    )}
+                  </div>
                 </div>
               )
             })
@@ -340,8 +341,10 @@ export function TableView({
           </header>
           <div className="tableView__cards tableView__cards--pendingSlot">
             {c ? (
-              <div className="tableView__cardSlot">
-                <CardView card={c} template={tmpl} showFace />
+              <div className="tableView__cardSlot tableView__cardSlot--enter">
+                <div className="tableView__cardSlotPose">
+                  <CardView card={c} template={tmpl} showFace />
+                </div>
               </div>
             ) : (
               <div className="tableView__pendingEmpty">—</div>

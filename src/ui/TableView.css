@@ -163,6 +163,13 @@
   flex-shrink: 0;
 }
 
+.tableView__cards--pendingSlot .cardFlip {
+  width: 4.75rem;
+  height: 6.75rem;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
 .tableView__pendingEmpty {
   opacity: 0.4;
   font-size: 1.35rem;
@@ -333,6 +340,14 @@
   flex-shrink: 1;
 }
 
+.tableView__cards--grid .tableView__cardSlot .cardFlip {
+  box-sizing: border-box;
+  width: min(4.75rem, 100%);
+  height: auto;
+  aspect-ratio: 4.75 / 6.75;
+  flex-shrink: 1;
+}
+
 .tableView__cards--grid .tableView__cardSlot .card--skyjoSlot {
   width: min(4.75rem, 100%);
   height: auto;
@@ -348,8 +363,39 @@
   position: relative;
 }
 
+.tableView__cardSlotPose {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .tableView__cards--stack .tableView__cardSlot {
   position: absolute;
   left: 0;
   top: 0;
+}
+
+/* Subtle enter / zone-change motion (runs on mount; flip handled in CardView) */
+.tableView__cardSlot--enter {
+  animation: tableViewCardArrive 0.44s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+}
+
+@keyframes tableViewCardArrive {
+  from {
+    opacity: 0.55;
+    transform: translateY(12px) scale(0.93);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tableView__cardSlot--enter {
+    animation: none;
+  }
 }
