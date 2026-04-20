@@ -11,10 +11,35 @@
   margin-bottom: 1rem;
 }
 
+.app__headerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.35rem;
+}
+
 .app__title {
   font-size: 1.75rem;
-  margin: 0 0 0.35rem;
+  margin: 0;
   letter-spacing: -0.02em;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.app__audioCues {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  flex: 0 1 auto;
+}
+
+.app__audioCue.app__audioCue--on {
+  border-color: var(--accent-border, rgba(170, 59, 255, 0.5));
+  background: var(--accent-bg, rgba(170, 59, 255, 0.1));
 }
 
 .app__subtitle {
