@@ -12,11 +12,13 @@ import {
   normalizeAiDifficultiesForCount,
   type CreateSessionOptions,
 } from './session/playerConfig'
+import type { SeatProfile } from './session/seatProfiles'
 import { clampMatchTargetScore, createSessionOptionsHouseRules, effectiveReshuffleDiscardWhenDrawEmpty } from './data/houseRules'
 import type { RulesGameId } from './data/rulesSources'
 
 export type { MatchState } from './core/match'
 export type { CreateSessionOptions } from './session/playerConfig'
+export type { SeatProfile } from './session/seatProfiles'
 
 /** Locked at deal time; `difficulties[i]` is for human player index `i + 1`. */
 export interface AiPlayerConfig {
@@ -42,6 +44,8 @@ export interface GameSession<T = unknown> {
   aiPlayerConfig?: AiPlayerConfig
   /** Set for browsers consuming a host snapshot over the network. */
   net?: GameSessionNetMeta
+  /** Per-seat display ids/names for online play (optional for local-only tables). */
+  seatProfiles?: SeatProfile[]
 }
 
 export function createSession(

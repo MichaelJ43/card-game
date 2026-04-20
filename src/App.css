@@ -715,6 +715,51 @@
   margin: 0.15rem 0;
 }
 
+.multiplayerPanel__nameplate {
+  margin-top: 0.65rem;
+  padding: 0.5rem 0.55rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 0.88rem;
+  text-align: left;
+}
+
+.multiplayerPanel__nameplateLabel {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+.multiplayerPanel__nameplateRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.multiplayerPanel__nameplateInput {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+}
+
+.multiplayerPanel__nameplateSave {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.multiplayerPanel__nameplateHint {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
 fieldset.app__houseRules {
   margin: 0;
   padding: 0;

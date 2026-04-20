@@ -6,6 +6,7 @@ import {
   isRoomCode,
   isSignalingMessage,
   isPeerMessage,
+  sanitizeDisplayName,
 } from './protocol'
 import { mulberry32 } from '../core/shuffle'
 
@@ -30,6 +31,19 @@ describe('room codes', () => {
   })
 })
 
+describe('sanitizeDisplayName', () => {
+  it('trims and caps length', () => {
+    expect(sanitizeDisplayName('  River  ')).toBe('River')
+    expect(sanitizeDisplayName('x'.repeat(50))!.length).toBe(40)
+  })
+
+  it('rejects empty', () => {
+    expect(sanitizeDisplayName('')).toBeNull()
+    expect(sanitizeDisplayName('   ')).toBeNull()
+    expect(sanitizeDisplayName(1 as unknown)).toBeNull()
+  })
+})
+
 describe('message type guards', () => {
   it('isSignalingMessage', () => {
     expect(isSignalingMessage({ type: 'hello' })).toBe(true)
@@ -41,6 +55,7 @@ describe('message type guards', () => {
   it('isPeerMessage', () => {
     expect(isPeerMessage({ type: 'snapshot' })).toBe(true)
     expect(isPeerMessage({ type: 'intent' })).toBe(true)
+    expect(isPeerMessage({ type: 'setDisplayName' })).toBe(true)
     expect(isPeerMessage({ type: 'nope' })).toBe(false)
   })
 })

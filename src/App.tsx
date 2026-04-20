@@ -5,6 +5,7 @@ import { type MatchState } from './core/match'
 import { aiPlayerMenuLabel, playerSeatLabel } from './core/playerLabels'
 import { parseGameManifestYaml } from './core/loadYaml'
 import { createSession, startNextMatchRound, type CreateSessionOptions, type GameSession } from './session'
+import { buildDefaultSeatProfiles } from './session/seatProfiles'
 import { createSessionOptionsHouseRules } from './data/houseRules'
 import { GAME_IDS, GAME_SOURCES } from './data/manifests'
 import { rulesTextForGame, type RulesGameId } from './data/rulesSources'
@@ -20,7 +21,12 @@ import {
 import { GameHouseRulesPanel } from './ui/GameHouseRulesPanel'
 import type { RoomClient } from './net/client'
 import type { HostedPeer, RoomHost } from './net/host'
-import type { PeerClientIntent, PeerHostSnapshot } from './net/protocol'
+import {
+  sanitizeDisplayName,
+  type PeerClientIntent,
+  type PeerClientSetDisplayName,
+  type PeerHostSnapshot,
+} from './net/protocol'
 import { parseSessionSnapshot, serializeSessionSnapshot } from './net/sessionSnapshot'
 import { MultiplayerPanel } from './ui/MultiplayerPanel'
 import { RulesModal } from './ui/RulesModal'
@@ -29,6 +35,16 @@ import { skyjoDumpUiStepShouldReset, type SkyjoDumpUiStep } from './ui/tableUiFl
 import type { GameAction } from './core/types'
 import type { GoFishGameState } from './games/go-fish'
 import { isSkyjoSlotTemplateId, type SkyjoGameState } from './games/skyjo'
+import type { MultiplayerNameplateProps } from './ui/MultiplayerPanel'
+
+function attachHostSeatProfilesIfNeeded(
+  sess: GameSession,
+  id: (typeof GAME_IDS)[number],
+  hosting: boolean,
+): GameSession {
+  if (!hosting || !gameSupportsOnlineMultiplayer(id)) return sess
+  return { ...sess, seatProfiles: buildDefaultSeatProfiles(sess.manifest) }
+}
 
 /** Local human’s server seat index (0 = host / solo). */
 function shellHumanSeat(session: GameSession | null): number {
@@ -296,6 +312,8 @@ function App() {
   const [skyjoDumpStep, setSkyjoDumpStep] = useState<SkyjoDumpUiStep>('idle')
   const [rulesOpen, setRulesOpen] = useState(false)
   const [hostClientRoster, setHostClientRoster] = useState<HostedPeer[]>([])
+  /** True while this browser is an active room host (not ref-driven — avoids reading refs during render). */
+  const [multiplayerHostActive, setMultiplayerHostActive] = useState(false)
 
   const selectedManifest = useMemo(() => parseGameManifestYaml(GAME_SOURCES[gameId]), [gameId])
 
@@ -305,6 +323,8 @@ function App() {
   const seatDisplayName = useCallback(
     (serverPlayerIndex: number): string => {
       if (!session) return `Player ${serverPlayerIndex + 1}`
+      const profileLabel = session.seatProfiles?.find((s) => s.seat === serverPlayerIndex)?.displayName?.trim()
+      if (profileLabel) return profileLabel
       const humanCount = session.manifest.players.human
       if (serverPlayerIndex >= humanCount) {
         return aiPlayerMenuLabel(serverPlayerIndex - humanCount)
@@ -394,7 +414,13 @@ function App() {
         openRemotes > 0 && gameSupportsOnlineMultiplayer(id)
           ? { ...baseOpts, remoteHumanCount: openRemotes }
           : baseOpts
-      setSession(createSession(id, Math.random, undefined, withRemotes))
+      const hosting = !!roomHostRef.current
+      const sess = attachHostSeatProfilesIfNeeded(
+        createSession(id, Math.random, undefined, withRemotes),
+        id,
+        hosting,
+      )
+      setSession(sess)
       setGfAwaitingOpponent(false)
       setGfRank('A')
       setSkyjoDumpStep('idle')
@@ -445,6 +471,7 @@ function App() {
 
   const onHostStarted = useCallback((host: RoomHost) => {
     roomHostRef.current = host
+    setMultiplayerHostActive(true)
     setHostClientRoster(host.getRoster())
   }, [])
 
@@ -467,6 +494,36 @@ function App() {
     setGfAwaitingOpponent(false)
     setGfRank('A')
     setSkyjoDumpStep('idle')
+  }, [])
+
+  const onRemoteSetDisplayName = useCallback((msg: PeerClientSetDisplayName, fromPeerId: string) => {
+    const host = roomHostRef.current
+    if (!host) return
+    const roster = host.getRoster()
+    const rec = roster.find((r) => r.peerId === fromPeerId)
+    if (!rec || rec.seat !== msg.seat) {
+      host.ack(fromPeerId, msg.nonce, false, 'Seat mismatch')
+      return
+    }
+    const name = sanitizeDisplayName(msg.displayName)
+    if (!name) {
+      host.ack(fromPeerId, msg.nonce, false, 'Invalid name')
+      return
+    }
+    const prev = sessionRef.current
+    if (!prev?.seatProfiles?.length) {
+      host.ack(fromPeerId, msg.nonce, false, 'No seat roster')
+      return
+    }
+    const ix = prev.seatProfiles.findIndex((s) => s.seat === msg.seat && s.id === msg.playerId)
+    if (ix < 0) {
+      host.ack(fromPeerId, msg.nonce, false, 'Unknown seat id')
+      return
+    }
+    const nextProfiles = prev.seatProfiles.slice()
+    nextProfiles[ix] = { ...nextProfiles[ix]!, displayName: name }
+    setSession({ ...prev, seatProfiles: nextProfiles })
+    host.ack(fromPeerId, msg.nonce, true)
   }, [])
 
   const onRemoteIntent = useCallback((msg: PeerClientIntent, fromPeerId: string) => {
@@ -501,6 +558,7 @@ function App() {
     roomHostRef.current = null
     roomClientRef.current = null
     setJoinedAsClient(false)
+    setMultiplayerHostActive(false)
     setHostClientRoster([])
     setSession(null)
     setGfAwaitingOpponent(false)
@@ -516,12 +574,80 @@ function App() {
   const onNextMatchRound = useCallback(() => {
     if (!session || session.net) return
     try {
-      const next = startNextMatchRound(session, gameId)
+      const next = attachHostSeatProfilesIfNeeded(
+        startNextMatchRound(session, gameId),
+        gameId,
+        !!roomHostRef.current,
+      )
       setSession(next)
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
     }
   }, [session, gameId])
+
+  const commitLocalSeatDisplayName = useCallback((raw: string) => {
+    const name = sanitizeDisplayName(raw)
+    if (!name) return
+    setSession((prev) => {
+      if (!prev?.seatProfiles?.length) return prev
+      const seat = prev.net?.spectator ? null : prev.net ? prev.net.seat : 0
+      if (seat == null) return prev
+      const ix = prev.seatProfiles.findIndex((s) => s.seat === seat)
+      if (ix < 0) return prev
+      const nextProfiles = prev.seatProfiles.slice()
+      nextProfiles[ix] = { ...nextProfiles[ix]!, displayName: name }
+      return { ...prev, seatProfiles: nextProfiles }
+    })
+  }, [])
+
+  const sendDisplayNameToHost = useCallback((raw: string) => {
+    const name = sanitizeDisplayName(raw)
+    if (!name) return
+    const prev = sessionRef.current
+    const c = roomClientRef.current
+    if (!prev?.net || prev.net.spectator || !c) return
+    const seat = prev.net.seat
+    const profile = prev.seatProfiles?.find((s) => s.seat === seat)
+    if (!profile) return
+    c.sendSetDisplayName({
+      nonce: crypto.randomUUID(),
+      seat,
+      playerId: profile.id,
+      displayName: name,
+    })
+  }, [])
+
+  const multiplayerNameplate = useMemo((): Omit<MultiplayerNameplateProps, 'onCommit'> | null => {
+    if (!session?.seatProfiles?.length || !gameSupportsOnlineMultiplayer(gameId)) return null
+    if (session.net?.spectator) return null
+    const seat = session.net ? session.net.seat : 0
+    const profile = session.seatProfiles.find((s) => s.seat === seat)
+    if (!profile) return null
+    const hostTable = !session.net && multiplayerHostActive
+    const clientTable = !!session.net
+    if (!hostTable && !clientTable) return null
+    return {
+      seat: profile.seat,
+      playerId: profile.id,
+      initialName: profile.displayName,
+      disabled: networkSpectator,
+    }
+  }, [session, gameId, networkSpectator, multiplayerHostActive])
+
+  const handleNameplateCommit = useCallback(
+    (raw: string) => {
+      if (sessionRef.current?.net && !sessionRef.current.net.spectator) {
+        sendDisplayNameToHost(raw)
+      } else {
+        commitLocalSeatDisplayName(raw)
+      }
+    },
+    [commitLocalSeatDisplayName, sendDisplayNameToHost],
+  )
+
+  const onPeerAck = useCallback((_nonce: string, ok: boolean, error: string | undefined) => {
+    if (!ok && error) window.alert(error)
+  }, [])
 
   const dispatchAction = useCallback((action: GameAction) => {
     const prev = sessionRef.current
@@ -1098,7 +1224,13 @@ function App() {
                           while (next.length < aiOpponents) next.push('medium')
                           setAiDifficulties(next)
                           if (session) {
-                            setSession(createSession(gameId, Math.random, undefined, makeDealOptions(undefined, gameId, next)))
+                            const hosting = !!roomHostRef.current
+                            const s = attachHostSeatProfilesIfNeeded(
+                              createSession(gameId, Math.random, undefined, makeDealOptions(undefined, gameId, next)),
+                              gameId,
+                              hosting,
+                            )
+                            setSession(s)
                             setSkyjoDumpStep('idle')
                             setGfAwaitingOpponent(false)
                             setGfRank('A')
@@ -1144,8 +1276,15 @@ function App() {
           onClientStarted={onClientStarted}
           onSessionSnapshot={onSessionSnapshot}
           onRemoteIntent={onRemoteIntent}
+          onRemoteSetDisplayName={onRemoteSetDisplayName}
           onHostingRosterChange={onHostingRosterChange}
           onTeardown={onMultiplayerTeardown}
+          onPeerAck={onPeerAck}
+          nameplate={
+            multiplayerNameplate
+              ? { ...multiplayerNameplate, onCommit: handleNameplateCommit }
+              : undefined
+          }
         />
       )}
 

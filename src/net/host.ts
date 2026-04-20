@@ -2,6 +2,7 @@ import { PeerLink, type PeerState } from './peer'
 import {
   PROTOCOL_VERSION,
   type PeerClientIntent,
+  type PeerClientSetDisplayName,
   type PeerHostSnapshot,
   type PeerMessage,
   type SignalingRelay,
@@ -21,7 +22,8 @@ export interface RoomHostOptions {
   token: string
   onRosterChange?: (peers: HostedPeer[]) => void
   onSignalingState?: (state: SignalingState) => void
-  onIntent?: (intent: PeerClientIntent, fromPeerId: string) => void
+  /** Game intents and auxiliary seat updates from clients. */
+  onIntent?: (msg: PeerClientIntent | PeerClientSetDisplayName, fromPeerId: string) => void
 }
 
 interface HostPeerRecord {
@@ -119,7 +121,7 @@ export class RoomHost {
   }
 
   private handlePeerMessage(msg: PeerMessage, fromPeerId: string) {
-    if (msg.type === 'intent') {
+    if (msg.type === 'intent' || msg.type === 'setDisplayName') {
       this.opts.onIntent?.(msg, fromPeerId)
     } else if (msg.type === 'ping') {
       const rec = this.peers.get(fromPeerId)
