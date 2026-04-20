@@ -95,11 +95,32 @@ jobs:
           echo "http_api_url=$(terraform output -raw http_api_url)" >> "$GITHUB_OUTPUT"
           echo "ws_api_url=$(terraform output -raw ws_api_url)" >> "$GITHUB_OUTPUT"
 
+      # Prefer repository Variables when set (stable URLs, no Terraform needed to
+      # change them). Otherwise use Terraform outputs from this apply.
+      - name: Resolve multiplayer URLs for Vite build
+        id: mp
+        env:
+          TF_HTTP: ${{ steps.tf.outputs.http_api_url }}
+          TF_WS: ${{ steps.tf.outputs.ws_api_url }}
+          VAR_HTTP: ${{ vars.VITE_MULTIPLAYER_HTTP_URL }}
+          VAR_WS: ${{ vars.VITE_MULTIPLAYER_WS_URL }}
+        run: |
+          set -e
+          HTTP="${VAR_HTTP:-}"
+          WS="${VAR_WS:-}"
+          if [ -z "$HTTP" ]; then HTTP="${TF_HTTP}"; fi
+          if [ -z "$WS" ]; then WS="${TF_WS}"; fi
+          echo "http=${HTTP}" >> "$GITHUB_OUTPUT"
+          echo "ws=${WS}" >> "$GITHUB_OUTPUT"
+          if [ -z "$HTTP" ] || [ -z "$WS" ]; then
+            echo "::warning::VITE_MULTIPLAYER_HTTP_URL / VITE_MULTIPLAYER_WS_URL are empty after resolve. Set repository Variables (recommended) or ensure Terraform outputs http_api_url and ws_api_url are non-empty."
+          fi
+
       # 3. Build the site with multiplayer endpoints baked in.
       - name: Build site
         env:
-          VITE_MULTIPLAYER_HTTP_URL: ${{ steps.tf.outputs.http_api_url }}
-          VITE_MULTIPLAYER_WS_URL: ${{ steps.tf.outputs.ws_api_url }}
+          VITE_MULTIPLAYER_HTTP_URL: ${{ steps.mp.outputs.http }}
+          VITE_MULTIPLAYER_WS_URL: ${{ steps.mp.outputs.ws }}
         run: npm run build
 
       # 4. Sync static assets to S3 + invalidate CloudFront.

@@ -23,6 +23,10 @@ npm run dev
 
 Then open the URL Vite prints (usually `http://localhost:5173`).
 
+### Online multiplayer (local)
+
+After you have deployed once, copy the **HTTP API** and **WebSocket API** URLs from the GitHub **Deploy** workflow summary (or run `terraform output -raw http_api_url` / `ws_api_url` under `deploy/terraform/aws`). Create `.env.local` from [`.env.example`](.env.example) and set `VITE_MULTIPLAYER_HTTP_URL` and `VITE_MULTIPLAYER_WS_URL`, then restart `npm run dev`.
+
 Choosing another entry in the **Game** menu updates the selection only; press **Start deal** (or **New deal** when a hand is already on the table) to shuffle and play.
 
 Use **Rules** (next to **End game**) to open a modal with the in-app rules for the **currently selected** game (you can read them before **Start deal**).

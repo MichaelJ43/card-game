@@ -289,6 +289,15 @@ Required GitHub configuration (repository **secrets** only — no Variables for 
 
 - `AWS_ROLE_ARN`, `ROOM_JWT_SECRET`, `AWS_REGION`, `TF_STATE_BUCKET`, `TF_STATE_LOCK_TABLE`.
 
+Optional repository **Variables** (plaintext) for Vite — set these so every
+`npm run build` (CI and deploy) bakes in stable API endpoints without depending
+only on the Terraform step output in the same job:
+
+- `VITE_MULTIPLAYER_HTTP_URL` — same value as `terraform output -raw http_api_url` (no trailing slash).
+- `VITE_MULTIPLAYER_WS_URL` — same value as `terraform output -raw ws_api_url` (includes stage path, e.g. `/prod`).
+
+Deploy resolves URLs as: **Variables if non-empty, else Terraform outputs** for that run. Copy the two lines from the last successful **Deploy** job summary into Variables once, then re-run **Deploy** (or push) so CloudFront serves a bundle with multiplayer enabled.
+
 ### Future backlog (not in this PR)
 
 - **TURN relay** for symmetric-NAT / strict-firewall peers (STUN-only may
