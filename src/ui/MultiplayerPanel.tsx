@@ -217,13 +217,24 @@ export function MultiplayerPanel({
 
       {showCompact && mode === 'hosting' && (
         <div className="multiplayerPanel__compact multiplayerPanel__compact--stacked">
-          <div className="multiplayerPanel__compactRow">
-            <span>
+          <div className="multiplayerPanel__compactRow multiplayerPanel__compactRow--split">
+            <span className="multiplayerPanel__compactLead">
               Hosting · code <strong className="multiplayerPanel__code">{roomCode}</strong>
             </span>
-            <button type="button" onClick={() => teardown()}>
-              Close room
-            </button>
+            <div className="multiplayerPanel__compactTail">
+              {nameplate && (
+                <NameplateInline
+                  seat={nameplate.seat}
+                  playerId={nameplate.playerId}
+                  initialName={nameplate.initialName}
+                  disabled={nameplate.disabled}
+                  onCommit={nameplate.onCommit}
+                />
+              )}
+              <button type="button" onClick={() => teardown()}>
+                Close room
+              </button>
+            </div>
           </div>
           {roster.length > 0 ? (
             <ul className="multiplayerPanel__compactRoster" aria-label="Connected clients">
@@ -241,14 +252,25 @@ export function MultiplayerPanel({
 
       {showCompact && mode === 'client' && (
         <div className="multiplayerPanel__compact">
-          <div className="multiplayerPanel__compactRow">
-            <span>
+          <div className="multiplayerPanel__compactRow multiplayerPanel__compactRow--split">
+            <span className="multiplayerPanel__compactLead">
               Joined · code <strong className="multiplayerPanel__code">{roomCode}</strong> · signaling{' '}
               <em>{signalingState}</em> · peer <em>{peerState}</em>
             </span>
-            <button type="button" onClick={() => teardown()}>
-              Leave room
-            </button>
+            <div className="multiplayerPanel__compactTail">
+              {nameplate && (
+                <NameplateInline
+                  seat={nameplate.seat}
+                  playerId={nameplate.playerId}
+                  initialName={nameplate.initialName}
+                  disabled={nameplate.disabled}
+                  onCommit={nameplate.onCommit}
+                />
+              )}
+              <button type="button" onClick={() => teardown()}>
+                Leave room
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -282,16 +304,6 @@ export function MultiplayerPanel({
         </div>
       )}
 
-      {nameplate && tableActive && (
-        <NameplateEditor
-          seat={nameplate.seat}
-          playerId={nameplate.playerId}
-          initialName={nameplate.initialName}
-          disabled={nameplate.disabled}
-          onCommit={nameplate.onCommit}
-        />
-      )}
-
       {status && <p className="multiplayerPanel__status">{status}</p>}
       {error && (
         <p className="multiplayerPanel__error" role="alert">
@@ -302,7 +314,9 @@ export function MultiplayerPanel({
   )
 }
 
-function NameplateEditor({
+const NAMEPLATE_HINT = 'Shown on the table and score card. Does not change your seat.'
+
+function NameplateInline({
   seat,
   playerId,
   initialName,
@@ -314,32 +328,32 @@ function NameplateEditor({
     setDraft(initialName)
   }, [playerId, initialName])
   if (!playerId) return null
+  const inputId = `mp-display-name-${seat}`
   return (
-    <div className="multiplayerPanel__nameplate">
-      <label className="multiplayerPanel__nameplateLabel" htmlFor={`mp-display-name-${seat}`}>
-        Your table name (seat {seat})
+    <div className="multiplayerPanel__nameplateInline" title={NAMEPLATE_HINT}>
+      <label className="multiplayerPanel__nameplateInlineShort" htmlFor={inputId}>
+        Name
       </label>
-      <div className="multiplayerPanel__nameplateRow">
-        <input
-          id={`mp-display-name-${seat}`}
-          className="multiplayerPanel__nameplateInput"
-          type="text"
-          maxLength={40}
-          autoComplete="nickname"
-          value={draft}
-          disabled={disabled}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-        <button
-          type="button"
-          className="multiplayerPanel__nameplateSave"
-          disabled={disabled || !draft.trim()}
-          onClick={() => onCommit(draft)}
-        >
-          Save
-        </button>
-      </div>
-      <p className="multiplayerPanel__nameplateHint">Shown on the table and score card. Does not change your seat.</p>
+      <input
+        id={inputId}
+        className="multiplayerPanel__nameplateInlineInput"
+        type="text"
+        maxLength={40}
+        autoComplete="nickname"
+        value={draft}
+        disabled={disabled}
+        aria-label={`Table display name, seat ${seat}`}
+        onChange={(e) => setDraft(e.target.value)}
+      />
+      <button
+        type="button"
+        className="multiplayerPanel__nameplateInlineSave"
+        disabled={disabled || !draft.trim()}
+        title={NAMEPLATE_HINT}
+        onClick={() => onCommit(draft)}
+      >
+        Save
+      </button>
     </div>
   )
 }
