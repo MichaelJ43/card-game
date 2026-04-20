@@ -1,5 +1,15 @@
 # Mini Baccarat
 
-Same flow as **Baccarat**: bet amount, pick **Player** or **Banker**, then the hands are dealt and scored modulo 10.
+**Mini baccarat** follows the same **Player vs Banker** rules as standard baccarat: compare totals modulo **9**, naturals on **8–9**, and fixed **third-card** rules. The “mini” layout usually means one dealer handles a smaller table and lower limits—here it is implemented with the same core logic as baccarat.
 
-This entry is a separate manifest preset (name / default match settings), not a different rules engine.
+## What to read
+
+1. See **Baccarat** in these rules for numbered steps on card values, naturals, drawing, and typical bets.
+
+## Match (this app)
+
+1. Chip stacks and a **match target** may apply; check the cumulative panel and **Rules → Options** if the match target is configurable for this manifest.
+
+## Playing in this app
+
+1. Place bets and step the round with the on-screen controls; follow the status text for each outcome.

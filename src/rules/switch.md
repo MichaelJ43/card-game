@@ -1,5 +1,16 @@
-# Switch
+# Switch (UK-style)
 
-**Switch** uses the **same rules as Crazy Eights** in this app (match rank or suit, eights change suit, draw when needed).
+Switch is closely related to **Crazy Eights**: shed cards by matching **rank** or **suit** to the discard, with **power cards** that skip, reverse, or force draws depending on the rule set. This app’s Switch manifest may differ slightly from Crazy Eights—follow the **legal actions** and status line.
 
-Pick this menu item for an alternate packaged preset. See **Crazy Eights** for how to play on the table.
+## Goal
+
+1. Be first to **play all your cards**, or win a **match** to a point total if scoring is enabled.
+
+## Typical turn
+
+1. Play one legal card, or **draw** if you cannot (per module rules).
+1. **Blackjack (the rank “blackjack” in some decks)** or other specials may act as wilds—confirm with the on-table hints.
+
+## Playing in this app
+
+1. Use the same control pattern as Crazy Eights: draw and play from your hand; pay attention to **turn order** if skip/reverse cards exist.

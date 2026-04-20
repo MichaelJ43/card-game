@@ -15,6 +15,17 @@ export interface CreateSessionOptions {
    * in the shell. Use for “end game” / practice table.
    */
   skipMatch?: boolean
+  /**
+   * Override match end threshold when the manifest enables match (e.g. Skyjo 100 → custom).
+   * Ignored when continuing a match via `carryMatch` (existing {@link MatchState} keeps its config).
+   */
+  matchTargetScore?: number
+  /** Skyjo: discard can only replace face-up grid cards. */
+  skyjoDiscardSwapFaceUpOnly?: boolean
+  /** Blackjack: dealer hits soft 17. */
+  dealerHitsSoft17?: boolean
+  /** War: face-down cards per player before tie-break flip (1 quick, 3 classic). */
+  warTieDownCards?: 1 | 3
 }
 
 const CONFIGURABLE_AI_GAME_IDS = new Set([

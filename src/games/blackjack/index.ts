@@ -4,7 +4,7 @@ import { registerGameModule } from '../../core/registry'
 import { mulberry32, shuffleInPlace } from '../../core/shuffle'
 import { cloneTable, createEmptyTable, moveTop } from '../../core/table'
 import type { TableState } from '../../core/types'
-import { blackjackValue, isBlackjack } from '../standard/cardUtils'
+import { blackjackValue, isBlackjack, isSoftBlackjack17 } from '../standard/cardUtils'
 
 function cmd(payload: Record<string, unknown> | undefined): string {
   return typeof payload?.cmd === 'string' ? payload.cmd : ''
@@ -20,6 +20,8 @@ export interface BlackjackGameState {
   bet: number
   roundDelta: [number, number] | null
   message: string
+  /** House rule: dealer draws again on soft 17. */
+  dealerHitsSoft17: boolean
 }
 
 function startingStacks(ctx: GameModuleContext, pCount: number): number[] {
@@ -39,11 +41,25 @@ function dealInitial(table: TableState, pCount: number): void {
   }
 }
 
-function dealerPlay(table: TableState, templates: Record<string, CardTemplate>): void {
+function dealerPlay(
+  table: TableState,
+  templates: Record<string, CardTemplate>,
+  dealerHitsSoft17: boolean,
+): void {
   const h = table.zones['hand:1']!.cards
   for (const c of h) c.faceUp = true
-  while (blackjackValue(templates, h.map((c) => c.templateId)) < 17 && table.zones.draw!.cards.length > 0) {
-    moveTop(table, 'draw', 'hand:1', true)
+  while (table.zones.draw!.cards.length > 0) {
+    const ids = h.map((c) => c.templateId)
+    const v = blackjackValue(templates, ids)
+    if (v < 17) {
+      moveTop(table, 'draw', 'hand:1', true)
+      continue
+    }
+    if (v === 17 && dealerHitsSoft17 && isSoftBlackjack17(templates, ids)) {
+      moveTop(table, 'draw', 'hand:1', true)
+      continue
+    }
+    break
   }
 }
 
@@ -53,6 +69,7 @@ const blackjackModule: GameModule<BlackjackGameState> = {
   setup(ctx: GameModuleContext, instances: CardInstance[]) {
     const pCount = totalPlayers(ctx.manifest)
     if (pCount !== 2) throw new Error('Blackjack module expects exactly 2 players (you + dealer).')
+    const dealerHitsSoft17 = ctx.dealerHitsSoft17 ?? false
     const rng = mulberry32(Math.floor(ctx.rng() * 0xffffffff))
     const zoneIds = ['draw', 'hand:0', 'hand:1']
     const table = createEmptyTable(ctx.templates, zoneIds, [
@@ -74,6 +91,7 @@ const blackjackModule: GameModule<BlackjackGameState> = {
         bet: 0,
         roundDelta: null,
         message: 'Place a bet (chips). Min 1, max 25 or your stack.',
+        dealerHitsSoft17,
       },
     }
   },
@@ -159,6 +177,7 @@ const blackjackModule: GameModule<BlackjackGameState> = {
             bet,
             roundDelta,
             message,
+            dealerHitsSoft17: gs.dealerHitsSoft17,
           },
         }
       }
@@ -171,6 +190,7 @@ const blackjackModule: GameModule<BlackjackGameState> = {
           bet,
           roundDelta,
           message,
+          dealerHitsSoft17: gs.dealerHitsSoft17,
         },
       }
     }
@@ -194,6 +214,7 @@ const blackjackModule: GameModule<BlackjackGameState> = {
               bet: gs.bet,
               roundDelta: [d0, d1],
               message: 'Bust — dealer wins.',
+              dealerHitsSoft17: gs.dealerHitsSoft17,
             },
           }
         }
@@ -203,7 +224,7 @@ const blackjackModule: GameModule<BlackjackGameState> = {
         }
       }
       if (c === 'bjStand') {
-        dealerPlay(t, templates)
+        dealerPlay(t, templates, gs.dealerHitsSoft17)
         const pv = blackjackValue(templates, pl.map((x) => x.templateId))
         const dv = blackjackValue(templates, dl.map((x) => x.templateId))
         let d0 = 0
@@ -234,6 +255,7 @@ const blackjackModule: GameModule<BlackjackGameState> = {
             bet: gs.bet,
             roundDelta: [d0, d1],
             message,
+            dealerHitsSoft17: gs.dealerHitsSoft17,
           },
         }
       }

@@ -3,8 +3,10 @@ import './App.css'
 import { AI_DIFFICULTY_OPTIONS, normalizeAiDifficulty, type AiDifficulty } from './core/aiContext'
 import { type MatchState } from './core/match'
 import { playerSeatLabel } from './core/playerLabels'
+import { parseGameManifestYaml } from './core/loadYaml'
 import { createSession, startNextMatchRound, type CreateSessionOptions, type GameSession } from './session'
-import { GAME_IDS } from './data/manifests'
+import { createSessionOptionsHouseRules } from './data/houseRules'
+import { GAME_IDS, GAME_SOURCES } from './data/manifests'
 import { rulesTextForGame, type RulesGameId } from './data/rulesSources'
 import {
   clampAiOpponentCount,
@@ -13,6 +15,7 @@ import {
   MAX_AI_OPPONENTS,
   normalizeAiDifficultiesForCount,
 } from './session/playerConfig'
+import { GameHouseRulesPanel } from './ui/GameHouseRulesPanel'
 import { RulesModal } from './ui/RulesModal'
 import { TableView, type ActiveTurnHighlight, type TableIntent } from './ui/TableView'
 import { skyjoDumpUiStepShouldReset, type SkyjoDumpUiStep } from './ui/tableUiFlow'
@@ -166,20 +169,27 @@ function App() {
   const [skyjoDumpStep, setSkyjoDumpStep] = useState<SkyjoDumpUiStep>('idle')
   const [rulesOpen, setRulesOpen] = useState(false)
 
+  const selectedManifest = useMemo(() => parseGameManifestYaml(GAME_SOURCES[gameId]), [gameId])
+
   const makeDealOptions = useCallback(
     (
       skipMatch?: boolean,
       forGameId: (typeof GAME_IDS)[number] = gameId,
       difficultyList?: AiDifficulty[],
     ): CreateSessionOptions | undefined => {
+      const house = createSessionOptionsHouseRules(forGameId as RulesGameId)
       if (!gameSupportsConfigurableAi(forGameId)) {
-        return skipMatch ? { skipMatch: true } : undefined
+        if (skipMatch) {
+          return { skipMatch: true, ...house }
+        }
+        return Object.keys(house).length ? house : undefined
       }
       const diffs = difficultyList ?? aiDifficulties
       return {
         aiCount: aiOpponents,
         aiDifficulties: normalizeAiDifficultiesForCount(aiOpponents, diffs),
         ...(skipMatch ? { skipMatch: true } : {}),
+        ...house,
       }
     },
     [gameId, aiOpponents, aiDifficulties],
@@ -539,6 +549,15 @@ function App() {
               dispatchAction({ type: 'skyjoSwapDrawn', gridIndex: idx })
             }
           } else {
+            if (
+              gs.discardSwapFaceUpOnly &&
+              (!cell || isSkyjoSlotTemplateId(cell.templateId) || !cell.faceUp)
+            ) {
+              window.alert(
+                'House rule: take the discard only by clicking a face-up card on your grid (the card you will replace).',
+              )
+              return
+            }
             dispatchAction({ type: 'skyjoTakeDiscard', gridIndex: idx })
           }
         }
@@ -791,6 +810,12 @@ function App() {
                     the grid to swap, or (no pending) click the grid to take the visible discard. Pending from the
                     discard pile must be placed (no dump).
                   </p>
+                  {session.gameState.discardSwapFaceUpOnly && (
+                    <p className="app__tableIntentHint app__tableIntentHint--sub">
+                      House rule: you may only take the discard by choosing a <strong>face-up</strong> card to replace;
+                      face-down spaces are filled from the deck only.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -834,6 +859,7 @@ function App() {
         open={rulesOpen}
         onClose={() => setRulesOpen(false)}
         markdown={rulesTextForGame(gameId as RulesGameId)}
+        optionsPanel={<GameHouseRulesPanel gameId={gameId as RulesGameId} manifest={selectedManifest} />}
       />
     </div>
   )

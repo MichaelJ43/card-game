@@ -12,6 +12,7 @@ import {
   normalizeAiDifficultiesForCount,
   type CreateSessionOptions,
 } from './session/playerConfig'
+import { clampMatchTargetScore } from './data/houseRules'
 
 export type { MatchState } from './core/match'
 export type { CreateSessionOptions } from './session/playerConfig'
@@ -43,6 +44,16 @@ export function createSession(
 
   let manifest = parseGameManifestYaml(raw)
   manifest = manifestWithAiOpponents(manifest, gameId, options?.aiCount)
+
+  if (!carryMatch && options?.matchTargetScore != null && manifest.match?.enabled) {
+    const def = typeof manifest.match.targetScore === 'number' ? manifest.match.targetScore : 100
+    const t = clampMatchTargetScore(options.matchTargetScore, def)
+    manifest = {
+      ...manifest,
+      match: { ...manifest.match!, targetScore: t },
+    }
+  }
+
   const nAi = manifest.players.ai
   const aiPlayerConfig: AiPlayerConfig | undefined =
     nAi > 0
@@ -60,7 +71,15 @@ export function createSession(
     options?.skipMatch === true ? undefined : carryMatch ?? createInitialMatchState(manifest)
 
   const { table, gameState } = mod.setup(
-    { manifest, templates, rng, matchCumulativeScores: match?.cumulativeScores },
+    {
+      manifest,
+      templates,
+      rng,
+      matchCumulativeScores: match?.cumulativeScores,
+      dealerHitsSoft17: options?.dealerHitsSoft17,
+      warTieDownCards: options?.warTieDownCards,
+      skyjoDiscardSwapFaceUpOnly: options?.skyjoDiscardSwapFaceUpOnly,
+    },
     instances,
   )
   return { manifest, module: mod as GameModule, table, gameState, match, aiPlayerConfig }
@@ -96,8 +115,27 @@ export function startNextMatchRound(
   if (nextMatch.complete) {
     return { ...prev, match: nextMatch }
   }
-  return createSession(gameId, rng, nextMatch, {
+  return createSession(gameId, rng, nextMatch, continuationOptionsFromSession(prev))
+}
+
+/** Preserve house rules and match threshold when dealing the next round. */
+export function continuationOptionsFromSession(prev: GameSession): CreateSessionOptions {
+  const base: CreateSessionOptions = {
     aiCount: prev.manifest.players.ai,
     aiDifficulties: prev.aiPlayerConfig?.difficulties,
-  })
+  }
+  if (prev.match) {
+    base.matchTargetScore = prev.match.config.targetScore
+  }
+  const gs = prev.gameState as Record<string, unknown>
+  if (prev.manifest.module === 'skyjo' && typeof gs.discardSwapFaceUpOnly === 'boolean') {
+    base.skyjoDiscardSwapFaceUpOnly = gs.discardSwapFaceUpOnly
+  }
+  if (prev.manifest.module === 'blackjack' && typeof gs.dealerHitsSoft17 === 'boolean') {
+    base.dealerHitsSoft17 = gs.dealerHitsSoft17
+  }
+  if (prev.manifest.module === 'war' && (gs.tieDownCards === 1 || gs.tieDownCards === 3)) {
+    base.warTieDownCards = gs.tieDownCards
+  }
+  return base
 }

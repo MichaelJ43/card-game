@@ -51,14 +51,17 @@ export interface WarGameState {
   winnerIndex: number | null
   message: string
   playerCount: number
+  /** Face-down cards each player puts out before the tie-break flip (1 quick, 3 classic). */
+  tieDownCards: 1 | 3
 }
 
-/** Classic War for 2+ players: one face-up per player; ties trigger war (3 down + 1 up). */
+/** Classic War for 2+ players: one face-up per player; ties trigger war (N down + 1 up). */
 function resolveSkirmish(
   table: TableState,
   templates: Record<string, CardTemplate>,
   playerCount: number,
   rng: () => number,
+  tieDownCards: 1 | 3,
 ): { message: string } {
   const skirmish = table.zones.skirmish.cards
   skirmish.length = 0
@@ -108,7 +111,7 @@ function resolveSkirmish(
   let guard = 0
   while (leaders.length > 1 && guard++ < 500) {
     for (const p of leaders) {
-      for (let k = 0; k < 3; k++) {
+      for (let k = 0; k < tieDownCards; k++) {
         if (piles[p]!.length === 0) break
         const c = piles[p]!.pop()!
         c.faceUp = false
@@ -164,6 +167,8 @@ const warModule: GameModule<WarGameState> = {
 
   setup(ctx: GameModuleContext, instances: CardInstance[]) {
     const { manifest, templates, rng } = ctx
+    const rawTie = ctx.warTieDownCards
+    const tieDownCards: 1 | 3 = rawTie === 1 ? 1 : 3
     const pCount = totalPlayers(manifest)
     const zoneIds = [...Array.from({ length: pCount }, (_, i) => pileId(i)), 'skirmish']
     const table = createEmptyTable(templates, zoneIds, [
@@ -186,6 +191,7 @@ const warModule: GameModule<WarGameState> = {
         winnerIndex: null,
         message: 'Click “Play round” to battle.',
         playerCount: pCount,
+        tieDownCards,
       },
     }
   },
@@ -207,7 +213,7 @@ const warModule: GameModule<WarGameState> = {
     const pCount = gameState.playerCount
 
     const rng = mulberry32(Math.floor(Math.random() * 0xffffffff))
-    const result = resolveSkirmish(t, t.templates, pCount, rng)
+    const result = resolveSkirmish(t, t.templates, pCount, rng, gameState.tieDownCards)
     let message = result.message
     let winnerIndex = gameState.winnerIndex
     let phase: WarGameState['phase'] = 'playing'
@@ -228,6 +234,7 @@ const warModule: GameModule<WarGameState> = {
         winnerIndex,
         message,
         playerCount: pCount,
+        tieDownCards: gameState.tieDownCards,
       },
     }
   },

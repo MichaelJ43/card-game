@@ -1,7 +1,15 @@
-# High-card duel
+# High Card Duel
 
-Each side antes **5** or **10** chips (when both can cover it). One card each; **higher rank wins** the pot (**aces high**). **Tie** refunds the antes.
+A simple **betting** duel: you and the dealer each receive a **single** card (or a small hand, per module). Higher card wins; ties may push or follow a house rule in the app.
 
-**Chips:** use **Next round (apply scores)** when the match module finishes a scoring round. Toolbar shows this variant’s chip goal.
+## Card strength
 
-**Players:** you vs one AI.
+1. Usually **ace high**, **2** low, with standard ordering in between.
+
+## Goal
+
+1. **Win bets** by beating the dealer’s card more often than you lose over a **match** (if chip tracking is enabled).
+
+## Playing in this app
+
+1. Place the **ante** or bet action, then reveal or step the round as prompted.
