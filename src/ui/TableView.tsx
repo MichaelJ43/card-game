@@ -21,6 +21,11 @@ export interface TableViewProps {
   /** Player index for the human; their pile cards can be shown face-down but “owned” */
   humanPlayerIndex?: number
   /**
+   * Server seat index → display name for opponents (not used for the viewer seat; that stays “You” / “Your …”).
+   * When omitted, {@link playerSeatLabel} is used for other seats.
+   */
+  getSeatDisplayName?: (serverPlayerIndex: number) => string
+  /**
    * When set together with {@link intentZoneAllowlist}, card and stack clicks emit intents.
    * Games map these to {@link import('../core/types').GameAction}s in the shell (e.g. App).
    */
@@ -49,34 +54,35 @@ function zoneAllowsIntent(zoneId: string, allowlist: readonly string[] | undefin
   return !!allowlist?.length && allowlist.includes(zoneId)
 }
 
-function zoneLabel(zone: Zone, humanPlayerIndex: number): string {
+function zoneLabel(zone: Zone, humanPlayerIndex: number, getSeatDisplayName?: (i: number) => string): string {
+  const other = (i: number) => getSeatDisplayName?.(i) ?? playerSeatLabel(i, humanPlayerIndex)
   if (zone.id === 'skirmish') return 'Table (skirmish)'
   if (zone.id === 'discard') return 'Discard pile'
   if (zone.id === 'stock' || zone.id === 'draw') return 'Draw pile'
   const b = /^books:(\d+)$/.exec(zone.id)
   if (b) {
     const i = Number(b[1])
-    return i === humanPlayerIndex ? 'Your books' : `${playerSeatLabel(i, humanPlayerIndex)}'s books`
+    return i === humanPlayerIndex ? 'Your books' : `${other(i)}'s books`
   }
   const h = /^hand:(\d+)$/.exec(zone.id)
   if (h) {
     const i = Number(h[1])
-    return i === humanPlayerIndex ? 'Your hand' : `${playerSeatLabel(i, humanPlayerIndex)}'s hand`
+    return i === humanPlayerIndex ? 'Your hand' : `${other(i)}'s hand`
   }
   const m = /^pile:(\d+)$/.exec(zone.id)
   if (m) {
     const i = Number(m[1])
-    return i === humanPlayerIndex ? 'You' : `${playerSeatLabel(i, humanPlayerIndex)} (AI)`
+    return i === humanPlayerIndex ? 'You' : other(i)
   }
   const s = /^show:(\d+)$/.exec(zone.id)
   if (s) {
     const i = Number(s[1])
-    return i === humanPlayerIndex ? 'Your card' : playerSeatLabel(i, humanPlayerIndex)
+    return i === humanPlayerIndex ? 'Your card' : other(i)
   }
   const g = /^grid:(\d+)$/.exec(zone.id)
   if (g) {
     const i = Number(g[1])
-    return i === humanPlayerIndex ? 'Your grid (3×4)' : `${playerSeatLabel(i, humanPlayerIndex)}'s grid`
+    return i === humanPlayerIndex ? 'Your grid (3×4)' : `${other(i)}'s grid`
   }
   return zone.id
 }
@@ -140,6 +146,7 @@ function buildLayoutGroups(order: string[], zones: TableState['zones']): LayoutG
 export function TableView({
   table,
   humanPlayerIndex = 0,
+  getSeatDisplayName,
   onTableIntent,
   intentZoneAllowlist,
   pendingStacksColumn,
@@ -185,7 +192,7 @@ export function TableView({
     const zone = table.zones[zid]
     if (!zone || zone.kind !== 'stack') return null
     const cards = zone.cards
-    const label = zoneLabel(zone, humanPlayerIndex)
+    const label = zoneLabel(zone, humanPlayerIndex, getSeatDisplayName)
     const zoneInteractive = intentsEnabled && zoneAllowsIntent(zid, intentZoneAllowlist)
     return (
       <>
@@ -223,7 +230,7 @@ export function TableView({
     const zone = table.zones[zid]
     if (!zone) return null
     const cards = zone.cards
-    const label = zoneLabel(zone, humanPlayerIndex)
+    const label = zoneLabel(zone, humanPlayerIndex, getSeatDisplayName)
     const zoneInteractive = intentsEnabled && zoneAllowsIntent(zid, intentZoneAllowlist)
 
     const activeTurn =

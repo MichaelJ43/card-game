@@ -22,7 +22,7 @@ export interface MultiplayerPanelProps {
   /** Client → host game intents (host only). */
   onRemoteIntent?: (intent: PeerClientIntent, fromPeerId: string) => void
   /** Host roster changed (e.g. client connected); parent may push a table snapshot. */
-  onHostingRosterChange?: () => void
+  onHostingRosterChange?: (peers: HostedPeer[]) => void
   /** Any multiplayer teardown (Close room, Leave room, or host disconnect). */
   onTeardown?: (wasHost: boolean) => void
   onClosed?: () => void
@@ -97,7 +97,7 @@ export function MultiplayerPanel({
         onSignalingState: setSignalingState,
         onRosterChange: (peers) => {
           setRoster(peers)
-          onHostingRosterChange?.()
+          onHostingRosterChange?.(peers)
         },
         onIntent: (msg, from) => {
           if (msg.type === 'intent') onRemoteIntent?.(msg, from)
