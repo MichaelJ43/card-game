@@ -1,3 +1,4 @@
+import { recycleDiscardIntoDrawWhenEmpty, isDeckDrawAvailableAfterOptionalRecycle } from '../../core/discardRecycle'
 import type { ApplyResult, GameModule, SelectAiContext } from '../../core/gameModule'
 import type { CardInstance, CardTemplate, GameAction, GameManifestYaml } from '../../core/types'
 import { registerGameModule } from '../../core/registry'
@@ -61,7 +62,7 @@ function legalForSeat(table: TableState, gs: ThirtyOneGameState, cur: number): G
   if (hz.length !== 3) return []
   const out: GameAction[] = []
   out.push({ type: 'custom', payload: { cmd: 't31Knock' } })
-  if (table.zones.draw!.cards.length > 0) {
+  if (isDeckDrawAvailableAfterOptionalRecycle(table, gs.reshuffleDiscardWhenDrawEmpty, true)) {
     for (let i = 0; i < hz.length; i++) {
       out.push({ type: 'custom', payload: { cmd: 't31DrawStock', discardIndex: i } })
     }
@@ -80,6 +81,7 @@ export interface ThirtyOneGameState {
   currentPlayer: number
   message: string
   roundScores: number[] | null
+  reshuffleDiscardWhenDrawEmpty: boolean
 }
 
 const thirtyOneModule: GameModule<ThirtyOneGameState> = {
@@ -119,6 +121,7 @@ const thirtyOneModule: GameModule<ThirtyOneGameState> = {
         currentPlayer: 0,
         message: 'Draw or take discard, then discard. Knock to end the round now.',
         roundScores: null,
+        reshuffleDiscardWhenDrawEmpty: ctx.reshuffleDiscardWhenDrawEmpty ?? false,
       },
     }
   },
@@ -160,6 +163,10 @@ const thirtyOneModule: GameModule<ThirtyOneGameState> = {
       if (c === 't31DrawStock') {
         const di = Number((action.payload as { discardIndex?: unknown }).discardIndex)
         if (!Number.isInteger(di) || di < 0 || di >= hz.length) return { table: t, gameState: gs, error: 'Bad discard index.' }
+        recycleDiscardIntoDrawWhenEmpty(t, () => Math.random(), {
+          enabled: gs.reshuffleDiscardWhenDrawEmpty,
+          preserveTopDiscard: true,
+        })
         if (t.zones.draw!.cards.length === 0) return { table: t, gameState: gs, error: 'Deck empty.' }
         const drawn = moveTop(t, 'draw', handId(cur), cur === 0)
         if (!drawn) return { table: t, gameState: gs, error: 'Draw failed.' }
@@ -172,6 +179,10 @@ const thirtyOneModule: GameModule<ThirtyOneGameState> = {
           currentPlayer: (cur + 1) % pc,
           message: 'Next player’s turn.',
         }
+        recycleDiscardIntoDrawWhenEmpty(t, () => Math.random(), {
+          enabled: gs.reshuffleDiscardWhenDrawEmpty,
+          preserveTopDiscard: true,
+        })
         if (t.zones.draw!.cards.length === 0) {
           const { winner } = showdownScores(t, pc)
           return finishRound(next, winner)
@@ -194,6 +205,10 @@ const thirtyOneModule: GameModule<ThirtyOneGameState> = {
           currentPlayer: (cur + 1) % pc,
           message: 'Next player’s turn.',
         }
+        recycleDiscardIntoDrawWhenEmpty(t, () => Math.random(), {
+          enabled: gs.reshuffleDiscardWhenDrawEmpty,
+          preserveTopDiscard: true,
+        })
         if (t.zones.draw!.cards.length === 0) {
           const { winner } = showdownScores(t, pc)
           return finishRound(next, winner)

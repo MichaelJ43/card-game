@@ -26,6 +26,10 @@ export interface CreateSessionOptions {
   dealerHitsSoft17?: boolean
   /** War: face-down cards per player before tie-break flip (1 quick, 3 classic). */
   warTieDownCards?: 1 | 3
+  /**
+   * Override “shuffle discard into draw when draw is empty” for games that support it (see house rules).
+   */
+  reshuffleDiscardWhenDrawEmpty?: boolean
 }
 
 const CONFIGURABLE_AI_GAME_IDS = new Set([

@@ -12,7 +12,8 @@ import {
   normalizeAiDifficultiesForCount,
   type CreateSessionOptions,
 } from './session/playerConfig'
-import { clampMatchTargetScore } from './data/houseRules'
+import { clampMatchTargetScore, createSessionOptionsHouseRules, effectiveReshuffleDiscardWhenDrawEmpty } from './data/houseRules'
+import type { RulesGameId } from './data/rulesSources'
 
 export type { MatchState } from './core/match'
 export type { CreateSessionOptions } from './session/playerConfig'
@@ -70,6 +71,12 @@ export function createSession(
   const match: MatchState | undefined =
     options?.skipMatch === true ? undefined : carryMatch ?? createInitialMatchState(manifest)
 
+  const reshuffleDiscardWhenDrawEmpty = effectiveReshuffleDiscardWhenDrawEmpty(
+    gameId as RulesGameId,
+    manifest,
+    options,
+  )
+
   const { table, gameState } = mod.setup(
     {
       manifest,
@@ -79,6 +86,7 @@ export function createSession(
       dealerHitsSoft17: options?.dealerHitsSoft17,
       warTieDownCards: options?.warTieDownCards,
       skyjoDiscardSwapFaceUpOnly: options?.skyjoDiscardSwapFaceUpOnly,
+      reshuffleDiscardWhenDrawEmpty,
     },
     instances,
   )
@@ -120,9 +128,11 @@ export function startNextMatchRound(
 
 /** Preserve house rules and match threshold when dealing the next round. */
 export function continuationOptionsFromSession(prev: GameSession): CreateSessionOptions {
+  const gameId = prev.manifest.id as RulesGameId
   const base: CreateSessionOptions = {
     aiCount: prev.manifest.players.ai,
     aiDifficulties: prev.aiPlayerConfig?.difficulties,
+    ...createSessionOptionsHouseRules(gameId),
   }
   if (prev.match) {
     base.matchTargetScore = prev.match.config.targetScore

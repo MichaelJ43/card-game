@@ -107,6 +107,11 @@ export interface GameManifestYaml {
   ai?: Record<string, unknown>
   /** When set, session may track cumulative scores across rounds (see core/match.ts). */
   match?: MatchManifestYaml
+  /**
+   * When both draw and discard piles exist: default for “shuffle discard into draw when draw is empty”.
+   * House rule can override; see `data/houseRules.ts` per-game defaults.
+   */
+  discardRecycleWhenDrawEmpty?: boolean
 }
 
 export type GameAction =

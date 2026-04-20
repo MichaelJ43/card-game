@@ -1,7 +1,9 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useMemo, useReducer, useState } from 'react'
 import type { GameManifestYaml } from '../core/types'
 import {
   clampMatchTargetScore,
+  defaultReshuffleDiscardWhenDrawEmpty,
+  GAMES_WITH_DISCARD_RECYCLE_OPTION,
   getHouseRulesForGame,
   patchHouseRulesForGame,
 } from '../data/houseRules'
@@ -29,6 +31,13 @@ export function GameHouseRulesPanel({ gameId, manifest }: GameHouseRulesPanelPro
   const [warTie, setWarTie] = useState<'1' | '3'>(() =>
     getHouseRulesForGame(gameId).warTieDownCards === 1 ? '1' : '3',
   )
+  const [houseRulesGen, bumpHouseRules] = useReducer((x: number) => x + 1, 0)
+  const houseRules = useMemo(() => {
+    void houseRulesGen
+    return getHouseRulesForGame(gameId)
+  }, [gameId, houseRulesGen])
+  const reshuffleDiscard =
+    houseRules.reshuffleDiscardWhenDrawEmpty ?? defaultReshuffleDiscardWhenDrawEmpty(gameId, manifest)
 
   useEffect(() => {
     const h = getHouseRulesForGame(gameId)
@@ -73,6 +82,23 @@ export function GameHouseRulesPanel({ gameId, manifest }: GameHouseRulesPanelPro
             }}
           />
           <span>{unit} ({manifest.match?.winnerIs === 'highest' ? 'highest' : 'lowest'} total wins)</span>
+        </label>
+      )}
+
+      {GAMES_WITH_DISCARD_RECYCLE_OPTION.has(gameId) && (
+        <label className="app__houseRulesCheck">
+          <input
+            type="checkbox"
+            checked={reshuffleDiscard}
+            onChange={(e) => {
+              patchHouseRulesForGame(gameId, { reshuffleDiscardWhenDrawEmpty: e.target.checked })
+              bumpHouseRules()
+            }}
+          />
+          <span>
+            When the <strong>draw pile</strong> is empty, shuffle the <strong>discard pile</strong> into a new draw pile
+            (top discard stays face-up).
+          </span>
         </label>
       )}
 
@@ -134,7 +160,8 @@ export function GameHouseRulesPanel({ gameId, manifest }: GameHouseRulesPanelPro
         gameId !== 'skyjo' &&
         gameId !== 'war' &&
         gameId !== 'blackjack' &&
-        gameId !== 'casino-blackjack' && (
+        gameId !== 'casino-blackjack' &&
+        !GAMES_WITH_DISCARD_RECYCLE_OPTION.has(gameId) && (
           <p className="app__houseRulesNone">
             No optional table rules are configurable in the app for this game yet (open Rules on Skyjo, War, or Blackjack
             variants to see examples).

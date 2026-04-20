@@ -1,6 +1,8 @@
 id: thirty-one
 name: Thirty-One (Scat)
 module: thirty-one
+# Typical 31: round ends when the deck is exhausted; recycle off by default (toggle in Rules → Options)
+discardRecycleWhenDrawEmpty: false
 deck: thirty-one-32
 players:
   human: 1

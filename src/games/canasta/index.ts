@@ -1,3 +1,4 @@
+import { recycleDiscardIntoDrawWhenEmpty, isDeckDrawAvailableAfterOptionalRecycle } from '../../core/discardRecycle'
 import type { ApplyResult, GameModule, SelectAiContext } from '../../core/gameModule'
 import { newInstanceId } from '../../core/deck'
 import type { CardInstance, GameAction, GameManifestYaml } from '../../core/types'
@@ -27,6 +28,7 @@ export interface CanastaGameState {
   drewThisTurn: boolean
   message: string
   roundScores: number[] | null
+  reshuffleDiscardWhenDrawEmpty: boolean
 }
 
 const canastaModule: GameModule<CanastaGameState> = {
@@ -75,15 +77,15 @@ const canastaModule: GameModule<CanastaGameState> = {
         drewThisTurn: false,
         message: 'Draw two from stock, then discard one to end your turn. Empty your hand to win the round.',
         roundScores: null,
+        reshuffleDiscardWhenDrawEmpty: ctx.reshuffleDiscardWhenDrawEmpty ?? false,
       },
     }
   },
 
   getLegalActions(table, gs) {
     if (gs.phase !== 'play' || gs.currentPlayer !== 0) return []
-    const stock = table.zones.draw!.cards.length
     if (!gs.drewThisTurn) {
-      if (stock === 0) {
+      if (!isDeckDrawAvailableAfterOptionalRecycle(table, gs.reshuffleDiscardWhenDrawEmpty, true)) {
         const hz = table.zones['hand:0']!.cards
         return hz.map((_, i) => ({ type: 'custom', payload: { cmd: 'cnsDiscard', index: i } }) as GameAction)
       }
@@ -120,6 +122,10 @@ const canastaModule: GameModule<CanastaGameState> = {
     if (command === 'cnsDrawTwo') {
       if (cur !== gs.currentPlayer) return { table: t, gameState: gs, error: 'Not your turn.' }
       if (gs.drewThisTurn) return { table: t, gameState: gs, error: 'Already drew.' }
+      recycleDiscardIntoDrawWhenEmpty(t, () => Math.random(), {
+        enabled: gs.reshuffleDiscardWhenDrawEmpty,
+        preserveTopDiscard: true,
+      })
       const stock = t.zones.draw!.cards.length
       if (stock === 0) return { table: t, gameState: gs, error: 'Stock empty — discard only.' }
       const n = Math.min(2, stock)
@@ -168,9 +174,10 @@ const canastaModule: GameModule<CanastaGameState> = {
   selectAiAction(table, gs, playerIndex, rng, context: SelectAiContext) {
     void context
     if (gs.phase !== 'play' || playerIndex !== gs.currentPlayer) return null
-    const stock = table.zones.draw!.cards.length
     if (!gs.drewThisTurn) {
-      if (stock > 0) return { type: 'custom', payload: { cmd: 'cnsDrawTwo' } }
+      if (isDeckDrawAvailableAfterOptionalRecycle(table, gs.reshuffleDiscardWhenDrawEmpty, true)) {
+        return { type: 'custom', payload: { cmd: 'cnsDrawTwo' } }
+      }
     }
     const hand = table.zones[handId(playerIndex)]!.cards
     if (!hand.length) return null

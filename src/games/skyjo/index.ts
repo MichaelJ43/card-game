@@ -3,6 +3,7 @@ import type { CardInstance, GameAction, GameManifestYaml } from '../../core/type
 import type { CardTemplate } from '../../core/types'
 import { playerSeatLabel } from '../../core/playerLabels'
 import { registerGameModule } from '../../core/registry'
+import { recycleDiscardIntoDrawWhenEmpty, isDeckDrawAvailableAfterOptionalRecycle } from '../../core/discardRecycle'
 import { mulberry32, shuffleInPlace } from '../../core/shuffle'
 import { cloneTable, createEmptyTable } from '../../core/table'
 import type { TableState } from '../../core/types'
@@ -51,17 +52,8 @@ function pushDiscard(table: TableState, card: CardInstance): void {
   table.zones.discard!.cards.push(card)
 }
 
-function recycleDiscardIfDrawEmpty(table: TableState, rng: () => number): void {
-  const draw = table.zones.draw!.cards
-  if (draw.length > 0) return
-  const disc = table.zones.discard!.cards
-  if (disc.length <= 1) return
-  const top = disc.pop()!
-  const rest = disc.splice(0, disc.length)
-  shuffleInPlace(rest, rng)
-  draw.push(...rest)
-  disc.length = 0
-  disc.push(top)
+function recycleDiscardIfDrawEmpty(table: TableState, rng: () => number, enabled: boolean): void {
+  recycleDiscardIntoDrawWhenEmpty(table, rng, { enabled, preserveTopDiscard: true })
 }
 
 function columnIndices(c: number): [number, number, number] {
@@ -408,6 +400,8 @@ export interface SkyjoGameState {
    * (face-down cells accept deck draws only).
    */
   discardSwapFaceUpOnly: boolean
+  /** House rule: shuffle discard into draw when draw is empty (except visible top discard). */
+  reshuffleDiscardWhenDrawEmpty: boolean
 }
 
 function buildLegalActions(table: TableState, gs: SkyjoGameState): GameAction[] {
@@ -437,7 +431,7 @@ function buildLegalActions(table: TableState, gs: SkyjoGameState): GameAction[] 
   }
 
   const actions: GameAction[] = []
-  if (table.zones.draw!.cards.length > 0) {
+  if (isDeckDrawAvailableAfterOptionalRecycle(table, gs.reshuffleDiscardWhenDrawEmpty, true)) {
     actions.push({ type: 'skyjoDraw', from: 'deck' })
   }
   if (table.zones.discard!.cards.length > 0) {
@@ -788,6 +782,7 @@ const skyjoModule: GameModule<SkyjoGameState> = {
   setup(ctx: GameModuleContext, instances: CardInstance[]) {
     const { manifest, templates, rng } = ctx
     const discardSwapFaceUpOnly = ctx.skyjoDiscardSwapFaceUpOnly ?? false
+    const reshuffleDiscardWhenDrawEmpty = ctx.reshuffleDiscardWhenDrawEmpty ?? false
     const pCount = totalPlayers(manifest)
     const rngFn = mulberry32(Math.floor(rng() * 0xffffffff))
 
@@ -853,6 +848,7 @@ const skyjoModule: GameModule<SkyjoGameState> = {
         roundScores: null,
         finisherDoubled: false,
         discardSwapFaceUpOnly,
+        reshuffleDiscardWhenDrawEmpty,
       },
     }
   },
@@ -877,12 +873,12 @@ const skyjoModule: GameModule<SkyjoGameState> = {
       return { table, gameState, error: 'Wait for the correct final-turn player.' }
     }
 
-    recycleDiscardIfDrawEmpty(t, rngFn)
+    recycleDiscardIfDrawEmpty(t, rngFn, gameState.reshuffleDiscardWhenDrawEmpty)
 
     const gs = gameState
 
     const endTurn = (next: Partial<SkyjoGameState>, finished: number): ApplyResult<SkyjoGameState> => {
-      recycleDiscardIfDrawEmpty(t, rngFn)
+      recycleDiscardIfDrawEmpty(t, rngFn, gs.reshuffleDiscardWhenDrawEmpty)
       if (gs.phase === 'final' && gs.finalQueue.length > 0) {
         const q = [...gs.finalQueue]
         if (q[0] === finished) {
@@ -1020,10 +1016,10 @@ const skyjoModule: GameModule<SkyjoGameState> = {
     }
 
     if (action.type === 'skyjoDraw' && action.from === 'deck') {
-      recycleDiscardIfDrawEmpty(t, rngFn)
+      recycleDiscardIfDrawEmpty(t, rngFn, gs.reshuffleDiscardWhenDrawEmpty)
       const drawn = popTopDraw(t)
       if (!drawn) {
-        recycleDiscardIfDrawEmpty(t, rngFn)
+        recycleDiscardIfDrawEmpty(t, rngFn, gs.reshuffleDiscardWhenDrawEmpty)
         const d2 = popTopDraw(t)
         if (!d2) return { table, gameState, error: 'Draw pile is empty.' }
         d2.faceUp = true
