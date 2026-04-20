@@ -11,10 +11,18 @@ export interface MultiplayerPanelProps {
   gameId: string
   /** Max remote clients this host is willing to accept. */
   maxClients: number
+  /** Host has an active table — keep RoomHost mounted; show compact room UI. */
+  tableActive?: boolean
   /** Called when a hosted room becomes active; useful for the parent to wire snapshots. */
   onHostStarted?: (host: RoomHost) => void
   /** Called when this browser successfully joins a remote host. */
   onClientStarted?: (client: RoomClient) => void
+  /** Host state received over the data channel (viewer). */
+  onSessionSnapshot?: (state: unknown) => void
+  /** Host roster changed (e.g. client connected); parent may push a table snapshot. */
+  onHostingRosterChange?: () => void
+  /** Any multiplayer teardown (Close room, Leave room, or host disconnect). */
+  onTeardown?: (wasHost: boolean) => void
   onClosed?: () => void
 }
 
@@ -23,8 +31,12 @@ type Mode = 'idle' | 'hosting' | 'client'
 export function MultiplayerPanel({
   gameId,
   maxClients,
+  tableActive = false,
   onHostStarted,
   onClientStarted,
+  onSessionSnapshot,
+  onHostingRosterChange,
+  onTeardown,
   onClosed,
 }: MultiplayerPanelProps) {
   const [mode, setMode] = useState<Mode>('idle')
@@ -40,7 +52,15 @@ export function MultiplayerPanel({
 
   const configured = isMultiplayerConfigured()
 
-  const teardown = useCallback(() => {
+  const updatePeerStatus = useCallback((s: PeerState) => {
+    setPeerState(s)
+    if (s === 'open') setStatus('Connected to host.')
+    else if (s === 'connecting') setStatus('Connecting to host…')
+    else if (s === 'closed') setStatus('Disconnected from host.')
+  }, [])
+
+  const teardown = useCallback((opts?: { clientKickedByHost?: boolean }) => {
+    const wasHost = hostRef.current !== null
     hostRef.current?.close()
     hostRef.current = null
     clientRef.current?.close()
@@ -50,9 +70,11 @@ export function MultiplayerPanel({
     setRoster([])
     setSignalingState('closed')
     setPeerState('new')
-    setStatus('')
+    setStatus(opts?.clientKickedByHost ? 'Host closed the room or disconnected.' : '')
+    setError('')
+    onTeardown?.(wasHost)
     onClosed?.()
-  }, [onClosed])
+  }, [onClosed, onTeardown])
 
   useEffect(() => () => teardown(), [teardown])
 
@@ -70,7 +92,10 @@ export function MultiplayerPanel({
         hostPeerId,
         token,
         onSignalingState: setSignalingState,
-        onRosterChange: setRoster,
+        onRosterChange: (peers) => {
+          setRoster(peers)
+          onHostingRosterChange?.()
+        },
         onIntent: () => {
           // Intents are consumed by the parent via onHostStarted wiring.
         },
@@ -84,7 +109,7 @@ export function MultiplayerPanel({
       setError(e instanceof Error ? e.message : String(e))
       setStatus('')
     }
-  }, [gameId, maxClients, onHostStarted])
+  }, [gameId, maxClients, onHostStarted, onHostingRosterChange])
 
   const startClient = useCallback(async () => {
     setError('')
@@ -105,19 +130,22 @@ export function MultiplayerPanel({
         clientPeerId,
         token,
         onSignalingState: setSignalingState,
-        onPeerState: setPeerState,
+        onPeerState: updatePeerStatus,
+        onSnapshot: (snap) => onSessionSnapshot?.(snap.state),
         onStatus: (m) => setStatus(m),
+        onHostEnded: () => {
+          teardown({ clientKickedByHost: true })
+        },
       })
       clientRef.current = client
       setRoomCode(rc)
       setMode('client')
-      setStatus('Connecting to host…')
       onClientStarted?.(client)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setStatus('')
     }
-  }, [joinCodeInput, onClientStarted])
+  }, [joinCodeInput, onClientStarted, onSessionSnapshot, teardown, updatePeerStatus])
 
   if (!configured) {
     return (
@@ -131,11 +159,13 @@ export function MultiplayerPanel({
     )
   }
 
+  const showCompact = tableActive && mode !== 'idle'
+
   return (
     <section className="multiplayerPanel" aria-label="Multiplayer">
       <h3>Online play</h3>
 
-      {mode === 'idle' && (
+      {!showCompact && mode === 'idle' && (
         <div className="multiplayerPanel__controls">
           <button type="button" onClick={startHost}>
             Host game
@@ -163,7 +193,30 @@ export function MultiplayerPanel({
         </div>
       )}
 
-      {mode === 'hosting' && (
+      {showCompact && mode === 'hosting' && (
+        <div className="multiplayerPanel__compact">
+          <span>
+            Hosting · code <strong className="multiplayerPanel__code">{roomCode}</strong>
+          </span>
+          <button type="button" onClick={() => teardown()}>
+            Close room
+          </button>
+        </div>
+      )}
+
+      {showCompact && mode === 'client' && (
+        <div className="multiplayerPanel__compact">
+          <span>
+            Joined · code <strong className="multiplayerPanel__code">{roomCode}</strong> · signaling{' '}
+            <em>{signalingState}</em> · peer <em>{peerState}</em>
+          </span>
+          <button type="button" onClick={() => teardown()}>
+            Leave room
+          </button>
+        </div>
+      )}
+
+      {!showCompact && mode === 'hosting' && (
         <div className="multiplayerPanel__hosting">
           <p>
             Room code: <strong className="multiplayerPanel__code">{roomCode}</strong>
@@ -172,13 +225,13 @@ export function MultiplayerPanel({
             Signaling: <em>{signalingState}</em>
           </p>
           <ConnectedPeers roster={roster} />
-          <button type="button" onClick={teardown}>
+          <button type="button" onClick={() => teardown()}>
             Close room
           </button>
         </div>
       )}
 
-      {mode === 'client' && (
+      {!showCompact && mode === 'client' && (
         <div className="multiplayerPanel__client">
           <p>
             Room code: <strong className="multiplayerPanel__code">{roomCode}</strong>
@@ -186,7 +239,7 @@ export function MultiplayerPanel({
           <p>
             Signaling: <em>{signalingState}</em> · Peer: <em>{peerState}</em>
           </p>
-          <button type="button" onClick={teardown}>
+          <button type="button" onClick={() => teardown()}>
             Leave room
           </button>
         </div>
