@@ -39,6 +39,7 @@ This document summarizes how the **card-game** repository is structured, how gam
 | `src/ui/GameHouseRulesPanel.tsx` | Per-game toggles/inputs saved to **`houseRules`** storage. |
 | `src/ui/CardView.tsx` | Card face/back, Skyjo tiers, standard ranks/suits. |
 | `docs/*.md` | Longer **repo documentation** per game (can diverge slightly from modal text). |
+| `docs/ui-design.md` | **Shell UI**: header toolbar button classes (`app__btn*`), multiplayer compact row layout (`multiplayerPanel__compact*` in `App.css`). |
 | `README.md` | User-facing run instructions and game table linking to `docs/`. |
 
 ---
@@ -253,7 +254,7 @@ Client-side entry points:
 | `src/net/peer.ts` | `RTCPeerConnection` + DataChannel wrapper. |
 | `src/net/host.ts` | `RoomHost` — accepts clients, assigns seats, broadcasts snapshots. |
 | `src/net/client.ts` | `RoomClient` — dials host, consumes snapshots, sends intents. |
-| `src/ui/MultiplayerPanel.tsx` | Lobby UI (Host / Join / roster / status). |
+| `src/ui/MultiplayerPanel.tsx` | Lobby UI (Host / Join / roster / status); chrome per **`docs/ui-design.md`**. |
 | `src/session/playerConfig.ts` | `remoteHumanCount`, `gameSupportsOnlineMultiplayer`, `manifestWithPlayerCounts`. |
 
 Backend entry points live in `lambda/src/` (`http.ts`, `websocket.ts`,
@@ -317,3 +318,4 @@ Deploy resolves URLs as: **Variables if non-empty, else Terraform outputs** for 
 - **Never** edit unrelated games when fixing one title unless shared core behavior requires it.
 - After behavior changes, update **`src/rules/*.md`** (and **`AGENTS.md`** / **`README`** if the architecture list changes).
 - **`playerIndex` 0** is the **human** in the shell; AI seats are **1…N**.
+- For **header toolbar**, **Rules** modal actions, and **multiplayer** shell controls, follow **`docs/ui-design.md`** and reuse **`app__btnSecondary app__btnToolbar`** from **`src/App.css`** unless there is a strong reason not to.

@@ -82,6 +82,7 @@ Pick a game from the in-app **Game** menu. Each row links to a short note in [`d
 | [`src/data/manifests.ts`](src/data/manifests.ts) | Wires game and deck ids to bundled YAML. |
 | [`src/rules/`](src/rules/) | In-app rules copy (markdown) shown in the **Rules** modal; see [`src/data/rulesSources.ts`](src/data/rulesSources.ts). |
 | [`docs/`](docs/) | Longer per-game notes (repo docs; can diverge slightly from the modal text). |
+| [`docs/ui-design.md`](docs/ui-design.md) | Shared shell UI (toolbar buttons, online multiplayer strip layout). |
 
 ## Contributing
 

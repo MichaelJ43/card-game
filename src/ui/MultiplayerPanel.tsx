@@ -189,7 +189,7 @@ export function MultiplayerPanel({
 
       {!showCompact && mode === 'idle' && (
         <div className="multiplayerPanel__controls">
-          <button type="button" onClick={startHost}>
+          <button type="button" className="app__btnSecondary app__btnToolbar" onClick={startHost}>
             Host game
           </button>
           <form
@@ -210,7 +210,9 @@ export function MultiplayerPanel({
               onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
               placeholder="ABC234"
             />
-            <button type="submit">Join</button>
+            <button type="submit" className="app__btnSecondary app__btnToolbar">
+              Join
+            </button>
           </form>
         </div>
       )}
@@ -231,7 +233,7 @@ export function MultiplayerPanel({
                   onCommit={nameplate.onCommit}
                 />
               )}
-              <button type="button" onClick={() => teardown()}>
+              <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => teardown()}>
                 Close room
               </button>
             </div>
@@ -267,7 +269,7 @@ export function MultiplayerPanel({
                   onCommit={nameplate.onCommit}
                 />
               )}
-              <button type="button" onClick={() => teardown()}>
+              <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => teardown()}>
                 Leave room
               </button>
             </div>
@@ -284,7 +286,7 @@ export function MultiplayerPanel({
             Signaling: <em>{signalingState}</em>
           </p>
           <ConnectedPeers roster={roster} />
-          <button type="button" onClick={() => teardown()}>
+          <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => teardown()}>
             Close room
           </button>
         </div>
@@ -298,7 +300,7 @@ export function MultiplayerPanel({
           <p>
             Signaling: <em>{signalingState}</em> · Peer: <em>{peerState}</em>
           </p>
-          <button type="button" onClick={() => teardown()}>
+          <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => teardown()}>
             Leave room
           </button>
         </div>
@@ -347,7 +349,7 @@ function NameplateInline({
       />
       <button
         type="button"
-        className="multiplayerPanel__nameplateInlineSave"
+        className="app__btnSecondary app__btnToolbar"
         disabled={disabled || !draft.trim()}
         title={NAMEPLATE_HINT}
         onClick={() => onCommit(draft)}
