@@ -601,6 +601,7 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 0.75rem;
   background: rgba(255, 255, 255, 0.03);
+  text-align: left;
 }
 
 .multiplayerPanel h3 {
@@ -617,13 +618,16 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
 .multiplayerPanel__join {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-start;
 }
 
 .multiplayerPanel__join input {
@@ -662,7 +666,7 @@
   font-size: 0.9rem;
 }
 
-.multiplayerPanel__meta {
-  margin: 0.5rem 0 0;
-  opacity: 0.6;
+.multiplayerPanel__hosting,
+.multiplayerPanel__client {
+  text-align: left;
 }

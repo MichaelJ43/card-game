@@ -306,16 +306,16 @@ function App() {
     if (!session) return
     if (
       !window.confirm(
-        'End this session? The table clears, any match progress is abandoned, and AI count and difficulty settings unlock.',
+        'End this session? You return to the lobby (game picker, Host / Join when available, then Start deal). Match progress for this hand is abandoned.',
       )
     ) {
       return
     }
-    setSession(createSession(gameId, Math.random, undefined, makeDealOptions(true)))
+    setSession(null)
     setSkyjoDumpStep('idle')
     setGfAwaitingOpponent(false)
     setGfRank('A')
-  }, [session, gameId, makeDealOptions])
+  }, [session])
 
   const onNextMatchRound = useCallback(() => {
     if (!session) return
