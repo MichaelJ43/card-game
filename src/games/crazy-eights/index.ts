@@ -1,6 +1,7 @@
 import type { ApplyResult, GameModule, SelectAiContext } from '../../core/gameModule'
 import type { CardTemplate, GameAction, GameManifestYaml } from '../../core/types'
 import { registerGameModule } from '../../core/registry'
+import { recycleDiscardIntoDrawWhenEmpty, isDeckDrawAvailableAfterOptionalRecycle } from '../../core/discardRecycle'
 import { mulberry32, shuffleInPlace } from '../../core/shuffle'
 import { cloneTable, createEmptyTable, moveTop } from '../../core/table'
 import type { TableState } from '../../core/types'
@@ -23,6 +24,7 @@ export interface Crazy8sGameState {
   currentSuit: string
   message: string
   roundScores: number[] | null
+  reshuffleDiscardWhenDrawEmpty: boolean
 }
 
 function topDiscard(table: TableState): { templateId: string } | null {
@@ -95,6 +97,7 @@ const crazy8sModule: GameModule<Crazy8sGameState> = {
         currentSuit: suit,
         message: 'Play a card matching rank or suit, or an 8.',
         roundScores: null,
+        reshuffleDiscardWhenDrawEmpty: ctx.reshuffleDiscardWhenDrawEmpty ?? false,
       },
     }
   },
@@ -117,7 +120,7 @@ const crazy8sModule: GameModule<Crazy8sGameState> = {
         }
       }
     })
-    if (table.zones.draw!.cards.length > 0) {
+    if (isDeckDrawAvailableAfterOptionalRecycle(table, gs.reshuffleDiscardWhenDrawEmpty, true)) {
       out.push({ type: 'custom', payload: { cmd: 'c8Draw' } })
     }
     return out
@@ -134,6 +137,11 @@ const crazy8sModule: GameModule<Crazy8sGameState> = {
     const hz = t.zones[hid]!.cards
 
     if (c === 'c8Draw') {
+      const rng = () => Math.random()
+      recycleDiscardIntoDrawWhenEmpty(t, rng, {
+        enabled: gs.reshuffleDiscardWhenDrawEmpty,
+        preserveTopDiscard: true,
+      })
       if (t.zones.draw!.cards.length === 0) return { table: t, gameState: gs, error: 'Deck empty.' }
       moveTop(t, 'draw', hid, cp === 0)
       return {
@@ -175,6 +183,7 @@ const crazy8sModule: GameModule<Crazy8sGameState> = {
             currentSuit: suit,
             roundScores: scores,
             message: `Player ${cp} went out!`,
+            reshuffleDiscardWhenDrawEmpty: gs.reshuffleDiscardWhenDrawEmpty,
           },
         }
       }
@@ -211,7 +220,9 @@ const crazy8sModule: GameModule<Crazy8sGameState> = {
       }
       return { type: 'custom', payload: { cmd: 'c8Play', index: pick } }
     }
-    if (table.zones.draw!.cards.length > 0) return { type: 'custom', payload: { cmd: 'c8Draw' } }
+    if (isDeckDrawAvailableAfterOptionalRecycle(table, gs.reshuffleDiscardWhenDrawEmpty, true)) {
+      return { type: 'custom', payload: { cmd: 'c8Draw' } }
+    }
     return null
   },
 

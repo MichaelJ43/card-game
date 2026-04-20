@@ -1,3 +1,4 @@
+import type { GameManifestYaml } from '../core/types'
 import type { CreateSessionOptions } from '../session/playerConfig'
 import type { RulesGameId } from './rulesSources'
 
@@ -13,6 +14,31 @@ export interface GameHouseRules {
   dealerHitsSoft17?: boolean
   /** War: face-down cards placed before each tie-break flip (1 = quick, 3 = classic). */
   warTieDownCards?: 1 | 3
+  /**
+   * When true, empty draw pile is refilled by shuffling the discard pile (games with draw + discard only).
+   * Omitted = use manifest default or built-in per-game default.
+   */
+  reshuffleDiscardWhenDrawEmpty?: boolean
+}
+
+/** Games that expose the discard→draw recycle toggle in Rules → Options. */
+export const GAMES_WITH_DISCARD_RECYCLE_OPTION: ReadonlySet<RulesGameId> = new Set([
+  'skyjo',
+  'uno',
+  'crazy-eights',
+  'canasta',
+  'poker-draw',
+  'thirty-one',
+])
+
+/** Built-in default when manifest + house rule do not set a preference. */
+const DISCARD_RECYCLE_DEFAULT_BY_GAME: Partial<Record<RulesGameId, boolean>> = {
+  skyjo: true,
+  uno: true,
+  'crazy-eights': true,
+  canasta: true,
+  'poker-draw': true,
+  'thirty-one': false,
 }
 
 export type HouseRulesStore = Partial<Record<RulesGameId, GameHouseRules>>
@@ -63,6 +89,25 @@ export function patchHouseRulesForGame(gameId: RulesGameId, patch: HouseRulesPat
   return next
 }
 
+/** Manifest + built-in default only (no saved house rule). */
+export function defaultReshuffleDiscardWhenDrawEmpty(gameId: RulesGameId, manifest: GameManifestYaml): boolean {
+  if (typeof manifest.discardRecycleWhenDrawEmpty === 'boolean') return manifest.discardRecycleWhenDrawEmpty
+  return DISCARD_RECYCLE_DEFAULT_BY_GAME[gameId] ?? false
+}
+
+export function effectiveReshuffleDiscardWhenDrawEmpty(
+  gameId: RulesGameId,
+  manifest: GameManifestYaml,
+  options?: CreateSessionOptions,
+): boolean {
+  if (options?.reshuffleDiscardWhenDrawEmpty === true) return true
+  if (options?.reshuffleDiscardWhenDrawEmpty === false) return false
+  const hr = getHouseRulesForGame(gameId)
+  if (hr.reshuffleDiscardWhenDrawEmpty === true) return true
+  if (hr.reshuffleDiscardWhenDrawEmpty === false) return false
+  return defaultReshuffleDiscardWhenDrawEmpty(gameId, manifest)
+}
+
 export function clampMatchTargetScore(n: number, fallback: number): number {
   const x = Math.floor(Number(n))
   if (!Number.isFinite(x)) return fallback
@@ -77,5 +122,7 @@ export function createSessionOptionsHouseRules(gameId: RulesGameId): Partial<Cre
   if (hr.skyjoDiscardSwapFaceUpOnly) o.skyjoDiscardSwapFaceUpOnly = true
   if (hr.dealerHitsSoft17) o.dealerHitsSoft17 = true
   if (hr.warTieDownCards === 1 || hr.warTieDownCards === 3) o.warTieDownCards = hr.warTieDownCards
+  if (hr.reshuffleDiscardWhenDrawEmpty === true) o.reshuffleDiscardWhenDrawEmpty = true
+  if (hr.reshuffleDiscardWhenDrawEmpty === false) o.reshuffleDiscardWhenDrawEmpty = false
   return o
 }

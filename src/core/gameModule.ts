@@ -13,6 +13,11 @@ export interface GameModuleContext {
   dealerHitsSoft17?: boolean
   warTieDownCards?: 1 | 3
   skyjoDiscardSwapFaceUpOnly?: boolean
+  /**
+   * When true, an empty draw pile is refilled by shuffling the discard pile into it (rules vary by game).
+   * Games without both `draw` and `discard` zones ignore this. Omitted or false = no recycle.
+   */
+  reshuffleDiscardWhenDrawEmpty?: boolean
 }
 
 export interface ApplyResult<TGame> {

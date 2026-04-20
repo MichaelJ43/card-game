@@ -1,6 +1,7 @@
 import type { ApplyResult, GameModule, SelectAiContext } from '../../core/gameModule'
 import type { CardInstance, CardTemplate, GameAction, GameManifestYaml } from '../../core/types'
 import { registerGameModule } from '../../core/registry'
+import { recycleDiscardIntoDrawWhenEmpty } from '../../core/discardRecycle'
 import { mulberry32, shuffleInPlace } from '../../core/shuffle'
 import { cloneTable, createEmptyTable, moveTop } from '../../core/table'
 import type { TableState } from '../../core/types'
@@ -64,22 +65,8 @@ function step(cur: number, direction: number, n: number): number {
   return (cur + direction + n * 100) % n
 }
 
-function reshuffleDrawFromDiscard(table: TableState, rng: () => number): void {
-  const draw = table.zones.draw!
-  const disc = table.zones.discard!
-  if (draw.cards.length > 0 || disc.cards.length <= 1) return
-  const top = disc.cards.pop()!
-  const rest = [...disc.cards]
-  disc.cards.length = 0
-  disc.cards.push(top)
-  shuffleInPlace(rest, rng)
-  for (const c of rest) {
-    draw.cards.push(c)
-  }
-}
-
-function ensureDraw(table: TableState, rng: () => number): void {
-  reshuffleDrawFromDiscard(table, rng)
+function ensureDraw(table: TableState, rng: () => number, reshuffleEnabled: boolean): void {
+  recycleDiscardIntoDrawWhenEmpty(table, rng, { enabled: reshuffleEnabled, preserveTopDiscard: true })
 }
 
 function handValue(templates: Record<string, CardTemplate>, cards: CardInstance[]): number {
@@ -107,6 +94,7 @@ export interface UnoGameState {
   drawSlot: number | null
   message: string
   roundScores: number[] | null
+  reshuffleDiscardWhenDrawEmpty: boolean
 }
 
 function roundOverScores(
@@ -132,7 +120,7 @@ function computeLegalActions(
   rng: () => number,
 ): GameAction[] {
   if (gs.phase !== 'play' || gs.currentPlayer !== playerIndex) return []
-  ensureDraw(table, rng)
+  ensureDraw(table, rng, gs.reshuffleDiscardWhenDrawEmpty)
   const top = topDiscard(table)
   if (!top) return []
   const templates = table.templates
@@ -240,6 +228,7 @@ const unoModule: GameModule<UnoGameState> = {
         drawSlot: null,
         message: 'Match color or number — Wilds are always playable.',
         roundScores: null,
+        reshuffleDiscardWhenDrawEmpty: ctx.reshuffleDiscardWhenDrawEmpty ?? false,
       },
     }
   },
@@ -278,7 +267,7 @@ const unoModule: GameModule<UnoGameState> = {
 
     if (c === 'unoPass') {
       if (gs.drewThisTurn) return { table: t, gameState: gs, error: 'Finish draw step.' }
-      ensureDraw(t, rng)
+      ensureDraw(t, rng, gs.reshuffleDiscardWhenDrawEmpty)
       if (t.zones.draw!.cards.length > 0) return { table: t, gameState: gs, error: 'Must draw.' }
       const next = step(cp, gs.direction, pCount)
       return {
@@ -298,7 +287,7 @@ const unoModule: GameModule<UnoGameState> = {
       const topTpl = templates[top.templateId]!
       const hasPlay = hz.some((card) => canPlay(templates[card.templateId]!, topTpl, gs.currentColor))
       if (hasPlay) return { table: t, gameState: gs, error: 'You have a playable card.' }
-      ensureDraw(t, rng)
+      ensureDraw(t, rng, gs.reshuffleDiscardWhenDrawEmpty)
       if (t.zones.draw!.cards.length === 0) return { table: t, gameState: gs, error: 'Cannot draw.' }
       moveTop(t, 'draw', hid, cp === 0)
       const newSlot = hz.length - 1
@@ -361,6 +350,7 @@ const unoModule: GameModule<UnoGameState> = {
           drawSlot: null,
           message: `Player ${cp} went out!`,
           roundScores: scores,
+          reshuffleDiscardWhenDrawEmpty: gs.reshuffleDiscardWhenDrawEmpty,
         },
       }
     }
@@ -371,7 +361,7 @@ const unoModule: GameModule<UnoGameState> = {
 
     const victimDraw = (victim: number, count: number) => {
       for (let i = 0; i < count; i++) {
-        ensureDraw(t, rng)
+        ensureDraw(t, rng, gs.reshuffleDiscardWhenDrawEmpty)
         if (t.zones.draw!.cards.length === 0) break
         moveTop(t, 'draw', handId(victim), victim === 0)
       }

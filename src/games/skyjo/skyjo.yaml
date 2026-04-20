@@ -12,3 +12,5 @@ match:
   endCondition: anyAtOrAbove
 ai:
   strategy: simple
+# Default for house rule “recycle discard into draw” (overridable in Rules → Options)
+discardRecycleWhenDrawEmpty: true

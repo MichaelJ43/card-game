@@ -1,3 +1,4 @@
+import { recycleDiscardIntoDrawWhenEmpty } from '../../core/discardRecycle'
 import type { ApplyResult, GameModule, GameModuleContext } from '../../core/gameModule'
 import type { CardTemplate, GameAction, GameManifestYaml } from '../../core/types'
 import { registerGameModule } from '../../core/registry'
@@ -38,6 +39,7 @@ export interface PokerDrawGameState {
   ante: number
   roundDelta: [number, number] | null
   message: string
+  reshuffleDiscardWhenDrawEmpty: boolean
 }
 
 const pokerDrawModule: GameModule<PokerDrawGameState> = {
@@ -67,6 +69,7 @@ const pokerDrawModule: GameModule<PokerDrawGameState> = {
         ante: 10,
         roundDelta: null,
         message: 'Ante 10 chips. Then replace 0–3 cards from the front of your hand (same count for both). Highest rank wins the pot.',
+        reshuffleDiscardWhenDrawEmpty: ctx.reshuffleDiscardWhenDrawEmpty ?? false,
       },
     }
   },
@@ -114,12 +117,17 @@ const pokerDrawModule: GameModule<PokerDrawGameState> = {
           phase: 'draw',
           stacks: afterAnte,
           message: 'How many cards to replace (0–3)? Same count is applied to both hands.',
+          reshuffleDiscardWhenDrawEmpty: gs.reshuffleDiscardWhenDrawEmpty,
         },
       }
     }
 
     if (gs.phase === 'draw' && c === 'p5Draw') {
       const count = Math.min(3, Math.max(0, Number((action.payload as { count?: number }).count)))
+      recycleDiscardIntoDrawWhenEmpty(t, () => Math.random(), {
+        enabled: gs.reshuffleDiscardWhenDrawEmpty,
+        preserveTopDiscard: true,
+      })
       const drawPile = t.zones.draw!.cards
       if (count * 2 > drawPile.length) {
         return { table: t, gameState: gs, error: 'Not enough cards to replace that many.' }
@@ -169,6 +177,7 @@ const pokerDrawModule: GameModule<PokerDrawGameState> = {
           ante: gs.ante,
           roundDelta: [s0 - preAnte0, s1 - preAnte1],
           message,
+          reshuffleDiscardWhenDrawEmpty: gs.reshuffleDiscardWhenDrawEmpty,
         },
       }
     }
