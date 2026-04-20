@@ -29,6 +29,10 @@ jobs:
         run: npm run test:ci
 
       - name: Build
+        env:
+          # Optional: set repository Variables so CI builds match production URLs.
+          VITE_MULTIPLAYER_HTTP_URL: ${{ vars.VITE_MULTIPLAYER_HTTP_URL }}
+          VITE_MULTIPLAYER_WS_URL: ${{ vars.VITE_MULTIPLAYER_WS_URL }}
         run: npm run build
 
       - name: Install Lambda dependencies
