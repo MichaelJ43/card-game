@@ -212,6 +212,18 @@ async function onDisconnect(
   if (!binding) return
   await deleteConnection(binding.roomCode, connectionId)
   const peers = await listConnections(binding.roomCode)
+
+  if (binding.role === 'host') {
+    // Host WebSocket gone: notify every remaining client so UIs can tear down.
+    const hostPeerId = binding.peerId
+    for (const p of peers) {
+      if (p.role === 'client') {
+        await postTo(client, p.connectionId, { type: 'peer-left', peerId: hostPeerId })
+      }
+    }
+    return
+  }
+
   const host = peers.find((p) => p.role === 'host')
   if (!host) return
   await postTo(client, host.connectionId, { type: 'peer-left', peerId: binding.peerId })

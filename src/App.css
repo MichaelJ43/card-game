@@ -670,3 +670,20 @@
 .multiplayerPanel__client {
   text-align: left;
 }
+
+.multiplayerPanel__compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.35rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 0.9rem;
+}
+
+.multiplayerPanel__compact button {
+  flex: 0 0 auto;
+}

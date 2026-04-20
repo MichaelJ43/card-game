@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { AI_DIFFICULTY_OPTIONS, normalizeAiDifficulty, type AiDifficulty } from './core/aiContext'
 import { type MatchState } from './core/match'
@@ -18,6 +18,8 @@ import {
   normalizeAiDifficultiesForCount,
 } from './session/playerConfig'
 import { GameHouseRulesPanel } from './ui/GameHouseRulesPanel'
+import type { RoomHost } from './net/host'
+import { parseSessionSnapshot, serializeSessionSnapshot } from './net/sessionSnapshot'
 import { MultiplayerPanel } from './ui/MultiplayerPanel'
 import { RulesModal } from './ui/RulesModal'
 import { TableView, type ActiveTurnHighlight, type TableIntent } from './ui/TableView'
@@ -248,6 +250,12 @@ function App() {
   const [aiOpponents, setAiOpponents] = useState(1)
   const [aiDifficulties, setAiDifficulties] = useState<AiDifficulty[]>(['medium'])
   const [session, setSession] = useState<GameSession | null>(null)
+  const [joinedAsClient, setJoinedAsClient] = useState(false)
+  const [remoteSpectator, setRemoteSpectator] = useState(false)
+
+  const roomHostRef = useRef<RoomHost | null>(null)
+  const sessionRef = useRef<GameSession | null>(null)
+  const pushSnapshotRef = useRef<() => void>(() => {})
 
   const [gfAwaitingOpponent, setGfAwaitingOpponent] = useState(false)
   const [gfRank, setGfRank] = useState('A')
@@ -255,6 +263,26 @@ function App() {
   const [rulesOpen, setRulesOpen] = useState(false)
 
   const selectedManifest = useMemo(() => parseGameManifestYaml(GAME_SOURCES[gameId]), [gameId])
+
+  useEffect(() => {
+    sessionRef.current = session
+  }, [session])
+
+  useEffect(() => {
+    pushSnapshotRef.current = () => {
+      if (remoteSpectator) return
+      const host = roomHostRef.current
+      if (!host) return
+      const roster = host.getRoster()
+      if (!roster.some((r) => r.state === 'open')) return
+      const sess = sessionRef.current
+      if (!sess) return
+      const wire = serializeSessionSnapshot(sess)
+      if (!wire) return
+      host.broadcastSnapshot(() => wire)
+    }
+    pushSnapshotRef.current()
+  }, [session, remoteSpectator])
 
   const makeDealOptions = useCallback(
     (
@@ -299,10 +327,23 @@ function App() {
   }, [])
 
   const startOrNewDeal = useCallback(() => {
+    if (joinedAsClient || remoteSpectator) return
     applyFreshDeal(gameId)
-  }, [gameId, applyFreshDeal])
+  }, [gameId, applyFreshDeal, joinedAsClient, remoteSpectator])
 
   const endGame = useCallback(() => {
+    if (remoteSpectator) {
+      if (!session) return
+      if (
+        !window.confirm(
+          'Hide this table? You stay in the room until you leave; the host can start another deal.',
+        )
+      ) {
+        return
+      }
+      setSession(null)
+      return
+    }
     if (!session) return
     if (
       !window.confirm(
@@ -315,19 +356,53 @@ function App() {
     setSkyjoDumpStep('idle')
     setGfAwaitingOpponent(false)
     setGfRank('A')
-  }, [session])
+  }, [session, remoteSpectator])
+
+  const onHostStarted = useCallback((host: RoomHost) => {
+    roomHostRef.current = host
+  }, [])
+
+  const onClientStarted = useCallback(() => {
+    setJoinedAsClient(true)
+  }, [])
+
+  const onSessionSnapshot = useCallback((wire: unknown) => {
+    const parsed = parseSessionSnapshot(wire)
+    if (!parsed) return
+    setSession(parsed)
+    setGameId(parsed.manifest.id as (typeof GAME_IDS)[number])
+    setRemoteSpectator(true)
+    setGfAwaitingOpponent(false)
+    setGfRank('A')
+    setSkyjoDumpStep('idle')
+  }, [])
+
+  const onMultiplayerTeardown = useCallback((_wasHost: boolean) => {
+    roomHostRef.current = null
+    setJoinedAsClient(false)
+    setRemoteSpectator(false)
+    setSession(null)
+    setGfAwaitingOpponent(false)
+    setGfRank('A')
+    setSkyjoDumpStep('idle')
+  }, [])
+
+  const onHostingRosterChange = useCallback(() => {
+    pushSnapshotRef.current()
+  }, [])
 
   const onNextMatchRound = useCallback(() => {
-    if (!session) return
+    if (!session || remoteSpectator) return
     try {
       const next = startNextMatchRound(session, gameId)
       setSession(next)
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
     }
-  }, [session, gameId])
+  }, [session, gameId, remoteSpectator])
 
   const dispatchAction = useCallback((action: GameAction) => {
+    if (remoteSpectator) return
     setSession((prev) => {
       if (!prev) return prev
       const result = prev.module.applyAction(prev.table, prev.gameState, action)
@@ -341,7 +416,7 @@ function App() {
         gameState: result.gameState,
       }
     })
-  }, [])
+  }, [remoteSpectator])
 
   const status = useMemo(() => {
     if (!session) return ''
@@ -458,6 +533,7 @@ function App() {
   }, [session])
 
   useEffect(() => {
+    if (remoteSpectator) return
     if (!session) return
     if (!isGoFishSession(session)) return
     const gs = session.gameState
@@ -479,9 +555,10 @@ function App() {
     }, 550)
 
     return () => window.clearTimeout(handle)
-  }, [session])
+  }, [session, remoteSpectator])
 
   useEffect(() => {
+    if (remoteSpectator) return
     if (!session) return
     if (!isCrazyEightsSession(session)) return
     const gs = session.gameState as { phase?: string; currentPlayer?: number }
@@ -507,9 +584,10 @@ function App() {
     }, 500)
 
     return () => window.clearTimeout(handle)
-  }, [session])
+  }, [session, remoteSpectator])
 
   useEffect(() => {
+    if (remoteSpectator) return
     if (!session) return
     if (!isUnoSession(session)) return
     const gs = session.gameState as { phase?: string; currentPlayer?: number }
@@ -535,9 +613,10 @@ function App() {
     }, 500)
 
     return () => window.clearTimeout(handle)
-  }, [session])
+  }, [session, remoteSpectator])
 
   useEffect(() => {
+    if (remoteSpectator) return
     if (!session) return
     if (!TABLE_AI_MEDIUM_MODULES.has(session.manifest.module)) return
     const gs = session.gameState as { phase?: string; currentPlayer?: number }
@@ -563,9 +642,10 @@ function App() {
     }, 500)
 
     return () => window.clearTimeout(handle)
-  }, [session])
+  }, [session, remoteSpectator])
 
   useEffect(() => {
+    if (remoteSpectator) return
     if (!session) return
     if (!isSkyjoSession(session)) return
     const gs = session.gameState
@@ -589,7 +669,7 @@ function App() {
     }, 650)
 
     return () => window.clearTimeout(handle)
-  }, [session])
+  }, [session, remoteSpectator])
 
   useEffect(() => {
     if (!session) return
@@ -640,7 +720,7 @@ function App() {
 
   const handleTableIntent = useCallback(
     (intent: TableIntent) => {
-      if (!session) return
+      if (!session || remoteSpectator) return
       if (isSkyjoSession(session)) {
         const gs = session.gameState
         if (gs.phase === 'roundOver' || gs.currentPlayer !== 0) return
@@ -735,7 +815,7 @@ function App() {
         }
       }
     },
-    [session, dispatchAction, skyjoDumpStep, gfAwaitingOpponent, gfRank, humanRanks],
+    [session, remoteSpectator, dispatchAction, skyjoDumpStep, gfAwaitingOpponent, gfRank, humanRanks],
   )
 
   return (
@@ -753,6 +833,12 @@ function App() {
                     <select
                       className="app__select"
                       value={gameId}
+                      disabled={joinedAsClient || remoteSpectator}
+                      title={
+                        joinedAsClient || remoteSpectator
+                          ? 'Game is chosen by the host while you are in an online room.'
+                          : undefined
+                      }
                       onChange={(e) => onGameIdChange(e.target.value as (typeof GAME_IDS)[number])}
                     >
                       {GAME_IDS.map((id) => (
@@ -771,11 +857,13 @@ function App() {
                         min={1}
                         max={MAX_AI_OPPONENTS}
                         value={aiOpponents}
-                        disabled={aiCountLocked}
+                        disabled={aiCountLocked || joinedAsClient || remoteSpectator}
                         title={
-                          aiCountLocked
-                            ? 'Finish or advance the match before changing player count.'
-                            : `1–${MAX_AI_OPPONENTS} computer players (${1 + aiOpponents} total). Applies on Start deal / New deal.`
+                          joinedAsClient || remoteSpectator
+                            ? 'Player count is set by the host while you are in an online room.'
+                            : aiCountLocked
+                              ? 'Finish or advance the match before changing player count.'
+                              : `1–${MAX_AI_OPPONENTS} computer players (${1 + aiOpponents} total). Applies on Start deal / New deal.`
                         }
                         onChange={(e) => {
                           const n = clampAiOpponentCount(gameId, Number(e.target.value))
@@ -787,7 +875,17 @@ function App() {
                   <div className="app__toolbarActions">
                     <span className="app__toolbarActionsLabel">Actions</span>
                     <div className="app__toolbarActionsBtns">
-                      <button type="button" className="app__btnToolbar app__btnSecondary" onClick={startOrNewDeal}>
+                      <button
+                        type="button"
+                        className="app__btnToolbar app__btnSecondary"
+                        onClick={startOrNewDeal}
+                        disabled={joinedAsClient || remoteSpectator}
+                        title={
+                          joinedAsClient || remoteSpectator
+                            ? 'Only the host can start or refresh the deal while you are in an online room.'
+                            : undefined
+                        }
+                      >
                         {session ? 'New deal' : 'Start deal'}
                       </button>
                       <button
@@ -812,11 +910,13 @@ function App() {
                       <select
                         className="app__select app__select--diff"
                         value={aiDifficulties[i] ?? 'medium'}
-                        disabled={aiCountLocked}
+                        disabled={aiCountLocked || joinedAsClient || remoteSpectator}
                         title={
-                          aiCountLocked
-                            ? 'Finish or advance the match before editing AI settings.'
-                            : 'Locked for this deal. Changing starts a new deal.'
+                          joinedAsClient || remoteSpectator
+                            ? 'AI settings are controlled by the host while you are in an online room.'
+                            : aiCountLocked
+                              ? 'Finish or advance the match before editing AI settings.'
+                              : 'Locked for this deal. Changing starts a new deal.'
                         }
                         onChange={(e) => {
                           const v = normalizeAiDifficulty(e.target.value)
@@ -869,24 +969,35 @@ function App() {
         </div>
       </header>
 
+      {gameSupportsOnlineMultiplayer(gameId) && (
+        <MultiplayerPanel
+          gameId={gameId}
+          maxClients={MAX_REMOTE_HUMANS}
+          tableActive={!!session}
+          onHostStarted={onHostStarted}
+          onClientStarted={onClientStarted}
+          onSessionSnapshot={onSessionSnapshot}
+          onHostingRosterChange={onHostingRosterChange}
+          onTeardown={onMultiplayerTeardown}
+        />
+      )}
+
       {!session && (
-        <>
-          <p className="app__lobbyHint" role="status">
-            Select a game, adjust AI options if needed, then press <strong>Start deal</strong>.
-          </p>
-          {gameSupportsOnlineMultiplayer(gameId) && (
-            <MultiplayerPanel
-              gameId={gameId}
-              maxClients={MAX_REMOTE_HUMANS}
-            />
+        <p className="app__lobbyHint" role="status">
+          {joinedAsClient ? (
+            'Waiting for the host to deal — the table appears here when they start.'
+          ) : (
+            <>
+              Select a game, adjust AI options if needed, then press <strong>Start deal</strong>.
+            </>
           )}
-        </>
+        </p>
       )}
 
       {session && (
         <>
           <p className="app__status" role="status">
-            {status}
+            {remoteSpectator ? `${status} (viewing host — read-only)` : status}
           </p>
 
           {matchPreviewTotals && session.match && !session.match.complete && (
@@ -902,7 +1013,13 @@ function App() {
           )}
           {canAdvanceMatch && (
             <div className="app__matchActions">
-              <button type="button" className="app__btnPrimary" onClick={onNextMatchRound}>
+              <button
+                type="button"
+                className="app__btnPrimary"
+                onClick={onNextMatchRound}
+                disabled={remoteSpectator}
+                title={remoteSpectator ? 'Only the host can advance the match.' : undefined}
+              >
                 Next round (apply scores)
               </button>
             </div>
@@ -936,7 +1053,12 @@ function App() {
                       : 'Click a card in your hand to choose the rank, then click an opponent’s hand or books.'}
                   </p>
                   {legal.some((a) => a.type === 'goFishPass') && (
-                    <button type="button" className="app__btnSecondary" onClick={() => dispatchAction({ type: 'goFishPass' })}>
+                    <button
+                      type="button"
+                      className="app__btnSecondary"
+                      disabled={remoteSpectator}
+                      onClick={() => dispatchAction({ type: 'goFishPass' })}
+                    >
                       Pass turn
                     </button>
                   )}
@@ -970,6 +1092,8 @@ function App() {
                     key={customActionKey(a)}
                     type="button"
                     className="app__btnSecondary"
+                    disabled={remoteSpectator}
+                    title={remoteSpectator ? 'Viewing the host table — actions are disabled.' : undefined}
                     onClick={() => dispatchAction(a)}
                   >
                     {labelCustomAction(a)}
@@ -983,7 +1107,8 @@ function App() {
                 type="button"
                 className="app__btnPrimary"
                 onClick={onPrimary}
-                disabled={legal.length === 0}
+                disabled={legal.length === 0 || remoteSpectator}
+                title={remoteSpectator ? 'Viewing the host table — actions are disabled.' : undefined}
               >
                 {primaryLabel}
               </button>

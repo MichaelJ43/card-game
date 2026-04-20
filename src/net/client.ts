@@ -18,6 +18,8 @@ export interface RoomClientOptions {
   onSnapshot?: (snapshot: PeerHostSnapshot) => void
   onStatus?: (message: string) => void
   onAck?: (nonce: string, ok: boolean, error: string | undefined) => void
+  /** Host closed the room or disconnected; stop signaling and data channel. */
+  onHostEnded?: () => void
 }
 
 /**
@@ -43,8 +45,7 @@ export class RoomClient {
         } else if (msg.type === 'relay' && msg.to === opts.clientPeerId) {
           this.ensureLink().acceptSignal(msg.payload)
         } else if (msg.type === 'peer-left' && msg.peerId === opts.hostPeerId) {
-          this.link?.close()
-          this.link = null
+          this.handleHostEnded()
         }
       },
     })
@@ -69,6 +70,13 @@ export class RoomClient {
       onPeerMessage: (msg) => this.handlePeerMessage(msg),
     })
     return this.link
+  }
+
+  private handleHostEnded(): void {
+    this.link?.close()
+    this.link = null
+    this.signaling.close()
+    this.opts.onHostEnded?.()
   }
 
   private handlePeerMessage(msg: PeerMessage) {
