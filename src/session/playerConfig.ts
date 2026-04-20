@@ -38,6 +38,11 @@ const CONFIGURABLE_AI_GAME_IDS = new Set([
   'poker-draw',
   'heads-up-poker',
   'uno',
+  'thirty-one',
+  'durak',
+  'pinochle',
+  'canasta',
+  'sequence-race',
 ])
 
 /** Games where `selectAiAction` uses {@link AiDifficulty} (per-seat). */

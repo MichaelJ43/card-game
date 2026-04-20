@@ -28,7 +28,7 @@ This document summarizes how the **card-game** repository is structured, how gam
 | `src/data/manifests.ts` | **`GAME_SOURCES`**, **`DECK_SOURCES`**, **`GAME_IDS`** — Vite `?raw` imports wiring ids to YAML strings. |
 | `src/data/rulesSources.ts` | **`RULES_SOURCES`**, **`rulesTextForGame`**, **`RulesGameId`** — maps each **`GAME_IDS`** entry to `src/rules/*.md` raw markdown. |
 | `src/data/houseRules.ts` | **`localStorage`** persistence for per-game **house rules**; **`createSessionOptionsHouseRules`** merges into **`CreateSessionOptions`**. |
-| `src/decks/*.yaml` | Deck definitions: `standard-52`, `skyjo`, `uno`, `example-custom`. |
+| `src/decks/*.yaml` | Deck definitions: `standard-52`, `skyjo`, `uno`, `thirty-one-32`, `euchre-24`, `durak-36`, `pinochle-24`, `canasta-108`, `sequence-race-112`, `example-custom`. |
 | `src/games/<id>/` | Per-title **`*.yaml` manifest** + **`index.ts`** module (some **game ids** share one **`module`** id). |
 | `src/games/*/index.ts` | Implements **`GameModule`**: **`setup`**, **`getLegalActions`**, **`applyAction`**, **`selectAiAction`**, **`statusText`**, optional **`extractMatchRoundScores`** / **`isMatchRoundFinished`**. |
 | `src/rules/*.md` | **In-app rules** copy (shown in **Rules** modal); structured with `#` title, `##` sections, numbered lists where possible. |
@@ -166,6 +166,12 @@ Agents changing rules behavior should update **both** the module logic and **`sr
 | `high-card-duel` | `high-card-duel` | Single-card compare. |
 | `red-dog` | `high-card-duel` | Alternate manifest. |
 | `uno` | `uno` | Custom **uno** deck. |
+| `thirty-one` | `thirty-one` | 32-card Scat-style draw/discard; optional match. |
+| `euchre` | `euchre` | 24-card simplified trick race (four seats, fixed AI count). |
+| `durak` | `durak` | 36-card two-player attack/defend. |
+| `pinochle` | `pinochle` | Double 48-card trick race; templates doubled in `setup`. |
+| `canasta` | `canasta` | 108-card draw-two/discard-one drill (not full canasta). |
+| `sequence-race` | `sequence-race` | Custom 112-card “Skip-Bo–style” builder. |
 
 ---
 

@@ -1,0 +1,4 @@
+id: thirty-one-32
+generate:
+  suits: [spades, hearts, diamonds, clubs]
+  ranks: ['7', '8', '9', '10', 'J', 'Q', 'K', 'A']

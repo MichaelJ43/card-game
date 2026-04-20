@@ -1,0 +1,13 @@
+id: euchre
+name: Euchre (simplified)
+module: euchre
+deck: euchre-24
+players:
+  human: 1
+  ai: 3
+match:
+  enabled: true
+  targetScore: 10
+  winnerIs: highest
+  endCondition: anyAtOrAbove
+  scoreLabel: Tricks won

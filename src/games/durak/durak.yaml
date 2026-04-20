@@ -1,0 +1,13 @@
+id: durak
+name: Durak (2-player simplified)
+module: durak
+deck: durak-36
+players:
+  human: 1
+  ai: 1
+match:
+  enabled: true
+  targetScore: 3
+  winnerIs: highest
+  endCondition: anyAtOrAbove
+  scoreLabel: Rounds won

@@ -101,6 +101,19 @@ function isUnoSession(s: GameSession): boolean {
   return s.manifest.module === 'uno'
 }
 
+/** Games where the shell runs medium-difficulty table AI on non-human turns. */
+const TABLE_AI_MEDIUM_MODULES = new Set([
+  'thirty-one',
+  'euchre',
+  'durak',
+  'pinochle',
+  'canasta',
+  'sequence-race',
+])
+
+/** Hand-zone active turn highlight for trick / shedding modules. */
+const HAND_TURN_HIGHLIGHT_MODULES = TABLE_AI_MEDIUM_MODULES
+
 function customActionKey(a: GameAction): string {
   if (a.type !== 'custom') return ''
   return JSON.stringify(a.payload)
@@ -146,6 +159,30 @@ function labelCustomAction(a: GameAction): string {
       if (typeof col === 'string' && names[col]) return `Wild → ${names[col]} (#${ix})`
       return `Play #${ix}`
     }
+    case 't31Knock':
+      return 'Knock'
+    case 't31DrawStock':
+      return `Draw deck · discard hand #${p.discardIndex}`
+    case 't31TakeDiscard':
+      return `Take discard · discard hand #${p.discardIndex}`
+    case 'echPlay':
+      return `Play hand #${p.index}`
+    case 'dukAttack':
+      return `Attack · hand #${p.index}`
+    case 'dukDefend':
+      return `Defend · hand #${p.index}`
+    case 'dukTake':
+      return 'Take attack card'
+    case 'pncPlay':
+      return `Play hand #${p.index}`
+    case 'cnsDrawTwo':
+      return 'Draw two'
+    case 'cnsDiscard':
+      return `Discard hand #${p.index}`
+    case 'srPlay':
+      return `Play hand #${p.handIndex} → pile ${Number(p.pileIndex) + 1}`
+    case 'srEndTurn':
+      return 'End turn (draw to five)'
     default:
       return cmd || 'Custom'
   }
@@ -312,7 +349,13 @@ function App() {
       m === 'poker-draw' ||
       m === 'high-card-duel' ||
       m === 'crazy-eights' ||
-      m === 'uno'
+      m === 'uno' ||
+      m === 'thirty-one' ||
+      m === 'euchre' ||
+      m === 'durak' ||
+      m === 'pinochle' ||
+      m === 'canasta' ||
+      m === 'sequence-race'
     )
   }, [session])
 
@@ -331,6 +374,15 @@ function App() {
       }
     }
     if (isUnoSession(session) && (session.gameState as { phase?: string }).phase === 'play') {
+      return {
+        playerIndex: (session.gameState as { currentPlayer: number }).currentPlayer,
+        zoneIdPrefix: 'hand',
+      }
+    }
+    if (
+      HAND_TURN_HIGHLIGHT_MODULES.has(session.manifest.module) &&
+      (session.gameState as { phase?: string }).phase === 'play'
+    ) {
       return {
         playerIndex: (session.gameState as { currentPlayer: number }).currentPlayer,
         zoneIdPrefix: 'hand',
@@ -419,6 +471,34 @@ function App() {
           g.currentPlayer!,
           Math.random,
           { difficulty: 'medium' },
+        )
+        if (!act) return prev
+        const r = prev.module.applyAction(prev.table, prev.gameState, act)
+        if (r.error) return prev
+        return { ...prev, table: r.table, gameState: r.gameState }
+      })
+    }, 500)
+
+    return () => window.clearTimeout(handle)
+  }, [session])
+
+  useEffect(() => {
+    if (!session) return
+    if (!TABLE_AI_MEDIUM_MODULES.has(session.manifest.module)) return
+    const gs = session.gameState as { phase?: string; currentPlayer?: number }
+    if (gs.phase !== 'play' || gs.currentPlayer === 0) return
+
+    const handle = window.setTimeout(() => {
+      setSession((prev) => {
+        if (!prev || !TABLE_AI_MEDIUM_MODULES.has(prev.manifest.module)) return prev
+        const g = prev.gameState as { phase?: string; currentPlayer?: number }
+        if (g.phase !== 'play' || g.currentPlayer === 0) return prev
+        const act = prev.module.selectAiAction(
+          prev.table,
+          prev.gameState,
+          g.currentPlayer!,
+          Math.random,
+          { difficulty: difficultyForAiPlayer(prev, g.currentPlayer!) },
         )
         if (!act) return prev
         const r = prev.module.applyAction(prev.table, prev.gameState, act)
