@@ -18,7 +18,9 @@ import {
   normalizeAiDifficultiesForCount,
 } from './session/playerConfig'
 import { GameHouseRulesPanel } from './ui/GameHouseRulesPanel'
+import type { RoomClient } from './net/client'
 import type { RoomHost } from './net/host'
+import type { PeerClientIntent, PeerHostSnapshot } from './net/protocol'
 import { parseSessionSnapshot, serializeSessionSnapshot } from './net/sessionSnapshot'
 import { MultiplayerPanel } from './ui/MultiplayerPanel'
 import { RulesModal } from './ui/RulesModal'
@@ -27,6 +29,25 @@ import { skyjoDumpUiStepShouldReset, type SkyjoDumpUiStep } from './ui/tableUiFl
 import type { GameAction } from './core/types'
 import type { GoFishGameState } from './games/go-fish'
 import { isSkyjoSlotTemplateId, type SkyjoGameState } from './games/skyjo'
+
+/** Local human’s server seat index (0 = host / solo). */
+function shellHumanSeat(session: GameSession | null): number {
+  if (!session?.net || session.net.spectator) return 0
+  return session.net.seat
+}
+
+/** TableView “you” seat; -1 = spectator (no local seat). */
+function tableViewHumanIndex(session: GameSession | null): number {
+  if (!session?.net) return 0
+  if (session.net.spectator) return -1
+  return session.net.seat
+}
+
+/** First player index that is an AI seat (manifest humans occupy 0..human-1). */
+function firstAiSeatIndex(session: GameSession | null): number {
+  if (!session) return 1
+  return session.manifest.players.human
+}
 
 function MatchCumulativePanel({
   match,
@@ -239,9 +260,10 @@ function labelCustomAction(a: GameAction): string {
 }
 
 function difficultyForAiPlayer(session: GameSession, playerIndex: number): AiDifficulty {
-  if (playerIndex <= 0) return 'medium'
+  const firstAi = session.manifest.players.human
+  if (playerIndex < firstAi) return 'medium'
   const cfg = session.aiPlayerConfig?.difficulties
-  const ix = playerIndex - 1
+  const ix = playerIndex - firstAi
   return cfg && ix >= 0 && ix < cfg.length ? normalizeAiDifficulty(cfg[ix]) : 'medium'
 }
 
@@ -251,9 +273,9 @@ function App() {
   const [aiDifficulties, setAiDifficulties] = useState<AiDifficulty[]>(['medium'])
   const [session, setSession] = useState<GameSession | null>(null)
   const [joinedAsClient, setJoinedAsClient] = useState(false)
-  const [remoteSpectator, setRemoteSpectator] = useState(false)
 
   const roomHostRef = useRef<RoomHost | null>(null)
+  const roomClientRef = useRef<RoomClient | null>(null)
   const sessionRef = useRef<GameSession | null>(null)
   const pushSnapshotRef = useRef<() => void>(() => {})
 
@@ -264,25 +286,32 @@ function App() {
 
   const selectedManifest = useMemo(() => parseGameManifestYaml(GAME_SOURCES[gameId]), [gameId])
 
+  const onlineClientShell = joinedAsClient || !!session?.net
+  const networkSpectator = !!session?.net?.spectator
+
   useEffect(() => {
     sessionRef.current = session
   }, [session])
 
   useEffect(() => {
     pushSnapshotRef.current = () => {
-      if (remoteSpectator) return
       const host = roomHostRef.current
       if (!host) return
       const roster = host.getRoster()
       if (!roster.some((r) => r.state === 'open')) return
       const sess = sessionRef.current
       if (!sess) return
-      const wire = serializeSessionSnapshot(sess)
-      if (!wire) return
-      host.broadcastSnapshot(() => wire)
+      const base = serializeSessionSnapshot(sess)
+      if (!base) return
+      const remoteHumans = Math.max(0, sess.manifest.players.human - 1)
+      host.broadcastSnapshot((seat) => ({
+        ...base,
+        viewerSeat: seat,
+        spectator: seat > remoteHumans,
+      }))
     }
     pushSnapshotRef.current()
-  }, [session, remoteSpectator])
+  }, [session])
 
   const makeDealOptions = useCallback(
     (
@@ -310,7 +339,14 @@ function App() {
 
   const applyFreshDeal = useCallback(
     (id: (typeof GAME_IDS)[number], options?: CreateSessionOptions) => {
-      setSession(createSession(id, Math.random, undefined, options ?? makeDealOptions(undefined, id)))
+      const baseOpts = options ?? makeDealOptions(undefined, id)
+      const openRemotes =
+        roomHostRef.current?.getRoster().filter((r) => r.state === 'open').length ?? 0
+      const withRemotes =
+        openRemotes > 0 && gameSupportsOnlineMultiplayer(id)
+          ? { ...baseOpts, remoteHumanCount: openRemotes }
+          : baseOpts
+      setSession(createSession(id, Math.random, undefined, withRemotes))
       setGfAwaitingOpponent(false)
       setGfRank('A')
       setSkyjoDumpStep('idle')
@@ -327,12 +363,12 @@ function App() {
   }, [])
 
   const startOrNewDeal = useCallback(() => {
-    if (joinedAsClient || remoteSpectator) return
+    if (onlineClientShell) return
     applyFreshDeal(gameId)
-  }, [gameId, applyFreshDeal, joinedAsClient, remoteSpectator])
+  }, [gameId, applyFreshDeal, onlineClientShell])
 
   const endGame = useCallback(() => {
-    if (remoteSpectator) {
+    if (networkSpectator) {
       if (!session) return
       if (
         !window.confirm(
@@ -344,6 +380,7 @@ function App() {
       setSession(null)
       return
     }
+    if (onlineClientShell) return
     if (!session) return
     if (
       !window.confirm(
@@ -356,31 +393,65 @@ function App() {
     setSkyjoDumpStep('idle')
     setGfAwaitingOpponent(false)
     setGfRank('A')
-  }, [session, remoteSpectator])
+  }, [session, networkSpectator, onlineClientShell])
 
   const onHostStarted = useCallback((host: RoomHost) => {
     roomHostRef.current = host
   }, [])
 
-  const onClientStarted = useCallback(() => {
+  const onClientStarted = useCallback((client: RoomClient) => {
+    roomClientRef.current = client
     setJoinedAsClient(true)
   }, [])
 
-  const onSessionSnapshot = useCallback((wire: unknown) => {
-    const parsed = parseSessionSnapshot(wire)
+  const onSessionSnapshot = useCallback((snap: PeerHostSnapshot) => {
+    const parsed = parseSessionSnapshot(snap.state, snap.seat)
     if (!parsed) return
     setSession(parsed)
     setGameId(parsed.manifest.id as (typeof GAME_IDS)[number])
-    setRemoteSpectator(true)
+    if (gameSupportsConfigurableAi(parsed.manifest.id)) {
+      setAiOpponents(parsed.manifest.players.ai)
+    }
+    if (parsed.aiPlayerConfig?.difficulties?.length) {
+      setAiDifficulties(parsed.aiPlayerConfig.difficulties)
+    }
     setGfAwaitingOpponent(false)
     setGfRank('A')
     setSkyjoDumpStep('idle')
   }, [])
 
+  const onRemoteIntent = useCallback((msg: PeerClientIntent, fromPeerId: string) => {
+    const host = roomHostRef.current
+    if (!host) return
+    const roster = host.getRoster()
+    const rec = roster.find((r) => r.peerId === fromPeerId)
+    if (!rec || rec.seat !== msg.seat) {
+      host.ack(fromPeerId, msg.nonce, false, 'Seat mismatch')
+      return
+    }
+    const prev = sessionRef.current
+    if (!prev) {
+      host.ack(fromPeerId, msg.nonce, false, 'No active table')
+      return
+    }
+    const action = msg.action as GameAction
+    const result = prev.module.applyAction(prev.table, prev.gameState, action)
+    if (result.error) {
+      host.ack(fromPeerId, msg.nonce, false, result.error)
+      return
+    }
+    host.ack(fromPeerId, msg.nonce, true)
+    setSession({
+      ...prev,
+      table: result.table,
+      gameState: result.gameState,
+    })
+  }, [])
+
   const onMultiplayerTeardown = useCallback((_wasHost: boolean) => {
     roomHostRef.current = null
+    roomClientRef.current = null
     setJoinedAsClient(false)
-    setRemoteSpectator(false)
     setSession(null)
     setGfAwaitingOpponent(false)
     setGfRank('A')
@@ -392,31 +463,42 @@ function App() {
   }, [])
 
   const onNextMatchRound = useCallback(() => {
-    if (!session || remoteSpectator) return
+    if (!session || session.net) return
     try {
       const next = startNextMatchRound(session, gameId)
       setSession(next)
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
     }
-  }, [session, gameId, remoteSpectator])
+  }, [session, gameId])
 
   const dispatchAction = useCallback((action: GameAction) => {
-    if (remoteSpectator) return
-    setSession((prev) => {
-      if (!prev) return prev
-      const result = prev.module.applyAction(prev.table, prev.gameState, action)
+    const prev = sessionRef.current
+    if (prev?.net?.spectator) return
+    if (prev?.net && !prev.net.spectator) {
+      const c = roomClientRef.current
+      if (!c) return
+      c.sendIntent({
+        nonce: crypto.randomUUID(),
+        seat: prev.net.seat,
+        action,
+      })
+      return
+    }
+    setSession((p) => {
+      if (!p) return p
+      const result = p.module.applyAction(p.table, p.gameState, action)
       if (result.error) {
         window.alert(result.error)
-        return prev
+        return p
       }
       return {
-        ...prev,
+        ...p,
         table: result.table,
         gameState: result.gameState,
       }
     })
-  }, [remoteSpectator])
+  }, [])
 
   const status = useMemo(() => {
     if (!session) return ''
@@ -523,7 +605,7 @@ function App() {
 
   const humanRanks = useMemo(() => {
     if (!session || !isGoFishSession(session)) return [] as string[]
-    const hz = session.table.zones['hand:0']?.cards ?? []
+    const hz = session.table.zones[`hand:${shellHumanSeat(session)}`]?.cards ?? []
     const s = new Set<string>()
     for (const c of hz) {
       const r = session.table.templates[c.templateId]?.rank
@@ -533,17 +615,17 @@ function App() {
   }, [session])
 
   useEffect(() => {
-    if (remoteSpectator) return
+    if (session?.net) return
     if (!session) return
     if (!isGoFishSession(session)) return
     const gs = session.gameState
-    if (gs.phase !== 'playing' || gs.currentPlayer === 0) return
+    if (gs.phase !== 'playing' || gs.currentPlayer < firstAiSeatIndex(session)) return
 
     const handle = window.setTimeout(() => {
       setSession((prev) => {
         if (!prev || !isGoFishSession(prev)) return prev
         const g = prev.gameState
-        if (g.phase !== 'playing' || g.currentPlayer === 0) return prev
+        if (g.phase !== 'playing' || g.currentPlayer < firstAiSeatIndex(prev)) return prev
         const act = prev.module.selectAiAction(prev.table, prev.gameState, g.currentPlayer, Math.random, {
           difficulty: difficultyForAiPlayer(prev, g.currentPlayer),
         })
@@ -555,20 +637,30 @@ function App() {
     }, 550)
 
     return () => window.clearTimeout(handle)
-  }, [session, remoteSpectator])
+  }, [session])
 
   useEffect(() => {
-    if (remoteSpectator) return
+    if (session?.net) return
     if (!session) return
     if (!isCrazyEightsSession(session)) return
     const gs = session.gameState as { phase?: string; currentPlayer?: number }
-    if (gs.phase !== 'play' || gs.currentPlayer === 0) return
+    if (
+      gs.phase !== 'play' ||
+      typeof gs.currentPlayer !== 'number' ||
+      gs.currentPlayer < firstAiSeatIndex(session)
+    )
+      return
 
     const handle = window.setTimeout(() => {
       setSession((prev) => {
         if (!prev || !isCrazyEightsSession(prev)) return prev
         const g = prev.gameState as { phase?: string; currentPlayer?: number }
-        if (g.phase !== 'play' || g.currentPlayer === 0) return prev
+        if (
+          g.phase !== 'play' ||
+          typeof g.currentPlayer !== 'number' ||
+          g.currentPlayer < firstAiSeatIndex(prev)
+        )
+          return prev
         const act = prev.module.selectAiAction(
           prev.table,
           prev.gameState,
@@ -584,20 +676,30 @@ function App() {
     }, 500)
 
     return () => window.clearTimeout(handle)
-  }, [session, remoteSpectator])
+  }, [session])
 
   useEffect(() => {
-    if (remoteSpectator) return
+    if (session?.net) return
     if (!session) return
     if (!isUnoSession(session)) return
     const gs = session.gameState as { phase?: string; currentPlayer?: number }
-    if (gs.phase !== 'play' || gs.currentPlayer === 0) return
+    if (
+      gs.phase !== 'play' ||
+      typeof gs.currentPlayer !== 'number' ||
+      gs.currentPlayer < firstAiSeatIndex(session)
+    )
+      return
 
     const handle = window.setTimeout(() => {
       setSession((prev) => {
         if (!prev || !isUnoSession(prev)) return prev
         const g = prev.gameState as { phase?: string; currentPlayer?: number }
-        if (g.phase !== 'play' || g.currentPlayer === 0) return prev
+        if (
+          g.phase !== 'play' ||
+          typeof g.currentPlayer !== 'number' ||
+          g.currentPlayer < firstAiSeatIndex(prev)
+        )
+          return prev
         const act = prev.module.selectAiAction(
           prev.table,
           prev.gameState,
@@ -613,20 +715,30 @@ function App() {
     }, 500)
 
     return () => window.clearTimeout(handle)
-  }, [session, remoteSpectator])
+  }, [session])
 
   useEffect(() => {
-    if (remoteSpectator) return
+    if (session?.net) return
     if (!session) return
     if (!TABLE_AI_MEDIUM_MODULES.has(session.manifest.module)) return
     const gs = session.gameState as { phase?: string; currentPlayer?: number }
-    if (gs.phase !== 'play' || gs.currentPlayer === 0) return
+    if (
+      gs.phase !== 'play' ||
+      typeof gs.currentPlayer !== 'number' ||
+      gs.currentPlayer < firstAiSeatIndex(session)
+    )
+      return
 
     const handle = window.setTimeout(() => {
       setSession((prev) => {
         if (!prev || !TABLE_AI_MEDIUM_MODULES.has(prev.manifest.module)) return prev
         const g = prev.gameState as { phase?: string; currentPlayer?: number }
-        if (g.phase !== 'play' || g.currentPlayer === 0) return prev
+        if (
+          g.phase !== 'play' ||
+          typeof g.currentPlayer !== 'number' ||
+          g.currentPlayer < firstAiSeatIndex(prev)
+        )
+          return prev
         const act = prev.module.selectAiAction(
           prev.table,
           prev.gameState,
@@ -642,20 +754,20 @@ function App() {
     }, 500)
 
     return () => window.clearTimeout(handle)
-  }, [session, remoteSpectator])
+  }, [session])
 
   useEffect(() => {
-    if (remoteSpectator) return
+    if (session?.net) return
     if (!session) return
     if (!isSkyjoSession(session)) return
     const gs = session.gameState
-    if (gs.phase === 'roundOver' || gs.currentPlayer === 0) return
+    if (gs.phase === 'roundOver' || gs.currentPlayer < firstAiSeatIndex(session)) return
 
     const handle = window.setTimeout(() => {
       setSession((prev) => {
         if (!prev || !isSkyjoSession(prev)) return prev
         const g = prev.gameState
-        if (g.phase === 'roundOver' || g.currentPlayer === 0) return prev
+        if (g.phase === 'roundOver' || g.currentPlayer < firstAiSeatIndex(prev)) return prev
         const act = prev.module.selectAiAction(prev.table, prev.gameState, g.currentPlayer, Math.random, {
           difficulty: difficultyForAiPlayer(prev, g.currentPlayer),
           matchCumulativeScores: prev.match?.cumulativeScores,
@@ -669,7 +781,7 @@ function App() {
     }, 650)
 
     return () => window.clearTimeout(handle)
-  }, [session, remoteSpectator])
+  }, [session])
 
   useEffect(() => {
     if (!session) return
@@ -691,7 +803,7 @@ function App() {
     if (!session) return
     if (!isGoFishSession(session)) return
     const g = session.gameState
-    if (g.phase !== 'playing' || g.currentPlayer !== 0) {
+    if (g.phase !== 'playing' || g.currentPlayer !== shellHumanSeat(session)) {
       setGfAwaitingOpponent(false)
     }
   }, [session])
@@ -699,31 +811,35 @@ function App() {
   const aiCountLocked = Boolean(session?.match && !session.match.complete)
 
   const tableIntentZones = useMemo((): readonly string[] | undefined => {
-    if (!session) return undefined
-    if (isSkyjoSession(session) && session.gameState.phase !== 'roundOver' && session.gameState.currentPlayer === 0) {
+    if (!session || networkSpectator) return undefined
+    const sh = shellHumanSeat(session)
+    if (isSkyjoSession(session) && session.gameState.phase !== 'roundOver' && session.gameState.currentPlayer === sh) {
       const gs = session.gameState
       if (gs.pendingDraw) {
-        if (gs.pendingFromDiscard) return ['grid:0']
-        return ['grid:0', 'discard']
+        if (gs.pendingFromDiscard) return [`grid:${sh}`]
+        return [`grid:${sh}`, 'discard']
       }
-      return ['draw', 'grid:0']
+      return ['draw', `grid:${sh}`]
     }
-    if (isGoFishSession(session) && session.gameState.phase === 'playing' && session.gameState.currentPlayer === 0) {
+    if (isGoFishSession(session) && session.gameState.phase === 'playing' && session.gameState.currentPlayer === sh) {
       const pc = session.gameState.playerCount
       if (!gfAwaitingOpponent) {
-        return ['hand:0']
+        return [`hand:${sh}`]
       }
-      return ['hand:0', ...goFishOpponentIntentZones(pc)]
+      return [`hand:${sh}`, ...goFishOpponentIntentZones(pc)]
     }
     return undefined
-  }, [session, gfAwaitingOpponent])
+  }, [session, gfAwaitingOpponent, networkSpectator])
 
   const handleTableIntent = useCallback(
     (intent: TableIntent) => {
-      if (!session || remoteSpectator) return
+      if (!session || networkSpectator) return
+      const sh = shellHumanSeat(session)
+      const myGrid = `grid:${sh}`
+      const myHand = `hand:${sh}`
       if (isSkyjoSession(session)) {
         const gs = session.gameState
-        if (gs.phase === 'roundOver' || gs.currentPlayer !== 0) return
+        if (gs.phase === 'roundOver' || gs.currentPlayer !== sh) return
 
         if (intent.kind === 'stack' && intent.zoneId === 'draw') {
           dispatchAction({ type: 'skyjoDraw', from: 'deck' })
@@ -736,9 +852,9 @@ function App() {
           return
         }
 
-        if (intent.kind === 'card' && intent.zoneId === 'grid:0') {
+        if (intent.kind === 'card' && intent.zoneId === myGrid) {
           const idx = intent.cardIndex
-          const grid = session.table.zones['grid:0']?.cards
+          const grid = session.table.zones[myGrid]?.cards
           const cell = grid?.[idx]
           if (gs.pendingDraw) {
             const legalDumpTarget =
@@ -781,10 +897,10 @@ function App() {
 
       if (isGoFishSession(session)) {
         const gs = session.gameState
-        if (gs.phase !== 'playing' || gs.currentPlayer !== 0) return
+        if (gs.phase !== 'playing' || gs.currentPlayer !== sh) return
 
-        if (intent.kind === 'card' && intent.zoneId === 'hand:0') {
-          const card = session.table.zones['hand:0']?.cards[intent.cardIndex]
+        if (intent.kind === 'card' && intent.zoneId === myHand) {
+          const card = session.table.zones[myHand]?.cards[intent.cardIndex]
           const r = card && session.table.templates[card.templateId]?.rank
           if (typeof r === 'string') {
             setGfRank(r)
@@ -797,7 +913,7 @@ function App() {
 
         if (intent.kind === 'card' || intent.kind === 'zone') {
           const target = goFishTargetPlayerFromZoneId(intent.zoneId)
-          if (target === null || target === 0) return
+          if (target === null || target === sh) return
           const rank =
             humanRanks.includes(gfRank) ? gfRank : humanRanks[0] ?? ''
           if (!rank) {
@@ -815,7 +931,7 @@ function App() {
         }
       }
     },
-    [session, remoteSpectator, dispatchAction, skyjoDumpStep, gfAwaitingOpponent, gfRank, humanRanks],
+    [session, networkSpectator, dispatchAction, skyjoDumpStep, gfAwaitingOpponent, gfRank, humanRanks],
   )
 
   return (
@@ -833,9 +949,9 @@ function App() {
                     <select
                       className="app__select"
                       value={gameId}
-                      disabled={joinedAsClient || remoteSpectator}
+                      disabled={onlineClientShell}
                       title={
-                        joinedAsClient || remoteSpectator
+                        onlineClientShell
                           ? 'Game is chosen by the host while you are in an online room.'
                           : undefined
                       }
@@ -857,9 +973,9 @@ function App() {
                         min={1}
                         max={MAX_AI_OPPONENTS}
                         value={aiOpponents}
-                        disabled={aiCountLocked || joinedAsClient || remoteSpectator}
+                        disabled={aiCountLocked || onlineClientShell}
                         title={
-                          joinedAsClient || remoteSpectator
+                          onlineClientShell
                             ? 'Player count is set by the host while you are in an online room.'
                             : aiCountLocked
                               ? 'Finish or advance the match before changing player count.'
@@ -873,21 +989,17 @@ function App() {
                     </label>
                   )}
                   <div className="app__toolbarActions">
-                    <span className="app__toolbarActionsLabel">Actions</span>
+                    {!onlineClientShell && <span className="app__toolbarActionsLabel">Actions</span>}
                     <div className="app__toolbarActionsBtns">
-                      <button
-                        type="button"
-                        className="app__btnToolbar app__btnSecondary"
-                        onClick={startOrNewDeal}
-                        disabled={joinedAsClient || remoteSpectator}
-                        title={
-                          joinedAsClient || remoteSpectator
-                            ? 'Only the host can start or refresh the deal while you are in an online room.'
-                            : undefined
-                        }
-                      >
-                        {session ? 'New deal' : 'Start deal'}
-                      </button>
+                      {!onlineClientShell && (
+                        <button
+                          type="button"
+                          className="app__btnToolbar app__btnSecondary"
+                          onClick={startOrNewDeal}
+                        >
+                          {session ? 'New deal' : 'Start deal'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="app__btnSecondary app__btnToolbar"
@@ -895,9 +1007,11 @@ function App() {
                       >
                         Rules
                       </button>
-                      <button type="button" className="app__btnSecondary app__btnToolbar" onClick={endGame}>
-                        End game
-                      </button>
+                      {!onlineClientShell && (
+                        <button type="button" className="app__btnSecondary app__btnToolbar" onClick={endGame}>
+                          End game
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -910,9 +1024,9 @@ function App() {
                       <select
                         className="app__select app__select--diff"
                         value={aiDifficulties[i] ?? 'medium'}
-                        disabled={aiCountLocked || joinedAsClient || remoteSpectator}
+                        disabled={aiCountLocked || onlineClientShell}
                         title={
-                          joinedAsClient || remoteSpectator
+                          onlineClientShell
                             ? 'AI settings are controlled by the host while you are in an online room.'
                             : aiCountLocked
                               ? 'Finish or advance the match before editing AI settings.'
@@ -977,6 +1091,7 @@ function App() {
           onHostStarted={onHostStarted}
           onClientStarted={onClientStarted}
           onSessionSnapshot={onSessionSnapshot}
+          onRemoteIntent={onRemoteIntent}
           onHostingRosterChange={onHostingRosterChange}
           onTeardown={onMultiplayerTeardown}
         />
@@ -997,7 +1112,7 @@ function App() {
       {session && (
         <>
           <p className="app__status" role="status">
-            {remoteSpectator ? `${status} (viewing host — read-only)` : status}
+            {networkSpectator ? `${status} (spectating until the next deal)` : status}
           </p>
 
           {matchPreviewTotals && session.match && !session.match.complete && (
@@ -1017,8 +1132,8 @@ function App() {
                 type="button"
                 className="app__btnPrimary"
                 onClick={onNextMatchRound}
-                disabled={remoteSpectator}
-                title={remoteSpectator ? 'Only the host can advance the match.' : undefined}
+                disabled={!!session?.net}
+                title={session?.net ? 'Only the host can advance the match.' : undefined}
               >
                 Next round (apply scores)
               </button>
@@ -1027,14 +1142,15 @@ function App() {
 
           <TableView
             table={session.table}
-            humanPlayerIndex={0}
+            humanPlayerIndex={tableViewHumanIndex(session)}
             onTableIntent={tableIntentZones ? handleTableIntent : undefined}
             intentZoneAllowlist={tableIntentZones}
             pendingStacksColumn={
               isSkyjoSession(session)
                 ? {
                     card: session.gameState.pendingDraw,
-                    skyjoDumpStep: session.gameState.currentPlayer === 0 ? skyjoDumpStep : 'idle',
+                    skyjoDumpStep:
+                      session.gameState.currentPlayer === shellHumanSeat(session) ? skyjoDumpStep : 'idle',
                   }
                 : undefined
             }
@@ -1045,7 +1161,7 @@ function App() {
             {gameId === 'go-fish' &&
               isGoFishSession(session) &&
               session.gameState.phase === 'playing' &&
-              session.gameState.currentPlayer === 0 && (
+              session.gameState.currentPlayer === shellHumanSeat(session) && (
                 <div className="app__goFish">
                   <p className="app__tableIntentHint">
                     {gfAwaitingOpponent
@@ -1056,7 +1172,7 @@ function App() {
                     <button
                       type="button"
                       className="app__btnSecondary"
-                      disabled={remoteSpectator}
+                      disabled={networkSpectator}
                       onClick={() => dispatchAction({ type: 'goFishPass' })}
                     >
                       Pass turn
@@ -1068,7 +1184,7 @@ function App() {
             {gameId === 'skyjo' &&
               isSkyjoSession(session) &&
               session.gameState.phase !== 'roundOver' &&
-              session.gameState.currentPlayer === 0 && (
+              session.gameState.currentPlayer === shellHumanSeat(session) && (
                 <div className="app__skyjo">
                   <p className="app__tableIntentHint">
                     Draw from the deck (left). With a pending card from the deck, click the discard pile to start dump
@@ -1092,8 +1208,8 @@ function App() {
                     key={customActionKey(a)}
                     type="button"
                     className="app__btnSecondary"
-                    disabled={remoteSpectator}
-                    title={remoteSpectator ? 'Viewing the host table — actions are disabled.' : undefined}
+                    disabled={networkSpectator}
+                    title={networkSpectator ? 'Spectating — actions are disabled.' : undefined}
                     onClick={() => dispatchAction(a)}
                   >
                     {labelCustomAction(a)}
@@ -1107,8 +1223,8 @@ function App() {
                 type="button"
                 className="app__btnPrimary"
                 onClick={onPrimary}
-                disabled={legal.length === 0 || remoteSpectator}
-                title={remoteSpectator ? 'Viewing the host table — actions are disabled.' : undefined}
+                disabled={legal.length === 0 || networkSpectator}
+                title={networkSpectator ? 'Spectating — actions are disabled.' : undefined}
               >
                 {primaryLabel}
               </button>
@@ -1128,7 +1244,13 @@ function App() {
         open={rulesOpen}
         onClose={() => setRulesOpen(false)}
         markdown={rulesTextForGame(gameId as RulesGameId)}
-        optionsPanel={<GameHouseRulesPanel gameId={gameId as RulesGameId} manifest={selectedManifest} />}
+        optionsPanel={
+          <GameHouseRulesPanel
+            gameId={gameId as RulesGameId}
+            manifest={session?.manifest ?? selectedManifest}
+            readOnly={onlineClientShell}
+          />
+        }
       />
     </div>
   )

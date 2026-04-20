@@ -23,6 +23,14 @@ export interface AiPlayerConfig {
   difficulties: AiDifficulty[]
 }
 
+/** Present when this session was built from a host snapshot (online client). */
+export interface GameSessionNetMeta {
+  /** Host roster / wire seat (1 for first remote client). */
+  seat: number
+  /** True when this client joined mid-deal and is not assigned a human slot yet. */
+  spectator: boolean
+}
+
 export interface GameSession<T = unknown> {
   manifest: GameManifestYaml
   module: GameModule<T>
@@ -32,6 +40,8 @@ export interface GameSession<T = unknown> {
   match?: MatchState
   /** Per-AI-seat difficulty for this deal; undefined if no AI players. */
   aiPlayerConfig?: AiPlayerConfig
+  /** Set for browsers consuming a host snapshot over the network. */
+  net?: GameSessionNetMeta
 }
 
 export function createSession(
