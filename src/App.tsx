@@ -19,16 +19,23 @@ import {
   normalizeAiDifficultiesForCount,
 } from './session/playerConfig'
 import { GameHouseRulesPanel } from './ui/GameHouseRulesPanel'
+import { CHAT_POPOUT_MESSAGE_SOURCE, isChatPopoutToMain, type MainToChatPopout } from './chat/chatPopoutMessages'
+import { useChatToasts } from './chat/useChatToasts'
 import type { RoomClient } from './net/client'
 import type { HostedPeer, RoomHost } from './net/host'
 import {
+  sanitizeChatText,
   sanitizeDisplayName,
+  type PeerClientChatSend,
   type PeerClientIntent,
   type PeerClientSetDisplayName,
+  type PeerHostChatLine,
   type PeerHostSnapshot,
 } from './net/protocol'
 import { parseSessionSnapshot, serializeSessionSnapshot } from './net/sessionSnapshot'
+import { ChatToastStack } from './ui/ChatToastStack'
 import { MultiplayerPanel } from './ui/MultiplayerPanel'
+import { openChatPopoutWindow } from './ui/openChatPopout'
 import { RulesModal } from './ui/RulesModal'
 import { TableView, type ActiveTurnHighlight, type TableIntent } from './ui/TableView'
 import { skyjoDumpUiStepShouldReset, type SkyjoDumpUiStep } from './ui/tableUiFlow'
@@ -70,6 +77,32 @@ function localViewerSeat(session: GameSession | null): number | null {
   if (!session?.net) return 0
   if (session.net.spectator) return null
   return session.net.seat
+}
+
+/** Display label for a seat in room chat (mirrors in-app seat labels; pure helper for host callbacks). */
+function chatSenderLabelForSeat(sess: GameSession | null, roster: HostedPeer[], serverPlayerIndex: number): string {
+  if (!sess) return `Player ${serverPlayerIndex + 1}`
+  const profileLabel = sess.seatProfiles?.find((s) => s.seat === serverPlayerIndex)?.displayName?.trim()
+  if (profileLabel) return profileLabel
+  const humanCount = sess.manifest.players.human
+  if (serverPlayerIndex >= humanCount) {
+    return aiPlayerMenuLabel(serverPlayerIndex - humanCount)
+  }
+  if (sess.net && !sess.net.spectator) {
+    if (serverPlayerIndex === 0) return 'Host'
+    return `Player ${serverPlayerIndex + 1}`
+  }
+  if (!sess.net) {
+    if (serverPlayerIndex === 0) return 'Host'
+    const peer = roster.find((r) => r.seat === serverPlayerIndex)
+    if (peer) {
+      const id = peer.peerId
+      return id.length > 16 ? `${id.slice(0, 15)}…` : id
+    }
+    return `Player ${serverPlayerIndex + 1}`
+  }
+  if (serverPlayerIndex === 0) return 'Host'
+  return `Player ${serverPlayerIndex + 1}`
 }
 
 function MatchCumulativePanel({
@@ -315,10 +348,29 @@ function App() {
   /** True while this browser is an active room host (not ref-driven — avoids reading refs during render). */
   const [multiplayerHostActive, setMultiplayerHostActive] = useState(false)
 
+  const [chatLines, setChatLines] = useState<PeerHostChatLine[]>([])
+  const [chatOpenFailed, setChatOpenFailed] = useState('')
+  const chatLinesRef = useRef<PeerHostChatLine[]>([])
+  const rosterRef = useRef<HostedPeer[]>([])
+  const chatPopoutRef = useRef<Window | null>(null)
+  const chatRateLimitRef = useRef<Map<number, number[]>>(new Map())
+  const { toasts: mainChatToasts, pushToast: pushMainChatToast, clearToasts: clearMainChatToasts } =
+    useChatToasts(5, 3000)
+
+  useEffect(() => {
+    chatLinesRef.current = chatLines
+  }, [chatLines])
+
+  useEffect(() => {
+    rosterRef.current = hostClientRoster
+  }, [hostClientRoster])
+
   const selectedManifest = useMemo(() => parseGameManifestYaml(GAME_SOURCES[gameId]), [gameId])
 
   const onlineClientShell = joinedAsClient || !!session?.net
   const networkSpectator = !!session?.net?.spectator
+  const multiplayerChatEnabled =
+    multiplayerHostActive || (!!session?.net && !session.net.spectator && joinedAsClient)
 
   const seatDisplayName = useCallback(
     (serverPlayerIndex: number): string => {
@@ -554,6 +606,145 @@ function App() {
     })
   }, [])
 
+  const deliverChatLineToUi = useCallback(
+    (line: PeerHostChatLine) => {
+      setChatLines((prev) => [...prev, line].slice(-200))
+      const w = chatPopoutRef.current
+      if (w && !w.closed) {
+        const payload: MainToChatPopout = {
+          source: CHAT_POPOUT_MESSAGE_SOURCE,
+          type: 'chat-line',
+          line,
+        }
+        w.postMessage(payload, window.location.origin)
+      } else {
+        pushMainChatToast({ id: line.id, senderLabel: line.senderLabel, text: line.text })
+      }
+    },
+    [pushMainChatToast],
+  )
+
+  const broadcastChatLineFromHost = useCallback(
+    (line: PeerHostChatLine) => {
+      roomHostRef.current?.broadcastChatLine(line)
+      deliverChatLineToUi(line)
+    },
+    [deliverChatLineToUi],
+  )
+
+  const onRemoteChatSend = useCallback(
+    (msg: PeerClientChatSend, fromPeerId: string) => {
+      const host = roomHostRef.current
+      if (!host) return
+      const roster = host.getRoster()
+      const rec = roster.find((r) => r.peerId === fromPeerId)
+      if (!rec || rec.seat !== msg.seat) return
+      const text = sanitizeChatText(msg.text)
+      if (!text) return
+      const now = Date.now()
+      const windowMs = 10_000
+      const max = 10
+      const arr = chatRateLimitRef.current.get(msg.seat) ?? []
+      const recent = arr.filter((t) => now - t < windowMs)
+      if (recent.length >= max) return
+      recent.push(now)
+      chatRateLimitRef.current.set(msg.seat, recent)
+      const sess = sessionRef.current
+      const senderLabel = chatSenderLabelForSeat(sess, rosterRef.current, msg.seat)
+      const line: PeerHostChatLine = {
+        type: 'chatLine',
+        id: crypto.randomUUID(),
+        seat: msg.seat,
+        senderLabel,
+        text,
+        ts: Date.now(),
+      }
+      broadcastChatLineFromHost(line)
+    },
+    [broadcastChatLineFromHost],
+  )
+
+  const onRoomChatLine = useCallback(
+    (line: PeerHostChatLine) => {
+      deliverChatLineToUi(line)
+    },
+    [deliverChatLineToUi],
+  )
+
+  const sendLocalRoomChat = useCallback(
+    (rawText: string) => {
+      const text = sanitizeChatText(rawText)
+      if (!text) return
+      const sess = sessionRef.current
+      const client = roomClientRef.current
+      if (client) {
+        if (!sess?.net || sess.net.spectator) return
+        client.sendChat({ seat: sess.net.seat, text })
+        return
+      }
+      const host = roomHostRef.current
+      if (!host) return
+      const hostSeat = 0
+      const now = Date.now()
+      const windowMs = 10_000
+      const max = 10
+      const arr = chatRateLimitRef.current.get(hostSeat) ?? []
+      const recent = arr.filter((t) => now - t < windowMs)
+      if (recent.length >= max) return
+      recent.push(now)
+      chatRateLimitRef.current.set(hostSeat, recent)
+      const senderLabel = chatSenderLabelForSeat(sess, rosterRef.current, hostSeat)
+      const line: PeerHostChatLine = {
+        type: 'chatLine',
+        id: crypto.randomUUID(),
+        seat: hostSeat,
+        senderLabel,
+        text,
+        ts: Date.now(),
+      }
+      broadcastChatLineFromHost(line)
+    },
+    [broadcastChatLineFromHost],
+  )
+
+  const handleOpenChat = useCallback(() => {
+    setChatOpenFailed('')
+    const w = openChatPopoutWindow()
+    if (!w) {
+      setChatOpenFailed(
+        'Could not open chat (popup blocked?). Allow pop-ups for this site from the address bar and try again.',
+      )
+      return
+    }
+    chatPopoutRef.current = w
+    clearMainChatToasts()
+  }, [clearMainChatToasts])
+
+  useEffect(() => {
+    const onMsg = (ev: MessageEvent) => {
+      if (ev.origin !== window.location.origin) return
+      if (!isChatPopoutToMain(ev.data)) return
+      if (ev.data.type === 'chat-popout-ready') {
+        const w = ev.source as Window | null
+        if (!w || w === window || w !== chatPopoutRef.current || w.closed) return
+        const sync: MainToChatPopout = {
+          source: CHAT_POPOUT_MESSAGE_SOURCE,
+          type: 'chat-sync',
+          lines: chatLinesRef.current,
+        }
+        w.postMessage(sync, window.location.origin)
+        return
+      }
+      if (ev.data.type === 'chat-outgoing') {
+        const w = ev.source as Window | null
+        if (!w || w !== chatPopoutRef.current) return
+        sendLocalRoomChat(ev.data.text)
+      }
+    }
+    window.addEventListener('message', onMsg)
+    return () => window.removeEventListener('message', onMsg)
+  }, [sendLocalRoomChat])
+
   const onMultiplayerTeardown = useCallback((_wasHost: boolean) => {
     roomHostRef.current = null
     roomClientRef.current = null
@@ -564,7 +755,18 @@ function App() {
     setGfAwaitingOpponent(false)
     setGfRank('A')
     setSkyjoDumpStep('idle')
-  }, [])
+    setChatLines([])
+    setChatOpenFailed('')
+    chatRateLimitRef.current.clear()
+    clearMainChatToasts()
+    try {
+      const w = chatPopoutRef.current
+      if (w && !w.closed) w.close()
+    } catch {
+      // ignore
+    }
+    chatPopoutRef.current = null
+  }, [clearMainChatToasts])
 
   const onHostingRosterChange = useCallback((peers?: HostedPeer[]) => {
     if (peers) setHostClientRoster(peers)
@@ -1277,6 +1479,11 @@ function App() {
           onSessionSnapshot={onSessionSnapshot}
           onRemoteIntent={onRemoteIntent}
           onRemoteSetDisplayName={onRemoteSetDisplayName}
+          onRemoteChatSend={onRemoteChatSend}
+          onRoomChatLine={onRoomChatLine}
+          onOpenChat={handleOpenChat}
+          chatEnabled={multiplayerChatEnabled}
+          chatOpenFailed={chatOpenFailed}
           onHostingRosterChange={onHostingRosterChange}
           onTeardown={onMultiplayerTeardown}
           onPeerAck={onPeerAck}
@@ -1444,6 +1651,7 @@ function App() {
           />
         }
       />
+      <ChatToastStack toasts={mainChatToasts} className="chatToastStack--mainApp" />
     </div>
   )
 }

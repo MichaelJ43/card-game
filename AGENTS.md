@@ -254,7 +254,7 @@ Client-side entry points:
 | `src/net/peer.ts` | `RTCPeerConnection` + DataChannel wrapper. |
 | `src/net/host.ts` | `RoomHost` — accepts clients, assigns seats, broadcasts snapshots. |
 | `src/net/client.ts` | `RoomClient` — dials host, consumes snapshots, sends intents. |
-| `src/ui/MultiplayerPanel.tsx` | Lobby UI (Host / Join / roster / status); chrome per **`docs/ui-design.md`**. |
+| `src/ui/MultiplayerPanel.tsx` | Lobby UI (Host / Join / roster / status, **Open chat**); chrome per **`docs/ui-design.md`**; room chat details in **`docs/multiplayer-chat.md`**. |
 | `src/session/playerConfig.ts` | `remoteHumanCount`, `gameSupportsOnlineMultiplayer`, `manifestWithPlayerCounts`. |
 
 Backend entry points live in `lambda/src/` (`http.ts`, `websocket.ts`,

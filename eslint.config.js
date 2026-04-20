@@ -33,4 +33,11 @@ export default defineConfig([
       'react-hooks/set-state-in-effect': 'off',
     },
   },
+  {
+    files: ['src/chat-popout/**/*.tsx'],
+    rules: {
+      // Second Vite entry: mount-only file, not a hot-reload component module.
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

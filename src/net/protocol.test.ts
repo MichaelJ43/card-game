@@ -6,6 +6,7 @@ import {
   isRoomCode,
   isSignalingMessage,
   isPeerMessage,
+  sanitizeChatText,
   sanitizeDisplayName,
 } from './protocol'
 import { mulberry32 } from '../core/shuffle'
@@ -28,6 +29,20 @@ describe('room codes', () => {
     expect(isRoomCode('ABCDE1')).toBe(false)
     expect(isRoomCode('abcdef')).toBe(false)
     expect(isRoomCode(123 as unknown)).toBe(false)
+  })
+})
+
+describe('sanitizeChatText', () => {
+  it('trims, strips controls, caps at 140', () => {
+    expect(sanitizeChatText('  hi  ')).toBe('hi')
+    expect(sanitizeChatText('a'.repeat(200))!.length).toBe(140)
+    expect(sanitizeChatText('\x01visible')).toBe('visible')
+  })
+
+  it('rejects empty', () => {
+    expect(sanitizeChatText('')).toBeNull()
+    expect(sanitizeChatText('   ')).toBeNull()
+    expect(sanitizeChatText(1 as unknown)).toBeNull()
   })
 })
 
@@ -56,6 +71,8 @@ describe('message type guards', () => {
     expect(isPeerMessage({ type: 'snapshot' })).toBe(true)
     expect(isPeerMessage({ type: 'intent' })).toBe(true)
     expect(isPeerMessage({ type: 'setDisplayName' })).toBe(true)
+    expect(isPeerMessage({ type: 'chatSend' })).toBe(true)
+    expect(isPeerMessage({ type: 'chatLine' })).toBe(true)
     expect(isPeerMessage({ type: 'nope' })).toBe(false)
   })
 })

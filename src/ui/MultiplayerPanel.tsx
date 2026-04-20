@@ -3,7 +3,14 @@ import { createRoom, joinRoom } from '../net/api'
 import { isMultiplayerConfigured } from '../net/config'
 import { RoomClient } from '../net/client'
 import { RoomHost, type HostedPeer } from '../net/host'
-import { isRoomCode, type PeerClientIntent, type PeerClientSetDisplayName, type PeerHostSnapshot } from '../net/protocol'
+import {
+  isRoomCode,
+  type PeerClientChatSend,
+  type PeerClientIntent,
+  type PeerClientSetDisplayName,
+  type PeerHostChatLine,
+  type PeerHostSnapshot,
+} from '../net/protocol'
 import type { PeerState } from '../net/peer'
 import type { SignalingState } from '../net/signaling'
 
@@ -31,6 +38,16 @@ export interface MultiplayerPanelProps {
   onRemoteIntent?: (intent: PeerClientIntent, fromPeerId: string) => void
   /** Client → host display name updates (host only). */
   onRemoteSetDisplayName?: (msg: PeerClientSetDisplayName, fromPeerId: string) => void
+  /** Client → host room chat (host only). */
+  onRemoteChatSend?: (msg: PeerClientChatSend, fromPeerId: string) => void
+  /** Host → client chat line (client only). */
+  onRoomChatLine?: (line: PeerHostChatLine) => void
+  /** Open second-window room chat (host or joined client). */
+  onOpenChat?: () => void
+  /** When false, **Open chat** is disabled (e.g. client waiting for first snapshot). */
+  chatEnabled?: boolean
+  /** Shown after a blocked popup when opening chat. */
+  chatOpenFailed?: string
   /** Host roster changed (e.g. client connected); parent may push a table snapshot. */
   onHostingRosterChange?: (peers: HostedPeer[]) => void
   /** Any multiplayer teardown (Close room, Leave room, or host disconnect). */
@@ -53,6 +70,11 @@ export function MultiplayerPanel({
   onSessionSnapshot,
   onRemoteIntent,
   onRemoteSetDisplayName,
+  onRemoteChatSend,
+  onRoomChatLine,
+  onOpenChat,
+  chatEnabled = true,
+  chatOpenFailed,
   onHostingRosterChange,
   onTeardown,
   onClosed,
@@ -119,6 +141,7 @@ export function MultiplayerPanel({
         onIntent: (msg, from) => {
           if (msg.type === 'intent') onRemoteIntent?.(msg, from)
           else if (msg.type === 'setDisplayName') onRemoteSetDisplayName?.(msg, from)
+          else if (msg.type === 'chatSend') onRemoteChatSend?.(msg, from)
         },
       })
       hostRef.current = host
@@ -130,7 +153,15 @@ export function MultiplayerPanel({
       setError(e instanceof Error ? e.message : String(e))
       setStatus('')
     }
-  }, [gameId, maxClients, onHostStarted, onHostingRosterChange, onRemoteIntent, onRemoteSetDisplayName])
+  }, [
+    gameId,
+    maxClients,
+    onHostStarted,
+    onHostingRosterChange,
+    onRemoteIntent,
+    onRemoteSetDisplayName,
+    onRemoteChatSend,
+  ])
 
   const startClient = useCallback(async () => {
     setError('')
@@ -155,6 +186,7 @@ export function MultiplayerPanel({
         onSnapshot: (snap) => onSessionSnapshot?.(snap),
         onStatus: (m) => setStatus(m),
         onAck: (nonce, ok, err) => onPeerAck?.(nonce, ok, err),
+        onChatLine: (line) => onRoomChatLine?.(line),
         onHostEnded: () => {
           teardown({ clientKickedByHost: true })
         },
@@ -167,7 +199,7 @@ export function MultiplayerPanel({
       setError(e instanceof Error ? e.message : String(e))
       setStatus('')
     }
-  }, [joinCodeInput, onClientStarted, onPeerAck, onSessionSnapshot, teardown, updatePeerStatus])
+  }, [joinCodeInput, onClientStarted, onPeerAck, onRoomChatLine, onSessionSnapshot, teardown, updatePeerStatus])
 
   if (!configured) {
     return (
@@ -182,6 +214,7 @@ export function MultiplayerPanel({
   }
 
   const showCompact = tableActive && mode !== 'idle'
+  const showOpenChat = mode !== 'idle' && !!onOpenChat
 
   return (
     <section className="multiplayerPanel" aria-label="Multiplayer">
@@ -233,6 +266,17 @@ export function MultiplayerPanel({
                   onCommit={nameplate.onCommit}
                 />
               )}
+              {showOpenChat && (
+                <button
+                  type="button"
+                  className="app__btnSecondary app__btnToolbar"
+                  disabled={!chatEnabled}
+                  title={!chatEnabled ? 'Wait until you have a seat at the table.' : undefined}
+                  onClick={() => onOpenChat?.()}
+                >
+                  Open chat
+                </button>
+              )}
               <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => teardown()}>
                 Close room
               </button>
@@ -269,6 +313,17 @@ export function MultiplayerPanel({
                   onCommit={nameplate.onCommit}
                 />
               )}
+              {showOpenChat && (
+                <button
+                  type="button"
+                  className="app__btnSecondary app__btnToolbar"
+                  disabled={!chatEnabled}
+                  title={!chatEnabled ? 'Wait until you have a seat at the table.' : undefined}
+                  onClick={() => onOpenChat?.()}
+                >
+                  Open chat
+                </button>
+              )}
               <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => teardown()}>
                 Leave room
               </button>
@@ -286,9 +341,22 @@ export function MultiplayerPanel({
             Signaling: <em>{signalingState}</em>
           </p>
           <ConnectedPeers roster={roster} />
-          <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => teardown()}>
-            Close room
-          </button>
+          <div className="multiplayerPanel__hostingActions">
+            {showOpenChat && (
+              <button
+                type="button"
+                className="app__btnSecondary app__btnToolbar"
+                disabled={!chatEnabled}
+                title={!chatEnabled ? 'Wait until you have a seat at the table.' : undefined}
+                onClick={() => onOpenChat?.()}
+              >
+                Open chat
+              </button>
+            )}
+            <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => teardown()}>
+              Close room
+            </button>
+          </div>
         </div>
       )}
 
@@ -300,9 +368,22 @@ export function MultiplayerPanel({
           <p>
             Signaling: <em>{signalingState}</em> · Peer: <em>{peerState}</em>
           </p>
-          <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => teardown()}>
-            Leave room
-          </button>
+          <div className="multiplayerPanel__hostingActions">
+            {showOpenChat && (
+              <button
+                type="button"
+                className="app__btnSecondary app__btnToolbar"
+                disabled={!chatEnabled}
+                title={!chatEnabled ? 'Wait until you have a seat at the table.' : undefined}
+                onClick={() => onOpenChat?.()}
+              >
+                Open chat
+              </button>
+            )}
+            <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => teardown()}>
+              Leave room
+            </button>
+          </div>
         </div>
       )}
 
@@ -312,6 +393,7 @@ export function MultiplayerPanel({
           {error}
         </p>
       )}
+      {chatOpenFailed ? <p className="multiplayerPanel__chatFail">{chatOpenFailed}</p> : null}
     </section>
   )
 }
