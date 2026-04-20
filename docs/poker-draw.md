@@ -7,3 +7,8 @@ Heads-up **five-card draw**: pay the **ante**, receive five cards, then choose h
 **Chips / match:** antes and pots adjust chip stacks; match ends at a chip target — see [`src/games/poker-draw/poker-draw.yaml`](../src/games/poker-draw/poker-draw.yaml).
 
 **Also see:** [Heads-up poker](heads-up-poker.md) (same module).
+
+## See also
+
+- **In-app rules** (modal text bundled in the app): [`src/rules/poker-draw.md`](../src/rules/poker-draw.md)
+- **Project wiki:** [Poker-draw](https://github.com/MichaelJ43/card-game/wiki/Poker-draw)

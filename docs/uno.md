@@ -11,3 +11,8 @@ Uno-style shedding: match the **current color** or the **face** of the top disca
 **Players:** 2–4 (human + AIs).
 
 *Uno® is a trademark of Mattel. This is an independent fan-style implementation for the table engine.*
+
+## See also
+
+- **In-app rules** (modal text bundled in the app): [`src/rules/uno.md`](../src/rules/uno.md)
+- **Project wiki:** [Uno](https://github.com/MichaelJ43/card-game/wiki/Uno)

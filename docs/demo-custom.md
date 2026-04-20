@@ -9,3 +9,8 @@ A minimal sample game using the small custom symbol deck from [`src/decks/exampl
 **Match:** none.
 
 Use **Play round** (or the game’s primary control) as indicated in the UI to advance the scripted duel.
+
+## See also
+
+- **In-app rules** (modal text bundled in the app): [`src/rules/demo-custom.md`](../src/rules/demo-custom.md)
+- **Project wiki:** [Demo-custom](https://github.com/MichaelJ43/card-game/wiki/Demo-custom)

@@ -4,4 +4,7 @@
 2. Four shared piles advance 1→…→12→1; Wild cards match the current need.
 3. End turn draws up to five from stock; first empty hand wins the round.
 
-See [`src/rules/sequence-race.md`](../src/rules/sequence-race.md).
+## See also
+
+- **In-app rules** (modal text bundled in the app): [`src/rules/sequence-race.md`](../src/rules/sequence-race.md)
+- **Project wiki:** [Sequence-race](https://github.com/MichaelJ43/card-game/wiki/Sequence-race)

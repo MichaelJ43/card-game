@@ -7,3 +7,8 @@ Each side antes **5** or **10** chips (when both can cover it), then one card is
 **Chips / match:** see [`src/games/high-card-duel/high-card-duel.yaml`](../src/games/high-card-duel/high-card-duel.yaml).
 
 **Also see:** [Red Dog](red-dog.md) (same engine).
+
+## See also
+
+- **In-app rules** (modal text bundled in the app): [`src/rules/high-card-duel.md`](../src/rules/high-card-duel.md)
+- **Project wiki:** [High-card-duel](https://github.com/MichaelJ43/card-game/wiki/High-card-duel)
