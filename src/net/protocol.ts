@@ -8,7 +8,7 @@
  * host sends back. Incrementing {@link PROTOCOL_VERSION} is a breaking change.
  */
 
-export const PROTOCOL_VERSION = 1
+export const PROTOCOL_VERSION = 2
 
 /** Room codes are 6 uppercase alphanumeric chars, ambiguous glyphs dropped. */
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -137,6 +137,31 @@ export interface PeerClientIntent {
   action: unknown
 }
 
+/** Client → host: change display label for their seat (host validates seat + player id). */
+export interface PeerClientSetDisplayName {
+  type: 'setDisplayName'
+  nonce: string
+  seat: number
+  /** Must match the seat’s profile id from the last snapshot (prevents spoofing another seat). */
+  playerId: string
+  displayName: string
+}
+
+/** Single-line display name for UI; returns null if empty after trim / invalid type. */
+export function sanitizeDisplayName(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const t = raw
+    .trim()
+    .split('')
+    .filter((ch) => {
+      const c = ch.charCodeAt(0)
+      return c >= 32 && c !== 127
+    })
+    .join('')
+    .slice(0, 40)
+  return t.length ? t : null
+}
+
 /** Client → host: liveness ping to detect silent disconnects. */
 export interface PeerClientPing {
   type: 'ping'
@@ -153,6 +178,7 @@ export type PeerMessage =
   | PeerHostAck
   | PeerHostStatus
   | PeerClientIntent
+  | PeerClientSetDisplayName
   | PeerClientPing
   | PeerHostPong
 
@@ -179,6 +205,7 @@ export function isPeerMessage(value: unknown): value is PeerMessage {
     t === 'ack' ||
     t === 'status' ||
     t === 'intent' ||
+    t === 'setDisplayName' ||
     t === 'ping' ||
     t === 'pong'
   )

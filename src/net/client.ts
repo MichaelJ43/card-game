@@ -1,6 +1,7 @@
 import { PeerLink, type PeerState } from './peer'
 import {
   type PeerClientIntent,
+  type PeerClientSetDisplayName,
   type PeerHostSnapshot,
   type PeerMessage,
   type SignalingRelay,
@@ -87,6 +88,10 @@ export class RoomClient {
 
   sendIntent(intent: Omit<PeerClientIntent, 'type'>): void {
     this.link?.send({ type: 'intent', ...intent })
+  }
+
+  sendSetDisplayName(body: Omit<PeerClientSetDisplayName, 'type'>): void {
+    this.link?.send({ type: 'setDisplayName', ...body })
   }
 
   close(): void {

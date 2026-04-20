@@ -3,9 +3,17 @@ import { createRoom, joinRoom } from '../net/api'
 import { isMultiplayerConfigured } from '../net/config'
 import { RoomClient } from '../net/client'
 import { RoomHost, type HostedPeer } from '../net/host'
-import { isRoomCode, type PeerClientIntent, type PeerHostSnapshot } from '../net/protocol'
+import { isRoomCode, type PeerClientIntent, type PeerClientSetDisplayName, type PeerHostSnapshot } from '../net/protocol'
 import type { PeerState } from '../net/peer'
 import type { SignalingState } from '../net/signaling'
+
+export interface MultiplayerNameplateProps {
+  seat: number
+  playerId: string
+  initialName: string
+  disabled?: boolean
+  onCommit: (raw: string) => void
+}
 
 export interface MultiplayerPanelProps {
   gameId: string
@@ -21,11 +29,17 @@ export interface MultiplayerPanelProps {
   onSessionSnapshot?: (snap: PeerHostSnapshot) => void
   /** Client → host game intents (host only). */
   onRemoteIntent?: (intent: PeerClientIntent, fromPeerId: string) => void
+  /** Client → host display name updates (host only). */
+  onRemoteSetDisplayName?: (msg: PeerClientSetDisplayName, fromPeerId: string) => void
   /** Host roster changed (e.g. client connected); parent may push a table snapshot. */
   onHostingRosterChange?: (peers: HostedPeer[]) => void
   /** Any multiplayer teardown (Close room, Leave room, or host disconnect). */
   onTeardown?: (wasHost: boolean) => void
   onClosed?: () => void
+  /** Host acks from the peer channel (e.g. failed rename). */
+  onPeerAck?: (nonce: string, ok: boolean, error: string | undefined) => void
+  /** Local viewer’s seat label editor (when the table has a seat roster). */
+  nameplate?: MultiplayerNameplateProps
 }
 
 type Mode = 'idle' | 'hosting' | 'client'
@@ -38,9 +52,12 @@ export function MultiplayerPanel({
   onClientStarted,
   onSessionSnapshot,
   onRemoteIntent,
+  onRemoteSetDisplayName,
   onHostingRosterChange,
   onTeardown,
   onClosed,
+  onPeerAck,
+  nameplate,
 }: MultiplayerPanelProps) {
   const [mode, setMode] = useState<Mode>('idle')
   const [roomCode, setRoomCode] = useState<string>('')
@@ -101,6 +118,7 @@ export function MultiplayerPanel({
         },
         onIntent: (msg, from) => {
           if (msg.type === 'intent') onRemoteIntent?.(msg, from)
+          else if (msg.type === 'setDisplayName') onRemoteSetDisplayName?.(msg, from)
         },
       })
       hostRef.current = host
@@ -112,7 +130,7 @@ export function MultiplayerPanel({
       setError(e instanceof Error ? e.message : String(e))
       setStatus('')
     }
-  }, [gameId, maxClients, onHostStarted, onHostingRosterChange, onRemoteIntent])
+  }, [gameId, maxClients, onHostStarted, onHostingRosterChange, onRemoteIntent, onRemoteSetDisplayName])
 
   const startClient = useCallback(async () => {
     setError('')
@@ -136,6 +154,7 @@ export function MultiplayerPanel({
         onPeerState: updatePeerStatus,
         onSnapshot: (snap) => onSessionSnapshot?.(snap),
         onStatus: (m) => setStatus(m),
+        onAck: (nonce, ok, err) => onPeerAck?.(nonce, ok, err),
         onHostEnded: () => {
           teardown({ clientKickedByHost: true })
         },
@@ -148,7 +167,7 @@ export function MultiplayerPanel({
       setError(e instanceof Error ? e.message : String(e))
       setStatus('')
     }
-  }, [joinCodeInput, onClientStarted, onSessionSnapshot, teardown, updatePeerStatus])
+  }, [joinCodeInput, onClientStarted, onPeerAck, onSessionSnapshot, teardown, updatePeerStatus])
 
   if (!configured) {
     return (
@@ -263,6 +282,16 @@ export function MultiplayerPanel({
         </div>
       )}
 
+      {nameplate && tableActive && (
+        <NameplateEditor
+          seat={nameplate.seat}
+          playerId={nameplate.playerId}
+          initialName={nameplate.initialName}
+          disabled={nameplate.disabled}
+          onCommit={nameplate.onCommit}
+        />
+      )}
+
       {status && <p className="multiplayerPanel__status">{status}</p>}
       {error && (
         <p className="multiplayerPanel__error" role="alert">
@@ -270,6 +299,48 @@ export function MultiplayerPanel({
         </p>
       )}
     </section>
+  )
+}
+
+function NameplateEditor({
+  seat,
+  playerId,
+  initialName,
+  disabled,
+  onCommit,
+}: Pick<MultiplayerNameplateProps, 'seat' | 'playerId' | 'initialName' | 'disabled' | 'onCommit'>) {
+  const [draft, setDraft] = useState(initialName)
+  useEffect(() => {
+    setDraft(initialName)
+  }, [playerId, initialName])
+  if (!playerId) return null
+  return (
+    <div className="multiplayerPanel__nameplate">
+      <label className="multiplayerPanel__nameplateLabel" htmlFor={`mp-display-name-${seat}`}>
+        Your table name (seat {seat})
+      </label>
+      <div className="multiplayerPanel__nameplateRow">
+        <input
+          id={`mp-display-name-${seat}`}
+          className="multiplayerPanel__nameplateInput"
+          type="text"
+          maxLength={40}
+          autoComplete="nickname"
+          value={draft}
+          disabled={disabled}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <button
+          type="button"
+          className="multiplayerPanel__nameplateSave"
+          disabled={disabled || !draft.trim()}
+          onClick={() => onCommit(draft)}
+        >
+          Save
+        </button>
+      </div>
+      <p className="multiplayerPanel__nameplateHint">Shown on the table and score card. Does not change your seat.</p>
+    </div>
   )
 }
 
