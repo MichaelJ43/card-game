@@ -19,15 +19,16 @@ This document summarizes how the **card-game** repository is structured, how gam
 | `src/session.ts` | **`createSession`**, **`startNextMatchRound`**, **`continuationOptionsFromSession`** (preserve house rules between match rounds). |
 | `src/session/playerConfig.ts` | **`CreateSessionOptions`** (AI count/difficulties, `skipMatch`, house-rule fields), **`gameSupportsConfigurableAi`**, **`clampAiOpponentCount`**, manifest AI count normalization. |
 | `src/core/` | **`GameModule`** contract, **`TableState`**, **`GameAction`**, **`MatchState`**, deck/build helpers, **`registerGameModule`**, shuffle, YAML parsing entry points. |
+| `src/core/discardRecycle.ts` | When the draw pile is empty, optionally **shuffle the discard pile into a new draw pile**; **`isDeckDrawAvailableAfterOptionalRecycle`** for legal-action checks without mutating the table. Used by games with both **`draw`** and **`discard`** when **`reshuffleDiscardWhenDrawEmpty`** is on. |
 | `src/core/types.ts` | Shared types: **`CardInstance`**, **`CardTemplate`**, zones, **`GameManifestYaml`**, **`MatchManifestYaml`**, **`GameAction`** variants. |
-| `src/core/gameModule.ts` | **`GameModuleContext`** (manifest, templates, rng, `matchCumulativeScores`, optional house-rule flags for modules). |
+| `src/core/gameModule.ts` | **`GameModuleContext`** (manifest, templates, rng, `matchCumulativeScores`, optional **`reshuffleDiscardWhenDrawEmpty`**, other house-rule flags for modules). |
 | `src/core/match.ts` | **`MatchState`**, **`applyFinishedRound`**, **`createInitialMatchState`**, end condition **`anyAtOrAbove`**, **`winnerIs`**: `lowest` \| `highest`. |
 | `src/core/table.ts` | **`createEmptyTable`**, **`cloneTable`**, **`moveTop`**, zone helpers. |
 | `src/core/registry.ts` | **`registerGameModule`** / **`getGameModule`** — modules self-register on import. |
 | `src/core/aiContext.ts` | **`AiDifficulty`**: `easy` \| `medium` \| `hard`; **`SelectAiContext`** (difficulty + optional match fields for Skyjo AI). |
 | `src/data/manifests.ts` | **`GAME_SOURCES`**, **`DECK_SOURCES`**, **`GAME_IDS`** — Vite `?raw` imports wiring ids to YAML strings. |
 | `src/data/rulesSources.ts` | **`RULES_SOURCES`**, **`rulesTextForGame`**, **`RulesGameId`** — maps each **`GAME_IDS`** entry to `src/rules/*.md` raw markdown. |
-| `src/data/houseRules.ts` | **`localStorage`** persistence for per-game **house rules**; **`createSessionOptionsHouseRules`** merges into **`CreateSessionOptions`**. |
+| `src/data/houseRules.ts` | **`localStorage`** persistence for per-game **house rules**; **`createSessionOptionsHouseRules`** merges into **`CreateSessionOptions`**; **`GAMES_WITH_DISCARD_RECYCLE_OPTION`** controls which games show the “reshuffle discard when draw empty” toggle; **`effectiveReshuffleDiscardWhenDrawEmpty`** resolves manifest default + stored preference + session options. |
 | `src/decks/*.yaml` | Deck definitions: `standard-52`, `skyjo`, `uno`, `thirty-one-32`, `euchre-24`, `durak-36`, `pinochle-24`, `canasta-108`, `sequence-race-112`, `example-custom`. |
 | `src/games/<id>/` | Per-title **`*.yaml` manifest** + **`index.ts`** module (some **game ids** share one **`module`** id). |
 | `src/games/*/index.ts` | Implements **`GameModule`**: **`setup`**, **`getLegalActions`**, **`applyAction`**, **`selectAiAction`**, **`statusText`**, optional **`extractMatchRoundScores`** / **`isMatchRoundFinished`**. |
@@ -49,7 +50,7 @@ This document summarizes how the **card-game** repository is structured, how gam
    - Parses manifest from **`GAME_SOURCES[gameId]`** (and may override **`match.targetScore`** from house rules when **not** continuing a match).
    - Applies **`manifestWithAiOpponents`** when **`CreateSessionOptions.aiCount`** is set.
    - Builds **`MatchState`** from manifest when **`match.enabled`** and not **`skipMatch`**, unless **`carryMatch`** is passed (next round).
-   - Loads deck YAML, **`buildDeckInstances`**, calls **`module.setup(ctx, instances)`** with **`GameModuleContext`** (including house-rule flags).
+   - Loads deck YAML, **`buildDeckInstances`**, calls **`module.setup(ctx, instances)`** with **`GameModuleContext`** (including house-rule flags and optional **`reshuffleDiscardWhenDrawEmpty`** for draw+discard games).
 3. **`GameSession`** holds **`manifest`**, **`module`**, **`table`**, **`gameState`**, optional **`match`**, optional **`aiPlayerConfig`**.
 4. **`App`** dispatches **`module.applyAction`** for button or intent-driven actions; **`TableView`** may call **`onTableIntent`** when zones are allowlisted.
 5. When a module implements **`isMatchRoundFinished`** + **`extractMatchRoundScores`**, **`startNextMatchRound`** merges scores via **`applyFinishedRound`** and either ends the match or **`createSession`** again with updated **`carryMatch`** and **`continuationOptionsFromSession`** so house rules persist.
@@ -63,6 +64,7 @@ Parsed as **`GameManifestYaml`** (`src/core/types.ts`). Important fields:
 - **`id`**, **`name`**, **`module`** (registry key — must match **`GameModule.moduleId`** in the TS file), **`deck`** (key into **`DECK_SOURCES`**).
 - **`players.human`**, **`players.ai`** — shell often fixes **`human: 1`** and varies AI count via **`manifestWithAiOpponents`**.
 - **`match`** (optional): **`enabled`**, **`targetScore`**, **`winnerIs`**, **`endCondition`**, **`startingStack`**, **`scoringMode`**, **`scoreLabel`**, etc.
+- **`discardRecycleWhenDrawEmpty`** (optional boolean): default for whether an **empty draw pile** should recycle the **discard** (shuffled) back into **draw** when the game uses both zones. Titles where an empty stock normally **ends** the round (e.g. **thirty-one**) should set **`false`**; casual “keep playing” defaults can set **`true`**. The Rules panel can override per player via **`reshuffleDiscardWhenDrawEmpty`** in **`houseRules`**.
 
 The **game id** in the menu is the manifest **`id`** (e.g. `casino-blackjack`), not always the same string as **`module`** (e.g. `blackjack`).
 
@@ -140,8 +142,8 @@ Keep **`RulesGameId`** in sync with **`GAME_IDS`** in **`rulesSources.ts`**.
 ## House rules (optional table options)
 
 - **`src/data/houseRules.ts`**: **`localStorage`** key **`card-game:house-rules:v1`**, per **`RulesGameId`**.
-- **`GameHouseRulesPanel`** (in Rules modal) edits: **match target**, Skyjo **discard-on-face-up-only**, blackjack **dealer hits soft 17**, War **tie pile size** (1 vs 3).
-- **`createSessionOptionsHouseRules`** merges into **`createSession`**; **`GameModuleContext`** passes module-specific flags into **`setup`**.
+- **`GameHouseRulesPanel`** (in Rules modal) edits: **match target**, Skyjo **discard-on-face-up-only**, blackjack **dealer hits soft 17**, War **tie pile size** (1 vs 3), and for games in **`GAMES_WITH_DISCARD_RECYCLE_OPTION`** (**skyjo**, **uno**, **crazy-eights**, **canasta**, **poker-draw**, **thirty-one**): **reshuffle discard into draw when the draw pile is empty** (stored as **`reshuffleDiscardWhenDrawEmpty`**).
+- **`createSessionOptionsHouseRules`** merges into **`createSession`**; **`continuationOptionsFromSession`** spreads those options so house rules persist across **next match round**. **`GameModuleContext`** passes **`reshuffleDiscardWhenDrawEmpty`** (and other flags) into **`setup`**; modules that implement recycle call **`recycleDiscardIntoDrawWhenEmpty`** / **`isDeckDrawAvailableAfterOptionalRecycle`** from **`src/core/discardRecycle.ts`**.
 
 Agents changing rules behavior should update **both** the module logic and **`src/rules/*.md`** (and optionally **`docs/`**).
 
@@ -154,23 +156,23 @@ Agents changing rules behavior should update **both** the module logic and **`sr
 | `war` | `war` | Step-driven skirmish; **`tieDownCards`** house rule. |
 | `demo-custom` | `demo-custom` | Sample custom deck. |
 | `go-fish` | `go-fish` | Asks, books, draw pile; per-seat AI difficulty. |
-| `skyjo` | `skyjo` | Grid, draw/discard, match play; rich AI; **`discardSwapFaceUpOnly`**. |
+| `skyjo` | `skyjo` | Grid, draw/discard, match play; rich AI; **`discardSwapFaceUpOnly`**; optional **discard→draw recycle** when stock empty (**`discardRecycleWhenDrawEmpty`** / Rules toggle). |
 | `blackjack` | `blackjack` | Chips, bet/hit/stand; **`dealerHitsSoft17`**. |
 | `casino-blackjack` | `blackjack` | Alternate manifest (stacks/target/scoring labels). |
 | `baccarat` | `baccarat` | Player/banker bets. |
 | `mini-baccarat` | `baccarat` | Alternate manifest. |
-| `crazy-eights` | `crazy-eights` | Shedding + eights wild. |
+| `crazy-eights` | `crazy-eights` | Shedding + eights wild; optional **discard recycle** when draw empty. |
 | `switch` | `crazy-eights` | Alternate manifest. |
-| `poker-draw` | `poker-draw` | Draw poker style. |
+| `poker-draw` | `poker-draw` | Draw poker style; optional **discard recycle** when deck empty. |
 | `heads-up-poker` | `poker-draw` | Alternate manifest. |
 | `high-card-duel` | `high-card-duel` | Single-card compare. |
 | `red-dog` | `high-card-duel` | Alternate manifest. |
-| `uno` | `uno` | Custom **uno** deck. |
-| `thirty-one` | `thirty-one` | 32-card Scat-style draw/discard; optional match. |
+| `uno` | `uno` | Custom **uno** deck; optional **discard recycle** when draw empty. |
+| `thirty-one` | `thirty-one` | 32-card Scat-style draw/discard; optional match; **discard recycle** defaults **off** (empty stock often ends the round). |
 | `euchre` | `euchre` | 24-card simplified trick race (four seats, fixed AI count). |
 | `durak` | `durak` | 36-card two-player attack/defend. |
 | `pinochle` | `pinochle` | Double 48-card trick race; templates doubled in `setup`. |
-| `canasta` | `canasta` | 108-card draw-two/discard-one drill (not full canasta). |
+| `canasta` | `canasta` | 108-card draw-two/discard-one drill (not full canasta); optional **discard recycle** when draw empty. |
 | `sequence-race` | `sequence-race` | Custom 112-card “Skip-Bo–style” builder. |
 
 ---
@@ -179,7 +181,7 @@ Agents changing rules behavior should update **both** the module logic and **`sr
 
 1. Add **`src/games/<id>/<id>.yaml`** and **`src/games/<id>/index.ts`** implementing **`GameModule`** + **`registerGameModule`**.
 2. Wire **`GAME_SOURCES`** and (if new) **`DECK_SOURCES`** in **`src/data/manifests.ts`** with `?raw` imports.
-3. Add **`src/rules/<id>.md`** and an entry in **`RULES_SOURCES`** (`src/data/rulesSources.ts`); extend **`GameHouseRules`** / panel only if new options are needed.
+3. Add **`src/rules/<id>.md`** and an entry in **`RULES_SOURCES`** (`src/data/rulesSources.ts`); extend **`GameHouseRules`** / panel only if new options are needed. For **draw + discard** games that should support “shuffle discard into draw when draw is empty,” wire **`src/core/discardRecycle.ts`**, set **`discardRecycleWhenDrawEmpty`** on the manifest, register the id in **`GAMES_WITH_DISCARD_RECYCLE_OPTION`**, and mirror the **`GameHouseRulesPanel`** + **`createSession`** pattern used by Skyjo / Uno.
 4. Update **`App.tsx`** if the shell must handle intents, custom buttons, or special UI (copy patterns from similar games).
 5. Add **`docs/<id>.md`** and a **README** table row if you want public doc parity.
 6. Run **`npm run build`** and **`npm run lint`**.
