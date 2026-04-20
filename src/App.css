@@ -699,7 +699,7 @@
 
 .multiplayerPanel__compactRow--split {
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.35rem 0.5rem;
 }
 
@@ -708,17 +708,19 @@
   min-width: 0;
 }
 
+/* Right-align name + actions with host; margin-left: auto pins tail when row wraps too */
 .multiplayerPanel__compactTail {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.35rem 0.5rem;
-  flex: 1 1 10rem;
+  flex: 0 1 auto;
   min-width: 0;
+  margin-left: auto;
 }
 
-.multiplayerPanel__compact button {
+.multiplayerPanel__compact .app__btnToolbar {
   flex: 0 0 auto;
 }
 
@@ -758,20 +760,15 @@
   min-width: 4.5rem;
   max-width: 12rem;
   flex: 1 1 6rem;
-  padding: 0.2rem 0.4rem;
-  border-radius: 0.3rem;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(0, 0, 0, 0.22);
-  color: inherit;
+  box-sizing: border-box;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border, #2e303a);
+  background: var(--bg, #16171d);
+  color: var(--text-h, #f3f4f6);
+  font: inherit;
   font-size: 0.82rem;
-}
-
-.multiplayerPanel__nameplateInlineSave {
-  flex-shrink: 0;
-  padding: 0.2rem 0.45rem;
-  border-radius: 0.3rem;
-  cursor: pointer;
-  font-size: 0.8rem;
 }
 
 fieldset.app__houseRules {
