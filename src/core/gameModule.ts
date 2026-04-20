@@ -9,6 +9,10 @@ export interface GameModuleContext {
   rng: () => number
   /** Present when session continues a match; use for chip stacks / cumulative state at deal time. */
   matchCumulativeScores?: number[]
+  /** House rules from the app rule picker (optional). */
+  dealerHitsSoft17?: boolean
+  warTieDownCards?: 1 | 3
+  skyjoDiscardSwapFaceUpOnly?: boolean
 }
 
 export interface ApplyResult<TGame> {

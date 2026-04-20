@@ -403,6 +403,11 @@ export interface SkyjoGameState {
   finalQueue: number[]
   roundScores: number[] | null
   finisherDoubled: boolean
+  /**
+   * House rule: the discard pile may only be taken to swap onto face-up grid cards
+   * (face-down cells accept deck draws only).
+   */
+  discardSwapFaceUpOnly: boolean
 }
 
 function buildLegalActions(table: TableState, gs: SkyjoGameState): GameAction[] {
@@ -412,11 +417,15 @@ function buildLegalActions(table: TableState, gs: SkyjoGameState): GameAction[] 
 
   if (gs.pendingDraw) {
     const actions: GameAction[] = []
+    const g = table.zones[gridZone(p)]!.cards
     for (let i = 0; i < GRID; i++) {
+      if (gs.pendingFromDiscard && gs.discardSwapFaceUpOnly) {
+        const c = g[i]
+        if (!c || isSlot(c.templateId) || !c.faceUp) continue
+      }
       actions.push({ type: 'skyjoSwapDrawn', gridIndex: i })
     }
     if (!gs.pendingFromDiscard) {
-      const g = table.zones[gridZone(p)]!.cards
       for (let i = 0; i < GRID; i++) {
         const c = g[i]
         if (c && !isSlot(c.templateId) && !c.faceUp) {
@@ -432,7 +441,12 @@ function buildLegalActions(table: TableState, gs: SkyjoGameState): GameAction[] 
     actions.push({ type: 'skyjoDraw', from: 'deck' })
   }
   if (table.zones.discard!.cards.length > 0) {
+    const g = table.zones[gridZone(p)]!.cards
     for (let i = 0; i < GRID; i++) {
+      if (gs.discardSwapFaceUpOnly) {
+        const c = g[i]
+        if (!c || isSlot(c.templateId) || !c.faceUp) continue
+      }
       actions.push({ type: 'skyjoTakeDiscard', gridIndex: i })
     }
   }
@@ -773,6 +787,7 @@ const skyjoModule: GameModule<SkyjoGameState> = {
 
   setup(ctx: GameModuleContext, instances: CardInstance[]) {
     const { manifest, templates, rng } = ctx
+    const discardSwapFaceUpOnly = ctx.skyjoDiscardSwapFaceUpOnly ?? false
     const pCount = totalPlayers(manifest)
     const rngFn = mulberry32(Math.floor(rng() * 0xffffffff))
 
@@ -837,6 +852,7 @@ const skyjoModule: GameModule<SkyjoGameState> = {
         finalQueue: [],
         roundScores: null,
         finisherDoubled: false,
+        discardSwapFaceUpOnly,
       },
     }
   },
@@ -962,6 +978,15 @@ const skyjoModule: GameModule<SkyjoGameState> = {
         if (i < 0 || i >= GRID) return { table, gameState, error: 'Bad grid index.' }
         const g = t.zones[gridZone(current)]!.cards
         const old = g[i]!
+        if (gs.discardSwapFaceUpOnly && gs.pendingFromDiscard) {
+          if (isSlot(old.templateId) || !old.faceUp) {
+            return {
+              table,
+              gameState,
+              error: 'With this house rule, discard may only replace a face-up card.',
+            }
+          }
+        }
         g[i] = pending
         pending.faceUp = true
         pushDiscard(t, old)
@@ -1027,6 +1052,17 @@ const skyjoModule: GameModule<SkyjoGameState> = {
     if (action.type === 'skyjoTakeDiscard') {
       const i = action.gridIndex
       if (i < 0 || i >= GRID) return { table, gameState, error: 'Bad grid index.' }
+      if (gs.discardSwapFaceUpOnly) {
+        const g = t.zones[gridZone(current)]!.cards
+        const cell = g[i]
+        if (!cell || isSlot(cell.templateId) || !cell.faceUp) {
+          return {
+            table,
+            gameState,
+            error: 'Take discard only by choosing a face-up card to replace (house rule).',
+          }
+        }
+      }
       const d = topDiscard(t)
       if (!d) return { table, gameState, error: 'Discard is empty.' }
       t.zones.discard!.cards.pop()

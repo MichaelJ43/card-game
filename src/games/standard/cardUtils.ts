@@ -22,6 +22,20 @@ export function rankOrder(templates: Record<string, CardTemplate>, templateId: s
 }
 
 /** Best blackjack total ≤ 21 (Aces 1 or 11). */
+/** All aces count as 1 (no soft totals). */
+export function blackjackHardTotal(templates: Record<string, CardTemplate>, templateIds: string[]): number {
+  let s = 0
+  for (const id of templateIds) {
+    const r = templates[id]?.rank
+    if (r === 'A') s += 1
+    else if (typeof r === 'string' && RANK_VAL[r] !== undefined) {
+      const v = RANK_VAL[r]!
+      s += v >= 10 ? 10 : v
+    }
+  }
+  return s
+}
+
 export function blackjackValue(templates: Record<string, CardTemplate>, templateIds: string[]): number {
   let low = 0
   let aces = 0
@@ -41,6 +55,11 @@ export function blackjackValue(templates: Record<string, CardTemplate>, template
     if (with11 <= 21) best = with11
   }
   return best
+}
+
+/** Soft 17: total 17 using at least one ace as 11 (e.g. A+6). */
+export function isSoftBlackjack17(templates: Record<string, CardTemplate>, templateIds: string[]): boolean {
+  return blackjackValue(templates, templateIds) === 17 && blackjackHardTotal(templates, templateIds) < 17
 }
 
 export function isBlackjack(templates: Record<string, CardTemplate>, twoIds: string[]): boolean {
