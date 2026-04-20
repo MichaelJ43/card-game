@@ -8,7 +8,7 @@ import { DECK_SOURCES, GAME_SOURCES } from './data/manifests'
 import type { AiDifficulty } from './core/aiContext'
 import type { GameManifestYaml, TableState } from './core/types'
 import {
-  manifestWithAiOpponents,
+  manifestWithPlayerCounts,
   normalizeAiDifficultiesForCount,
   type CreateSessionOptions,
 } from './session/playerConfig'
@@ -44,7 +44,10 @@ export function createSession(
   if (!raw) throw new Error(`Unknown game: ${gameId}`)
 
   let manifest = parseGameManifestYaml(raw)
-  manifest = manifestWithAiOpponents(manifest, gameId, options?.aiCount)
+  manifest = manifestWithPlayerCounts(manifest, gameId, {
+    aiCount: options?.aiCount,
+    remoteHumanCount: options?.remoteHumanCount,
+  })
 
   if (!carryMatch && options?.matchTargetScore != null && manifest.match?.enabled) {
     const def = typeof manifest.match.targetScore === 'number' ? manifest.match.targetScore : 100

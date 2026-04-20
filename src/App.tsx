@@ -11,11 +11,14 @@ import { rulesTextForGame, type RulesGameId } from './data/rulesSources'
 import {
   clampAiOpponentCount,
   gameSupportsConfigurableAi,
+  gameSupportsOnlineMultiplayer,
   gameSupportsPerSeatAiDifficulty,
   MAX_AI_OPPONENTS,
+  MAX_REMOTE_HUMANS,
   normalizeAiDifficultiesForCount,
 } from './session/playerConfig'
 import { GameHouseRulesPanel } from './ui/GameHouseRulesPanel'
+import { MultiplayerPanel } from './ui/MultiplayerPanel'
 import { RulesModal } from './ui/RulesModal'
 import { TableView, type ActiveTurnHighlight, type TableIntent } from './ui/TableView'
 import { skyjoDumpUiStepShouldReset, type SkyjoDumpUiStep } from './ui/tableUiFlow'
@@ -867,9 +870,17 @@ function App() {
       </header>
 
       {!session && (
-        <p className="app__lobbyHint" role="status">
-          Select a game, adjust AI options if needed, then press <strong>Start deal</strong>.
-        </p>
+        <>
+          <p className="app__lobbyHint" role="status">
+            Select a game, adjust AI options if needed, then press <strong>Start deal</strong>.
+          </p>
+          {gameSupportsOnlineMultiplayer(gameId) && (
+            <MultiplayerPanel
+              gameId={gameId}
+              maxClients={MAX_REMOTE_HUMANS}
+            />
+          )}
+        </>
       )}
 
       {session && (

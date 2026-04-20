@@ -30,7 +30,15 @@ export interface CreateSessionOptions {
    * Override “shuffle discard into draw when draw is empty” for games that support it (see house rules).
    */
   reshuffleDiscardWhenDrawEmpty?: boolean
+  /**
+   * Remote human opponents (networked peers). Applied only for games in {@link gameSupportsOnlineMultiplayer}.
+   * Player 0 is always the local human; remote humans occupy 1..N before any AI seats.
+   */
+  remoteHumanCount?: number
 }
+
+/** Max remote human opponents per table (excludes the host / player 0). */
+export const MAX_REMOTE_HUMANS = 7
 
 const CONFIGURABLE_AI_GAME_IDS = new Set([
   'war',
@@ -105,5 +113,61 @@ export function manifestWithAiOpponents(
       human: manifest.players.human,
       ai,
     },
+  }
+}
+
+/**
+ * Games where remote humans can join in addition to the local host.
+ * Defaults to the same set as configurable AI (seat slots work the same way),
+ * minus titles whose UI/flow is heads-up only.
+ */
+const ONLINE_MULTIPLAYER_GAME_IDS = new Set([
+  'war',
+  'go-fish',
+  'skyjo',
+  'demo-custom',
+  'crazy-eights',
+  'switch',
+  'uno',
+  'thirty-one',
+  'pinochle',
+  'canasta',
+  'sequence-race',
+])
+
+export function gameSupportsOnlineMultiplayer(gameId: string): boolean {
+  return ONLINE_MULTIPLAYER_GAME_IDS.has(gameId)
+}
+
+export function clampRemoteHumanCount(gameId: string, requested: number): number {
+  let n = Math.floor(Number(requested))
+  if (!Number.isFinite(n)) n = 0
+  if (n < 0) n = 0
+  if (!gameSupportsOnlineMultiplayer(gameId)) return 0
+  const totalSeats = MAX_AI_OPPONENTS + 1
+  return Math.min(MAX_REMOTE_HUMANS, Math.min(totalSeats - 1, n))
+}
+
+/**
+ * Apply both remote human and AI counts to a manifest. Humans get slot 0 (host) and slots 1..remoteHumanCount.
+ * AI seats occupy the remaining slots.
+ */
+export function manifestWithPlayerCounts(
+  manifest: GameManifestYaml,
+  gameId: string,
+  counts: { aiCount?: number; remoteHumanCount?: number },
+): GameManifestYaml {
+  const remoteHumans = counts.remoteHumanCount
+    ? clampRemoteHumanCount(gameId, counts.remoteHumanCount)
+    : 0
+  const human = 1 + remoteHumans
+  let ai = manifest.players.ai
+  if (counts.aiCount !== undefined && gameSupportsConfigurableAi(gameId)) {
+    ai = clampAiOpponentCount(gameId, counts.aiCount)
+  }
+  if (remoteHumans === 0 && counts.aiCount === undefined) return manifest
+  return {
+    ...manifest,
+    players: { human, ai },
   }
 }

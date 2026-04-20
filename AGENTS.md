@@ -196,7 +196,109 @@ npm run dev      # dev server
 npm run build    # tsc + vite build
 npm run lint     # eslint
 npm run preview  # serve production build
+npm run test     # vitest (watch)
+npm run test:ci  # vitest run (used in CI)
 ```
+
+Backend (AWS Lambda signaling) lives in `lambda/`:
+
+```bash
+cd lambda
+npm install
+npm run build   # tsc -> dist/
+npm run bundle  # zip dist/ into http.zip + websocket.zip for Terraform
+npm run test    # vitest run
+```
+
+Infra lives in `deploy/terraform/aws/` (see its `README.md`). The GitHub Actions
+workflow `.github/workflows/deploy.yml` runs build + bundle + terraform apply +
+S3 sync + CloudFront invalidation on pushes to `main`. One-time AWS/GitHub
+bootstrap steps are tracked in the gitignored `AWS_SETUP.md` (kept out of the
+repo on purpose).
+
+---
+
+## Versioning
+
+- `VERSION` holds the current semver tag (must match `package.json#version`).
+- Bump together when shipping a release; CI does not enforce this yet.
+- Breaking wire changes must bump `PROTOCOL_VERSION` in `src/net/protocol.ts`.
+
+---
+
+## Online multiplayer (high level)
+
+- Star topology: player 0 (local browser) is the **host** and authoritative
+  game runner. Clients (seats 1..N) send intents and render host-provided
+  snapshots.
+- Signaling: short-lived room JWT from a Lambda HTTP API + API Gateway
+  WebSocket Lambda that relays `SignalingRelay { to, from, payload }` envelopes.
+- Transport: WebRTC DataChannels (single ordered channel `game`).
+- Room codes: 6-char base-32 (`ABCDEFGHJKMNPQRSTUVWXYZ23456789`), issued and
+  validated by the backend (see `lambda/src/roomCode.ts` and
+  `src/net/protocol.ts#isRoomCode`).
+- Reconnects: the signaling client backs off and re-sends `hello`; room JWTs
+  have TTL `ROOM_TTL_SECONDS` (default 24h). DataChannel reconnection is
+  advisory in v1 — a lost `RTCPeerConnection` tears down and the user re-joins
+  the same code.
+
+Client-side entry points:
+
+| File | Role |
+|------|------|
+| `src/net/protocol.ts` | Wire types, room-code helpers, protocol version. |
+| `src/net/config.ts` | Reads `VITE_MULTIPLAYER_*` env vars at build time. |
+| `src/net/api.ts` | `createRoom` / `joinRoom` HTTP calls. |
+| `src/net/signaling.ts` | Auto-reconnecting WebSocket client. |
+| `src/net/peer.ts` | `RTCPeerConnection` + DataChannel wrapper. |
+| `src/net/host.ts` | `RoomHost` — accepts clients, assigns seats, broadcasts snapshots. |
+| `src/net/client.ts` | `RoomClient` — dials host, consumes snapshots, sends intents. |
+| `src/ui/MultiplayerPanel.tsx` | Lobby UI (Host / Join / roster / status). |
+| `src/session/playerConfig.ts` | `remoteHumanCount`, `gameSupportsOnlineMultiplayer`, `manifestWithPlayerCounts`. |
+
+Backend entry points live in `lambda/src/` (`http.ts`, `websocket.ts`,
+`storage.ts`, `auth.ts`, `roomCode.ts`).
+
+### DynamoDB schema (single table `card-game-<env>-rooms`, `PAY_PER_REQUEST`)
+
+| pk | sk | Description |
+|----|----|-------------|
+| `ROOM#<code>` | `META` | `RoomMeta` — hostPeerId, gameId, createdAt, ttl. |
+| `ROOM#<code>` | `CONN#<connectionId>` | Per-connection record (role, peerId, ttl). |
+| `CONNIDX#<connectionId>` | `IDX` | Reverse lookup used by `$disconnect` and `relay` without a Scan. |
+
+TTL attribute `ttl` is enabled on the table so idle rooms age out without a
+sweeper process.
+
+### Cost posture
+
+- Everything is pay-per-use; a deployed-but-idle environment rounds to ~\$0/month
+  (plus a Route 53 hosted zone if you bring a custom domain).
+- No `Scan` on hot paths (`relay` uses `GetItem` on the reverse index;
+  `listConnections` uses `Query` within a single partition).
+- See `AWS_SETUP.md` (gitignored) for repository secrets and
+  `deploy/terraform/aws/README.md` for infra details.
+
+### GitHub Actions
+
+- `.github/workflows/ci.yml` — lint, test (site + lambda), build on every PR/push.
+- `.github/workflows/deploy.yml` — OIDC-assumed role; applies Terraform, builds
+  the site with endpoint URLs baked in, syncs to S3 and invalidates CloudFront.
+
+Required GitHub configuration (repository **secrets** only — no Variables for deploy):
+
+- `AWS_ROLE_ARN`, `ROOM_JWT_SECRET`, `AWS_REGION`, `TF_STATE_BUCKET`, `TF_STATE_LOCK_TABLE`.
+
+### Future backlog (not in this PR)
+
+- **TURN relay** for symmetric-NAT / strict-firewall peers (STUN-only may
+  fail). Plan is to add an env-configured managed TURN (Twilio, Cloudflare, or
+  self-hosted coturn) behind a feature flag.
+- **Per-game host-broadcast integration**: wire each supported game module’s
+  `applyAction` output into `RoomHost.broadcastSnapshot` with per-seat
+  redaction of hidden information (opponent hands).
+- **RNG audit**: centralise `rng` usage through `GameModuleContext` so hosts
+  own the single source of randomness in multiplayer rounds.
 
 ---
 
