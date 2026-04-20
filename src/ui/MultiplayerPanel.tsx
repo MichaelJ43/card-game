@@ -44,8 +44,10 @@ export interface MultiplayerPanelProps {
   onRoomChatLine?: (line: PeerHostChatLine) => void
   /** Open second-window room chat (host or joined client). */
   onOpenChat?: () => void
-  /** When false, **Open chat** is disabled (e.g. client waiting for first snapshot). */
+  /** When false, **Open chat** is disabled (e.g. spectating). */
   chatEnabled?: boolean
+  /** Tooltip when **Open chat** is disabled; defaults to a generic message. */
+  chatDisabledTitle?: string
   /** Shown after a blocked popup when opening chat. */
   chatOpenFailed?: string
   /** Host roster changed (e.g. client connected); parent may push a table snapshot. */
@@ -74,6 +76,7 @@ export function MultiplayerPanel({
   onRoomChatLine,
   onOpenChat,
   chatEnabled = true,
+  chatDisabledTitle,
   chatOpenFailed,
   onHostingRosterChange,
   onTeardown,
@@ -215,6 +218,7 @@ export function MultiplayerPanel({
 
   const showCompact = tableActive && mode !== 'idle'
   const showOpenChat = mode !== 'idle' && !!onOpenChat
+  const chatDisabledHint = chatDisabledTitle ?? 'Chat is not available.'
 
   return (
     <section className="multiplayerPanel" aria-label="Multiplayer">
@@ -271,7 +275,7 @@ export function MultiplayerPanel({
                   type="button"
                   className="app__btnSecondary app__btnToolbar"
                   disabled={!chatEnabled}
-                  title={!chatEnabled ? 'Wait until you have a seat at the table.' : undefined}
+                  title={!chatEnabled ? chatDisabledHint : undefined}
                   onClick={() => onOpenChat?.()}
                 >
                   Open chat
@@ -318,7 +322,7 @@ export function MultiplayerPanel({
                   type="button"
                   className="app__btnSecondary app__btnToolbar"
                   disabled={!chatEnabled}
-                  title={!chatEnabled ? 'Wait until you have a seat at the table.' : undefined}
+                  title={!chatEnabled ? chatDisabledHint : undefined}
                   onClick={() => onOpenChat?.()}
                 >
                   Open chat
@@ -347,7 +351,7 @@ export function MultiplayerPanel({
                 type="button"
                 className="app__btnSecondary app__btnToolbar"
                 disabled={!chatEnabled}
-                title={!chatEnabled ? 'Wait until you have a seat at the table.' : undefined}
+                title={!chatEnabled ? chatDisabledHint : undefined}
                 onClick={() => onOpenChat?.()}
               >
                 Open chat
@@ -374,7 +378,7 @@ export function MultiplayerPanel({
                 type="button"
                 className="app__btnSecondary app__btnToolbar"
                 disabled={!chatEnabled}
-                title={!chatEnabled ? 'Wait until you have a seat at the table.' : undefined}
+                title={!chatEnabled ? chatDisabledHint : undefined}
                 onClick={() => onOpenChat?.()}
               >
                 Open chat
