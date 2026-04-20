@@ -31,8 +31,7 @@ export interface TableViewProps {
    */
   intentZoneAllowlist?: readonly string[]
   /**
-   * When both `draw` and `discard` exist, set this to show a middle “Pending” column (e.g. Skyjo drawn card)
-   * and split the draw pile into two columns (deck label | cards).
+   * When both `draw` and `discard` exist, set this to show a middle “Pending” column (e.g. Skyjo drawn card).
    */
   pendingStacksColumn?: {
     card: CardInstance | null
@@ -220,36 +219,12 @@ export function TableView({
     )
   }
 
-  const renderZone = (zid: string, variant?: 'drawSplit') => {
+  const renderZone = (zid: string) => {
     const zone = table.zones[zid]
     if (!zone) return null
     const cards = zone.cards
     const label = zoneLabel(zone, humanPlayerIndex)
     const zoneInteractive = intentsEnabled && zoneAllowsIntent(zid, intentZoneAllowlist)
-
-    if (zid === 'draw' && variant === 'drawSplit') {
-      return (
-        <section
-          key={zid}
-          className={`tableView__zone tableView__zone--drawSplit${zoneInteractive ? ' tableView__zone--interactive' : ''}`}
-          data-zone-kind={zone.kind}
-          data-zone-id={zid}
-        >
-          <header className="tableView__zoneTitle">
-            <span>{label}</span>
-            {cards.length > 0 && <span className="tableView__count">{cards.length} cards</span>}
-          </header>
-          <div className="tableView__drawSplitBody">
-            <div className="tableView__drawSplitHalf tableView__drawSplitHalf--meta">
-              <span className="tableView__drawSplitHalfLabel">Deck</span>
-            </div>
-            <div className="tableView__drawSplitHalf tableView__drawSplitHalf--pile">
-              <div className="tableView__cards tableView__cards--stack">{renderStackCardsInner('draw')}</div>
-            </div>
-          </div>
-        </section>
-      )
-    }
 
     const activeTurn =
       activeTurnHighlight != null && zid === `${activeTurnHighlight.zoneIdPrefix}:${activeTurnHighlight.playerIndex}`
@@ -362,7 +337,7 @@ export function TableView({
           if (pendingStacksColumn) {
             return (
               <div key="__draw_pending_discard__" className="tableView__stacksRow tableView__stacksRow--tri">
-                <div className="tableView__stackCol tableView__stackCol--draw">{renderZone('draw', 'drawSplit')}</div>
+                <div className="tableView__stackCol tableView__stackCol--draw">{renderZone('draw')}</div>
                 {renderPendingStacksColumn()}
                 <div className="tableView__stackCol tableView__stackCol--discardColumn">
                   <div className="tableView__discardZoneStretch">{renderZone('discard')}</div>

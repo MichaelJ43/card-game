@@ -49,10 +49,10 @@ export function GameHouseRulesPanel({ gameId, manifest }: GameHouseRulesPanelPro
   }
 
   return (
-    <fieldset className="app__houseRules" aria-labelledby={legendId}>
-      <legend id={legendId} className="app__houseRulesLegend">
+    <div className="app__houseRules" role="group" aria-labelledby={legendId}>
+      <h3 id={legendId} className="app__houseRulesLegend">
         Options for this game
-      </legend>
+      </h3>
       <p className="app__houseRulesHint">
         Saved in your browser. Start a <strong>new deal</strong> (or next match round) for changes to apply.
       </p>
@@ -140,6 +140,6 @@ export function GameHouseRulesPanel({ gameId, manifest }: GameHouseRulesPanelPro
             variants to see examples).
           </p>
         )}
-    </fieldset>
+    </div>
   )
 }

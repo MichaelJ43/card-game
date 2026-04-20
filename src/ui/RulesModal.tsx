@@ -10,19 +10,45 @@ export interface RulesModalProps {
 
 /** Split leading `# Title` from body for dialog chrome. */
 function parseRulesHeading(markdown: string): { title: string; body: string } {
-  const trimmed = markdown.trim()
-  const lines = trimmed.split('\n')
-  const first = lines[0] ?? ''
+  const trimmed = markdown.trim().replace(/^\uFEFF/, '')
+  const lines = trimmed.split(/\r?\n/)
+  const first = (lines[0] ?? '').trim()
   const m = /^#\s+(.+)$/.exec(first)
   if (!m) {
     return { title: 'Rules', body: trimmed }
   }
+  const title = m[1]!.trim()
   const body = lines.slice(1).join('\n').trim()
-  return { title: m[1]!.trim(), body }
+  return { title, body }
+}
+
+/** Inline `**bold**` (non-greedy); leaves unmatched `**` as text. */
+function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode {
+  const out: ReactNode[] = []
+  let last = 0
+  const re = /\*\*(.+?)\*\*/g
+  let m: RegExpExecArray | null
+  let k = 0
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) {
+      out.push(text.slice(last, m.index))
+    }
+    out.push(
+      <strong key={`${keyPrefix}-${k++}`} className="app__rulesStrong">
+        {m[1]}
+      </strong>,
+    )
+    last = m.index + m[0].length
+  }
+  if (last < text.length) {
+    out.push(text.slice(last))
+  }
+  if (out.length === 0) return text
+  return <>{out}</>
 }
 
 function RulesMarkdownBody({ text }: { text: string }) {
-  const lines = text.split('\n')
+  const lines = text.split(/\r?\n/)
   const blocks: ReactNode[] = []
   let i = 0
   while (i < lines.length) {
@@ -34,7 +60,16 @@ function RulesMarkdownBody({ text }: { text: string }) {
     if (/^##\s+/.test(trimmed)) {
       blocks.push(
         <h3 key={`h-${i}`} className="app__rulesSubhead">
-          {trimmed.replace(/^##\s+/, '')}
+          {renderInlineMarkdown(trimmed.replace(/^##\s+/, ''), `h-${i}`)}
+        </h3>,
+      )
+      i++
+      continue
+    }
+    if (/^#\s+/.test(trimmed)) {
+      blocks.push(
+        <h3 key={`h1-${i}`} className="app__rulesSubhead app__rulesSubhead--title">
+          {renderInlineMarkdown(trimmed.replace(/^#\s+/, ''), `h1-${i}`)}
         </h3>,
       )
       i++
@@ -60,7 +95,7 @@ function RulesMarkdownBody({ text }: { text: string }) {
         blocks.push(
           <ol key={`ol-${i}`} className="app__rulesOl">
             {items.map((t, j) => (
-              <li key={j}>{t}</li>
+              <li key={j}>{renderInlineMarkdown(t, `ol-${i}-${j}`)}</li>
             ))}
           </ol>,
         )
@@ -68,7 +103,7 @@ function RulesMarkdownBody({ text }: { text: string }) {
         blocks.push(
           <ul key={`ul-${i}`} className="app__rulesUl">
             {items.map((t, j) => (
-              <li key={j}>{t}</li>
+              <li key={j}>{renderInlineMarkdown(t, `ul-${i}-${j}`)}</li>
             ))}
           </ul>,
         )
@@ -80,14 +115,15 @@ function RulesMarkdownBody({ text }: { text: string }) {
       const raw = lines[i] ?? ''
       const t = raw.trim()
       if (!t) break
-      if (/^##\s/.test(t) || /^\d+\.\s/.test(t) || /^[-*]\s/.test(t)) break
+      if (/^##\s/.test(t) || /^#\s/.test(t) || /^\d+\.\s/.test(t) || /^[-*]\s/.test(t)) break
       paraLines.push(raw.trimEnd())
       i++
     }
     if (paraLines.length) {
+      const para = paraLines.join(' ')
       blocks.push(
         <p key={`p-${i}`} className="app__rulesParagraph">
-          {paraLines.join(' ')}
+          {renderInlineMarkdown(para, `p-${i}`)}
         </p>,
       )
     }
