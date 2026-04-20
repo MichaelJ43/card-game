@@ -22,6 +22,7 @@ body {
   border-bottom: 1px solid var(--border, #2a2f3a);
   font-size: 0.95rem;
   font-weight: 600;
+  color: var(--text-h, #08060d);
 }
 
 .chatPopout__transcript {
@@ -38,14 +39,32 @@ body {
 }
 
 .chatPopout__meta {
-  opacity: 0.85;
   font-size: 0.8rem;
   margin-bottom: 0.1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem;
 }
 
+/* Use heading foreground, not --accent-bg (that token is a wash for UI surfaces, not text). */
 .chatPopout__sender {
-  font-weight: 600;
-  color: var(--accent-bg, #6b9fff);
+  font-weight: 700;
+  color: var(--text-h, #08060d);
+}
+
+.chatPopout__metaSep {
+  color: var(--text-muted, #5c566a);
+  font-weight: 400;
+}
+
+.chatPopout__time {
+  color: var(--text-muted, #5c566a);
+  font-weight: 500;
+}
+
+.chatPopout__body {
+  color: var(--text-h, #08060d);
 }
 
 .chatPopout__composer {
@@ -94,38 +113,4 @@ body {
   padding: 1rem 0.75rem;
   font-size: 0.9rem;
   line-height: 1.4;
-}
-
-.chatToastStack {
-  position: fixed;
-  right: 12px;
-  bottom: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: min(360px, calc(100vw - 24px));
-  z-index: 9999;
-  pointer-events: none;
-}
-
-.chatToastStack__item {
-  pointer-events: auto;
-  padding: 0.5rem 0.65rem;
-  border-radius: 8px;
-  border: 1px solid var(--border, #2a2f3a);
-  background: rgba(24, 28, 36, 0.96);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-}
-
-.chatToastStack__sender {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--accent-bg, #6b9fff);
-  margin-bottom: 0.15rem;
-}
-
-.chatToastStack__text {
-  font-size: 0.85rem;
-  line-height: 1.3;
-  word-break: break-word;
 }
