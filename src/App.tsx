@@ -43,6 +43,11 @@ import type { GameAction } from './core/types'
 import type { GoFishGameState } from './games/go-fish'
 import { isSkyjoSlotTemplateId, type SkyjoGameState } from './games/skyjo'
 import type { MultiplayerNameplateProps } from './ui/MultiplayerPanel'
+import { readAudioCueVolumes } from './audio/audioStorage'
+import { playAudioCue } from './audio/playCue'
+import { tableCardFingerprint } from './audio/tableFingerprint'
+import { turnSignalFromSession } from './audio/turnSignal'
+import { AudioCueBar } from './ui/AudioCueBar'
 
 function attachHostSeatProfilesIfNeeded(
   sess: GameSession,
@@ -354,6 +359,9 @@ function App() {
   const rosterRef = useRef<HostedPeer[]>([])
   const chatPopoutRef = useRef<Window | null>(null)
   const chatRateLimitRef = useRef<Map<number, number[]>>(new Map())
+  const prevTurnSigRef = useRef<string | null>(null)
+  const prevTableFpRef = useRef<string | null>(null)
+  const flipSoundTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
   const { toasts: mainChatToasts, pushToast: pushMainChatToast, clearToasts: clearMainChatToasts } =
     useChatToasts(5, 3000)
 
@@ -408,6 +416,49 @@ function App() {
     },
     [session, seatDisplayName],
   )
+
+  const tableFingerprint = useMemo(
+    () => (session ? tableCardFingerprint(session.table) : null),
+    [session],
+  )
+
+  useEffect(() => {
+    if (tableFingerprint === null) {
+      prevTableFpRef.current = null
+      return
+    }
+    const prev = prevTableFpRef.current
+    prevTableFpRef.current = tableFingerprint
+    if (prev === null || prev === tableFingerprint) return
+    const vol = readAudioCueVolumes().flip
+    if (vol <= 0) return
+    if (flipSoundTimerRef.current) window.clearTimeout(flipSoundTimerRef.current)
+    flipSoundTimerRef.current = window.setTimeout(() => {
+      flipSoundTimerRef.current = null
+      playAudioCue('flip', readAudioCueVolumes().flip)
+    }, 80)
+  }, [tableFingerprint])
+
+  useEffect(() => {
+    return () => {
+      if (flipSoundTimerRef.current) window.clearTimeout(flipSoundTimerRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    const sig = turnSignalFromSession(session)
+    if (sig === null) {
+      prevTurnSigRef.current = null
+      return
+    }
+    const prev = prevTurnSigRef.current
+    prevTurnSigRef.current = sig
+    if (prev === null || prev === sig) return
+    const vol = readAudioCueVolumes().turn
+    if (vol <= 0) return
+    if (document.visibilityState === 'visible' && document.hasFocus()) return
+    playAudioCue('turn', vol)
+  }, [session])
 
   useEffect(() => {
     sessionRef.current = session
@@ -618,6 +669,8 @@ function App() {
         }
         w.postMessage(payload, window.location.origin)
       } else {
+        const chatVol = readAudioCueVolumes().chat
+        if (chatVol > 0) playAudioCue('chat', chatVol)
         pushMainChatToast({ id: line.id, senderLabel: line.senderLabel, text: line.text })
       }
     },
@@ -1316,7 +1369,10 @@ function App() {
   return (
     <div className="app">
       <header className="app__header">
-        <h1 className="app__title">Card table</h1>
+        <div className="app__headerRow">
+          <h1 className="app__title">Card table</h1>
+          <AudioCueBar inRoom={multiplayerHostActive || joinedAsClient} />
+        </div>
         <p className="app__subtitle">Runs entirely in your browser — decks and manifests are YAML.</p>
         <div className="app__toolbar">
           <div className="app__toolbarMain">

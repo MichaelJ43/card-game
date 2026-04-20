@@ -86,6 +86,7 @@ Pick a game from the in-app **Game** menu. Each row links to a short note in [`d
 | [`docs/`](docs/) | Longer per-game notes (repo docs; can diverge slightly from the modal text). |
 | [`docs/ui-design.md`](docs/ui-design.md) | Shared shell UI (toolbar buttons, online multiplayer strip layout). |
 | [`docs/multiplayer-chat.md`](docs/multiplayer-chat.md) | Room chat (DataChannel + chat popout + toasts). |
+| [`docs/audio-cues.md`](docs/audio-cues.md) | Optional chat / turn / card sounds (`public/sounds/*.wav`). |
 
 ## Contributing
 

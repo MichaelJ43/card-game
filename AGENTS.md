@@ -15,7 +15,7 @@ This document summarizes how the **card-game** repository is structured, how gam
 
 | Path | Purpose |
 |------|--------|
-| `src/App.tsx` | Game picker, session lifecycle, match panel, table intents (Go Fish, Skyjo, etc.), **Rules** modal, AI timers for supported games. |
+| `src/App.tsx` | Game picker, session lifecycle, match panel, table intents (Go Fish, Skyjo, etc.), **Rules** modal, AI timers, optional **audio cues** (see `docs/audio-cues.md`, `src/audio/`). |
 | `src/session.ts` | **`createSession`**, **`startNextMatchRound`**, **`continuationOptionsFromSession`** (preserve house rules between match rounds). |
 | `src/session/playerConfig.ts` | **`CreateSessionOptions`** (AI count/difficulties, `skipMatch`, house-rule fields), **`gameSupportsConfigurableAi`**, **`clampAiOpponentCount`**, manifest AI count normalization. |
 | `src/core/` | **`GameModule`** contract, **`TableState`**, **`GameAction`**, **`MatchState`**, deck/build helpers, **`registerGameModule`**, shuffle, YAML parsing entry points. |
