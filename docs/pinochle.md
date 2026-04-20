@@ -4,4 +4,7 @@
 2. Twelve tricks, fixed trump, simplified in-suit ordering.
 3. Match scoring accumulates tricks per hand toward a configurable goal.
 
-See [`src/rules/pinochle.md`](../src/rules/pinochle.md).
+## See also
+
+- **In-app rules** (modal text bundled in the app): [`src/rules/pinochle.md`](../src/rules/pinochle.md)
+- **Project wiki:** [Pinochle](https://github.com/MichaelJ43/card-game/wiki/Pinochle)

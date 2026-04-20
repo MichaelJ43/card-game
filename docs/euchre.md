@@ -4,4 +4,7 @@
 2. Four seats with fixed AI count from the manifest (three computer opponents).
 3. Free-for-all tricks; trump from a turned card; no bowers or bidding.
 
-See [`src/rules/euchre.md`](../src/rules/euchre.md) for the full modal text.
+## See also
+
+- **In-app rules** (modal text bundled in the app): [`src/rules/euchre.md`](../src/rules/euchre.md)
+- **Project wiki:** [Euchre](https://github.com/MichaelJ43/card-game/wiki/Euchre)

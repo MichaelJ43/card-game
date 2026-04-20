@@ -4,4 +4,7 @@
 2. This is a shedding drill, not tournament canasta (no melds or piles).
 3. Draw two, discard one, first to empty hand wins the round.
 
-See [`src/rules/canasta.md`](../src/rules/canasta.md).
+## See also
+
+- **In-app rules** (modal text bundled in the app): [`src/rules/canasta.md`](../src/rules/canasta.md)
+- **Project wiki:** [Canasta](https://github.com/MichaelJ43/card-game/wiki/Canasta)

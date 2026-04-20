@@ -7,3 +7,8 @@ Punto banco–style **two-card** hands for “player” and “banker” seats. 
 **Chips / match:** bankrolls and round deltas feed the multi-round match — see [`src/games/baccarat/baccarat.yaml`](../src/games/baccarat/baccarat.yaml).
 
 **Also see:** [Mini Baccarat](mini-baccarat.md) (same engine).
+
+## See also
+
+- **In-app rules** (modal text bundled in the app): [`src/rules/baccarat.md`](../src/rules/baccarat.md)
+- **Project wiki:** [Baccarat](https://github.com/MichaelJ43/card-game/wiki/Baccarat)

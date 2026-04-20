@@ -5,3 +5,8 @@
 Same heads-up draw poker flow: ante, draw round, showdown.
 
 **Difference:** manifest-only (stacks / targets). See [`src/games/poker-draw/heads-up-poker.yaml`](../src/games/poker-draw/heads-up-poker.yaml).
+
+## See also
+
+- **In-app rules** (modal text bundled in the app): [`src/rules/heads-up-poker.md`](../src/rules/heads-up-poker.md)
+- **Project wiki:** [Heads-up-poker](https://github.com/MichaelJ43/card-game/wiki/Heads-up-poker)

@@ -7,3 +7,8 @@ Shedding game: play a card that matches the **current suit** or **rank** of the 
 **Players:** 2–4 (human + AIs). Match scoring can award a point to the player who goes out first — see manifest.
 
 **Also see:** [Switch](switch.md) (same module, alternate YAML).
+
+## See also
+
+- **In-app rules** (modal text bundled in the app): [`src/rules/crazy-eights.md`](../src/rules/crazy-eights.md)
+- **Project wiki:** [Crazy-Eights](https://github.com/MichaelJ43/card-game/wiki/Crazy-Eights)
