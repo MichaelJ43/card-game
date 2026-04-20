@@ -1,5 +1,5 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
-import { nanoid } from 'nanoid'
+import { randomBytes } from 'node:crypto'
 import { signRoomToken } from './auth'
 import { generateRoomCode } from './roomCode'
 import {
@@ -67,6 +67,11 @@ interface JoinRoomRequest {
   roomCode?: string
 }
 
+/** URL-safe ~12-char suffix; avoids nanoid (ESM-only in v5) under Lambda CommonJS `require`. */
+function randomPeerSuffix(): string {
+  return randomBytes(9).toString('base64url').slice(0, 12)
+}
+
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
   const origin = event.headers?.origin ?? event.headers?.Origin
   const method = (event.requestContext.http.method ?? 'GET').toUpperCase()
@@ -105,7 +110,7 @@ async function handleCreateRoom(
   const maxClientsRaw = Number(body.maxClients ?? 7)
   const maxClients = Math.min(Math.max(Math.floor(maxClientsRaw) || 1, 1), 7)
 
-  const hostPeerId = `h-${nanoid(12)}`
+  const hostPeerId = `h-${randomPeerSuffix()}`
   const ttlSeconds = getRoomTtlSeconds()
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -149,7 +154,7 @@ async function handleJoinRoom(
   const meta = await getRoom(rc)
   if (!meta) return bad(404, 'Room not found', origin)
 
-  const clientPeerId = `c-${nanoid(12)}`
+  const clientPeerId = `c-${randomPeerSuffix()}`
   const ttlSeconds = getRoomTtlSeconds()
   const token = signRoomToken(
     { roomCode: rc, peerId: clientPeerId, role: 'client' },
