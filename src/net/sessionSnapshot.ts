@@ -4,7 +4,7 @@ import type { GameModule } from '../core/gameModule'
 import type { MatchState } from '../core/match'
 import type { GameManifestYaml, TableState } from '../core/types'
 import { GAME_SOURCES } from '../data/manifests'
-import type { GameSession } from '../session'
+import type { AiPlayerConfig, GameSession } from '../session'
 
 /** Wire shape sent in {@link PeerHostSnapshot.state} for table sync. */
 export interface SessionSnapshotWire {
@@ -12,6 +12,11 @@ export interface SessionSnapshotWire {
   table: TableState
   gameState: unknown
   match?: MatchState
+  aiPlayerConfig?: AiPlayerConfig
+  /** Host fills per client: network seat index (matches {@link PeerHostSnapshot.seat}). */
+  viewerSeat?: number
+  /** True when this seat is not in the current deal’s human slots (mid-join spectator). */
+  spectator?: boolean
 }
 
 export function isSessionSnapshotWire(value: unknown): value is SessionSnapshotWire {
@@ -28,6 +33,9 @@ export function serializeSessionSnapshot(session: GameSession): SessionSnapshotW
       table: JSON.parse(JSON.stringify(session.table)) as TableState,
       gameState: JSON.parse(JSON.stringify(session.gameState)),
       match: session.match ? (JSON.parse(JSON.stringify(session.match)) as MatchState) : undefined,
+      aiPlayerConfig: session.aiPlayerConfig
+        ? (JSON.parse(JSON.stringify(session.aiPlayerConfig)) as AiPlayerConfig)
+        : undefined,
     }
     return wire
   } catch {
@@ -35,20 +43,25 @@ export function serializeSessionSnapshot(session: GameSession): SessionSnapshotW
   }
 }
 
-export function parseSessionSnapshot(value: unknown): GameSession | null {
+export function parseSessionSnapshot(value: unknown, peerSeatFallback?: number): GameSession | null {
   if (!isSessionSnapshotWire(value)) return null
-  const gameId = value.gameId as keyof typeof GAME_SOURCES
+  const w = value as SessionSnapshotWire
+  const gameId = w.gameId as keyof typeof GAME_SOURCES
   const raw = GAME_SOURCES[gameId]
   if (!raw) return null
   const manifest = parseGameManifestYaml(raw) as GameManifestYaml
   const mod = getGameModule(manifest.module)
   if (!mod) return null
+  const remoteHumans = Math.max(0, manifest.players.human - 1)
+  const seat = typeof w.viewerSeat === 'number' ? w.viewerSeat : peerSeatFallback ?? 1
+  const spectator = typeof w.spectator === 'boolean' ? w.spectator : seat > remoteHumans
   return {
     manifest,
     module: mod as GameModule,
-    table: value.table,
-    gameState: value.gameState,
-    match: value.match,
-    aiPlayerConfig: undefined,
+    table: w.table,
+    gameState: w.gameState,
+    match: w.match,
+    aiPlayerConfig: w.aiPlayerConfig,
+    net: { seat, spectator },
   }
 }

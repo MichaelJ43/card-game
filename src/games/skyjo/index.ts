@@ -925,7 +925,7 @@ const skyjoModule: GameModule<SkyjoGameState> = {
           pendingDraw: null,
           pendingFromDiscard: false,
           currentPlayer: nx,
-          message: `${playerSeatLabel(nx)}'s turn.`,
+          message: nx === 0 ? 'Your turn.' : `${playerSeatLabel(nx)}'s turn.`,
         },
       }
     }

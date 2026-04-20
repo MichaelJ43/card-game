@@ -12,9 +12,11 @@ import type { RulesGameId } from '../data/rulesSources'
 export interface GameHouseRulesPanelProps {
   gameId: RulesGameId
   manifest: GameManifestYaml
+  /** When true, controls are disabled (e.g. online guest viewing the host’s rules). */
+  readOnly?: boolean
 }
 
-export function GameHouseRulesPanel({ gameId, manifest }: GameHouseRulesPanelProps) {
+export function GameHouseRulesPanel({ gameId, manifest, readOnly = false }: GameHouseRulesPanelProps) {
   const legendId = useId()
   const matchEnabled = manifest.match?.enabled === true
   const defaultTarget = typeof manifest.match?.targetScore === 'number' ? manifest.match.targetScore : 100
@@ -58,12 +60,20 @@ export function GameHouseRulesPanel({ gameId, manifest }: GameHouseRulesPanelPro
   }
 
   return (
-    <div className="app__houseRules" role="group" aria-labelledby={legendId}>
+    <fieldset className="app__houseRules" disabled={readOnly} aria-labelledby={legendId}>
       <h3 id={legendId} className="app__houseRulesLegend">
         Options for this game
       </h3>
       <p className="app__houseRulesHint">
-        Saved in your browser. Start a <strong>new deal</strong> (or next match round) for changes to apply.
+        {readOnly ? (
+          <>
+            These are the <strong>host’s</strong> table options. They are read-only while you are connected as a guest.
+          </>
+        ) : (
+          <>
+            Saved in your browser. Start a <strong>new deal</strong> (or next match round) for changes to apply.
+          </>
+        )}
       </p>
 
       {matchEnabled && (
@@ -167,6 +177,6 @@ export function GameHouseRulesPanel({ gameId, manifest }: GameHouseRulesPanelPro
             variants to see examples).
           </p>
         )}
-    </div>
+    </fieldset>
   )
 }
