@@ -65,7 +65,8 @@
 .app__toolbarScores {
   flex: 0 0 auto;
   align-self: flex-start;
-  min-width: min(100%, 17rem);
+  min-width: 0;
+  max-width: min(100%, 36rem);
   text-align: right;
 }
 
@@ -201,59 +202,121 @@
   line-height: 1.4;
 }
 
-/* Borderless cumulative scoreboard (toolbar when match active) */
+/* Cumulative scoreboard: theme tokens from index.css (light + dark readable) */
 .matchCumulative {
   font-size: 0.82rem;
   line-height: 1.35;
-  color: var(--text-h, #f3f4f6);
+  color: var(--match-cumulative-cell);
+  padding: 0.55rem 0.65rem 0.5rem;
+  border-radius: 0.65rem;
+  background: var(--match-cumulative-surface);
+  border: none;
+  box-shadow: var(--shadow);
+}
+
+.matchCumulative__scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -0.15rem;
+  padding: 0 0.15rem;
 }
 
 .matchCumulative__table {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   margin: 0;
   text-align: right;
+  width: 100%;
+  min-width: min(100%, 12rem);
 }
 
 .matchCumulative__table caption {
   caption-side: top;
   text-align: inherit;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.78rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  opacity: 0.8;
-  padding: 0 0 0.35rem;
+  padding: 0 0 0.45rem;
+  color: var(--match-cumulative-caption);
 }
 
 .matchCumulative__table th,
 .matchCumulative__table td {
   border: none;
-  padding: 0.15rem 0 0.15rem 0.65rem;
+  padding: 0.22rem 0.45rem;
   font-weight: 400;
+  vertical-align: middle;
 }
 
-.matchCumulative__table th:first-child,
-.matchCumulative__table td:first-child {
-  padding-left: 0;
+.matchCumulative__thPlayer,
+.matchCumulative__playerCell {
+  padding-left: 0.35rem !important;
   text-align: left;
+  font-weight: 600;
+}
+
+.matchCumulative__playerCell {
+  font-weight: 600;
+  color: var(--match-cumulative-caption);
 }
 
 .matchCumulative__table thead th {
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-size: 0.68rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  opacity: 0.75;
-  padding-bottom: 0.25rem;
+  letter-spacing: 0.05em;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--match-cumulative-head-rule);
+}
+
+.matchCumulative__thRound--a {
+  background: var(--match-cumulative-round-a-bg);
+  color: var(--match-cumulative-round-a-fg);
+}
+
+.matchCumulative__thRound--b {
+  background: var(--match-cumulative-round-b-bg);
+  color: var(--match-cumulative-round-b-fg);
+}
+
+.matchCumulative__thTotal {
+  background: var(--match-cumulative-total-bg);
+  color: var(--match-cumulative-total-fg);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.matchCumulative__roundCell--a {
+  background: var(--match-cumulative-round-a-bg);
+  color: var(--match-cumulative-round-a-fg);
+}
+
+.matchCumulative__roundCell--b {
+  background: var(--match-cumulative-round-b-bg);
+  color: var(--match-cumulative-round-b-fg);
+}
+
+.matchCumulative__roundCell--a,
+.matchCumulative__roundCell--b {
+  font-variant-numeric: tabular-nums;
+}
+
+.matchCumulative__totalCell {
+  background: var(--match-cumulative-total-bg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--match-cumulative-total-fg);
 }
 
 .matchCumulative__meta {
-  margin: 0.4rem 0 0;
+  margin: 0.45rem 0 0;
   font-size: 0.75rem;
-  line-height: 1.4;
-  opacity: 0.82;
-  max-width: 16rem;
+  line-height: 1.45;
+  max-width: 28rem;
   text-align: right;
+  margin-left: auto;
+  color: var(--match-cumulative-meta);
 }
 
 .matchCumulative--toolbar {
@@ -262,25 +325,24 @@
 
 .matchCumulative--toolbar .matchCumulative__table caption {
   font-size: 0.68rem;
-  padding-bottom: 0.28rem;
+  padding-bottom: 0.32rem;
 }
 
 .matchCumulative--toolbar .matchCumulative__table th,
 .matchCumulative--toolbar .matchCumulative__table td {
-  padding: 0.08rem 0 0.08rem 0.5rem;
+  padding: 0.12rem 0.4rem;
 }
 
 .matchCumulative--toolbar .matchCumulative__meta {
-  margin-top: 0.3rem;
+  margin-top: 0.32rem;
   font-size: 0.68rem;
-  max-width: 20rem;
-  margin-left: auto;
+  max-width: none;
 }
 
 @media (max-width: 52rem) {
   .matchCumulative--toolbar .matchCumulative__meta {
     margin-left: 0;
-    max-width: none;
+    text-align: left;
   }
 }
 
@@ -436,19 +498,24 @@
   border: 1px solid var(--border, #2e303a);
   border-radius: 0.45rem;
   background: rgba(15, 23, 42, 0.35);
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .app__houseRulesLegend {
-  padding: 0 0.25rem;
+  margin: 0 0 0.5rem;
+  padding: 0;
   font-size: 0.82rem;
   font-weight: 700;
+  font-family: inherit;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted, #9ca3af);
+  line-height: 1.3;
 }
 
 .app__houseRulesHint {
-  margin: 0.35rem 0 0.65rem;
+  margin: 0 0 0.65rem;
   font-size: 0.82rem;
   opacity: 0.88;
   line-height: 1.4;
@@ -500,6 +567,15 @@
 
 .app__rulesSubhead:first-child {
   margin-top: 0;
+}
+
+.app__rulesSubhead--title {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.app__rulesStrong {
+  font-weight: 650;
 }
 
 .app__rulesOl,

@@ -11,6 +11,24 @@
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
+  --text-muted: #5c566a;
+
+  /* Cumulative score panel (toolbar + table; light mode = high contrast on white) */
+  --match-cumulative-surface: color-mix(in srgb, var(--text-h) 4.5%, var(--bg));
+  --match-cumulative-border: color-mix(in srgb, var(--text-h) 14%, var(--border));
+  --match-cumulative-inset: color-mix(in srgb, var(--bg) 70%, var(--text-h) 30%);
+  --match-cumulative-caption: var(--text-h);
+  --match-cumulative-cell: var(--text-h);
+  --match-cumulative-head-rule: color-mix(in srgb, var(--text-h) 16%, var(--border));
+  --match-cumulative-round-a-bg: #e0e7ff;
+  --match-cumulative-round-a-fg: #1e3a8a;
+  --match-cumulative-round-b-bg: #ede9fe;
+  --match-cumulative-round-b-fg: #4c1d95;
+  --match-cumulative-total-bg: #d1fae5;
+  --match-cumulative-total-fg: #065f46;
+  --match-cumulative-total-border: #059669;
+  --match-cumulative-meta: var(--text-muted);
+
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
@@ -36,6 +54,22 @@
     --text-h: #f3f4f6;
     --bg: #16171d;
     --border: #2e303a;
+    --text-muted: #9ca3af;
+
+    --match-cumulative-surface: color-mix(in srgb, var(--text-h) 7%, var(--bg));
+    --match-cumulative-border: color-mix(in srgb, var(--text-h) 22%, var(--border));
+    --match-cumulative-inset: color-mix(in srgb, var(--text-h) 8%, transparent);
+    --match-cumulative-caption: var(--text-h);
+    --match-cumulative-cell: #e5e7eb;
+    --match-cumulative-head-rule: color-mix(in srgb, var(--text-h) 28%, var(--border));
+    --match-cumulative-round-a-bg: color-mix(in srgb, #3b82f6 22%, var(--bg));
+    --match-cumulative-round-a-fg: #dbeafe;
+    --match-cumulative-round-b-bg: color-mix(in srgb, #8b5cf6 18%, var(--bg));
+    --match-cumulative-round-b-fg: #ede9fe;
+    --match-cumulative-total-bg: color-mix(in srgb, #10b981 20%, var(--bg));
+    --match-cumulative-total-fg: #a7f3d0;
+    --match-cumulative-total-border: #34d399;
+    --match-cumulative-meta: #a1a1aa;
     --code-bg: #1f2028;
     --accent: #c084fc;
     --accent-bg: rgba(192, 132, 252, 0.15);

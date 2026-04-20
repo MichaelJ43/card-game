@@ -29,33 +29,78 @@ function MatchCumulativePanel({
   scoreColumnLabel = 'Total',
   caption = 'Cumulative scores',
   scoringMode = 'points',
+  pendingRoundScores,
 }: {
   match: MatchState
   toolbar?: boolean
   scoreColumnLabel?: string
   caption?: string
   scoringMode?: 'points' | 'chips'
+  /** Round scored in game state but not yet merged — updates Total column only (no layout change). */
+  pendingRoundScores?: number[] | null
 }) {
   const unit = scoringMode === 'chips' ? 'chips' : 'points'
+  const history = match.completedRoundScores ?? []
+  const n = match.cumulativeScores.length
+  const pending =
+    pendingRoundScores && pendingRoundScores.length === n ? pendingRoundScores : null
+  const displayTotals = pending
+    ? match.cumulativeScores.map((c, i) => c + (pending[i] ?? 0))
+    : match.cumulativeScores
+
   return (
     <div className={`matchCumulative${toolbar ? ' matchCumulative--toolbar' : ''}`}>
-      <table className="matchCumulative__table">
-        <caption>{caption}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Player</th>
-            <th scope="col">{scoreColumnLabel}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {match.cumulativeScores.map((s, i) => (
-            <tr key={i}>
-              <td>{playerSeatLabel(i)}</td>
-              <td>{s}</td>
+      <div className="matchCumulative__scroll">
+        <table
+          className="matchCumulative__table"
+          title={
+            pending
+              ? `${scoreColumnLabel} shows the result after merging this round (before you click Next round).`
+              : undefined
+          }
+        >
+          <caption>{caption}</caption>
+          <thead>
+            <tr>
+              <th scope="col" className="matchCumulative__thPlayer">
+                Player
+              </th>
+              {history.map((_, ri) => (
+                <th
+                  key={`r-${ri}`}
+                  scope="col"
+                  className={`matchCumulative__thRound matchCumulative__thRound--${ri % 2 === 0 ? 'a' : 'b'}`}
+                >
+                  R{ri + 1}
+                </th>
+              ))}
+              <th scope="col" className="matchCumulative__thTotal">
+                {scoreColumnLabel}
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {match.cumulativeScores.map((_, pi) => (
+              <tr key={pi}>
+                <th scope="row" className="matchCumulative__playerCell">
+                  {playerSeatLabel(pi)}
+                </th>
+                {history.map((roundVec, ri) => (
+                  <td
+                    key={`${pi}-${ri}`}
+                    className={`matchCumulative__roundCell matchCumulative__roundCell--${ri % 2 === 0 ? 'a' : 'b'}`}
+                  >
+                    {roundVec[pi] ?? '—'}
+                  </td>
+                ))}
+                <td className="matchCumulative__totalCell">
+                  {displayTotals[pi] ?? '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <p className="matchCumulative__meta">
         Round {match.round}
         {' · '}
@@ -311,7 +356,7 @@ function App() {
     )
   }, [session])
 
-  const matchPreviewTotals = useMemo(() => {
+  const pendingMergeRoundScores = useMemo(() => {
     if (!session) return null
     const m = session.match
     if (!m?.config || m.complete) return null
@@ -319,8 +364,15 @@ function App() {
     if (!mod.isMatchRoundFinished?.(session.gameState)) return null
     const rs = mod.extractMatchRoundScores?.(session.gameState)
     if (!rs?.length) return null
-    return m.cumulativeScores.map((c, i) => c + (rs[i] ?? 0))
+    return rs
   }, [session])
+
+  const matchPreviewTotals = useMemo(() => {
+    if (!session || !pendingMergeRoundScores) return null
+    const m = session.match
+    if (!m?.config || m.complete) return null
+    return m.cumulativeScores.map((c, i) => c + (pendingMergeRoundScores[i] ?? 0))
+  }, [session, pendingMergeRoundScores])
 
   const primaryLabel = gameId === 'demo-custom' ? 'Reveal winner' : 'Play round'
 
@@ -806,6 +858,7 @@ function App() {
                     session.manifest.match?.scoringMode === 'chips' ? 'Cumulative chips' : 'Cumulative scores'
                   }
                   scoringMode={session.manifest.match?.scoringMode === 'chips' ? 'chips' : 'points'}
+                  pendingRoundScores={pendingMergeRoundScores}
                 />
               </div>
             )}

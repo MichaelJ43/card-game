@@ -16,6 +16,11 @@ export interface MatchState {
   /** 1-based round number for the deal currently in play (or just finished). */
   round: number
   cumulativeScores: number[]
+  /**
+   * Each entry is one completed round’s per-player scores (same length as {@link cumulativeScores}),
+   * in order. Used for the cumulative scoreboard UI. Omitted in older in-memory state — treat as [].
+   */
+  completedRoundScores?: number[][]
   config: MatchConfig
   /** Set when a player’s cumulative score crosses the threshold. */
   complete: boolean
@@ -45,6 +50,7 @@ export function createInitialMatchState(manifest: GameManifestYaml): MatchState 
   return {
     round: 1,
     cumulativeScores,
+    completedRoundScores: [],
     config,
     complete: false,
     matchWinnerIndex: null,
@@ -84,12 +90,15 @@ export function applyFinishedRound(
 ): MatchState {
   const next = match.cumulativeScores.map((c, i) => c + (roundScores[i] ?? 0))
   const { targetScore, winnerIs, endCondition } = match.config
+  const prevRounds = match.completedRoundScores ?? []
+  const completedRoundScores = [...prevRounds, roundScores.map((_, i) => roundScores[i] ?? 0)]
 
   if (endCondition === 'anyAtOrAbove' && next.some((s) => s >= targetScore)) {
     const win = indexOfExtreme(next, winnerIs)
     return {
       ...match,
       cumulativeScores: next,
+      completedRoundScores,
       complete: true,
       matchWinnerIndex: win,
     }
@@ -98,6 +107,7 @@ export function applyFinishedRound(
   return {
     ...match,
     cumulativeScores: next,
+    completedRoundScores,
     round: match.round + 1,
     complete: false,
     matchWinnerIndex: null,
