@@ -13,4 +13,4 @@ See [`src/games/skyjo/skyjo.yaml`](../src/games/skyjo/skyjo.yaml) for bundled ma
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/skyjo.md`](../src/rules/skyjo.md)
-- **Project wiki:** [Skyjo](https://github.com/MichaelJ43/card-game/wiki/Skyjo)
+- **Wikipedia:** [Skyjo](https://de.wikipedia.org/wiki/Skyjo) (English Wikipedia has no article yet; German article)

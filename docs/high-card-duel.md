@@ -11,4 +11,4 @@ Each side antes **5** or **10** chips (when both can cover it), then one card is
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/high-card-duel.md`](../src/rules/high-card-duel.md)
-- **Project wiki:** [High-card-duel](https://github.com/MichaelJ43/card-game/wiki/High-card-duel)
+- **Wikipedia:** [War (card game)](https://en.wikipedia.org/wiki/War_(card_game)) (same high-card comparison idea)

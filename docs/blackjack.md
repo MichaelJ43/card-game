@@ -11,4 +11,4 @@ Heads-up **blackjack** vs a dealer seat: place a bet, receive two cards, then **
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/blackjack.md`](../src/rules/blackjack.md)
-- **Project wiki:** [Blackjack](https://github.com/MichaelJ43/card-game/wiki/Blackjack)
+- **Wikipedia:** [Blackjack](https://en.wikipedia.org/wiki/Blackjack)

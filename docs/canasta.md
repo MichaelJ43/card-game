@@ -7,4 +7,4 @@
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/canasta.md`](../src/rules/canasta.md)
-- **Project wiki:** [Canasta](https://github.com/MichaelJ43/card-game/wiki/Canasta)
+- **Wikipedia:** [Canasta](https://en.wikipedia.org/wiki/Canasta)

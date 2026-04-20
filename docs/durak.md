@@ -7,4 +7,4 @@
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/durak.md`](../src/rules/durak.md)
-- **Project wiki:** [Durak](https://github.com/MichaelJ43/card-game/wiki/Durak)
+- **Wikipedia:** [Durak](https://en.wikipedia.org/wiki/Durak)

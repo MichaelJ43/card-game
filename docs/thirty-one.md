@@ -9,4 +9,4 @@ Browser table notes for the `thirty-one` game id.
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/thirty-one.md`](../src/rules/thirty-one.md)
-- **Project wiki:** [Thirty-one](https://github.com/MichaelJ43/card-game/wiki/Thirty-one)
+- **Wikipedia:** [Thirty-one (card game)](https://en.wikipedia.org/wiki/Thirty-one_(card_game))

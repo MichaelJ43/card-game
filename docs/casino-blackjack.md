@@ -9,4 +9,4 @@ Same rules and UI actions as **Blackjack** — bet, hit, stand, round scoring, a
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/casino-blackjack.md`](../src/rules/casino-blackjack.md)
-- **Project wiki:** [Casino-blackjack](https://github.com/MichaelJ43/card-game/wiki/Casino-blackjack)
+- **Wikipedia:** [Blackjack](https://en.wikipedia.org/wiki/Blackjack)

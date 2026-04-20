@@ -9,4 +9,4 @@ Compare [`src/games/crazy-eights/switch.yaml`](../src/games/crazy-eights/switch.
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/switch.md`](../src/rules/switch.md)
-- **Project wiki:** [Switch](https://github.com/MichaelJ43/card-game/wiki/Switch)
+- **Wikipedia:** [Switch (card game)](https://en.wikipedia.org/wiki/Switch_(card_game))

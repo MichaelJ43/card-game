@@ -7,4 +7,4 @@
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/sequence-race.md`](../src/rules/sequence-race.md)
-- **Project wiki:** [Sequence-race](https://github.com/MichaelJ43/card-game/wiki/Sequence-race)
+- **Wikipedia:** [Skip-Bo](https://en.wikipedia.org/wiki/Skip-Bo) (similar commercial sequence-builder)

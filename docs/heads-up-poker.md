@@ -9,4 +9,4 @@ Same heads-up draw poker flow: ante, draw round, showdown.
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/heads-up-poker.md`](../src/rules/heads-up-poker.md)
-- **Project wiki:** [Heads-up-poker](https://github.com/MichaelJ43/card-game/wiki/Heads-up-poker)
+- **Wikipedia:** [Heads-up poker](https://en.wikipedia.org/wiki/Heads-up_poker)

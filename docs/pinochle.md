@@ -7,4 +7,4 @@
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/pinochle.md`](../src/rules/pinochle.md)
-- **Project wiki:** [Pinochle](https://github.com/MichaelJ43/card-game/wiki/Pinochle)
+- **Wikipedia:** [Pinochle](https://en.wikipedia.org/wiki/Pinochle)
