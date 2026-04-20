@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoom, joinRoom } from '../net/api'
-import { getMultiplayerConfig, isMultiplayerConfigured } from '../net/config'
+import { isMultiplayerConfigured } from '../net/config'
 import { RoomClient } from '../net/client'
 import { RoomHost, type HostedPeer } from '../net/host'
 import { isRoomCode } from '../net/protocol'
@@ -131,8 +131,6 @@ export function MultiplayerPanel({
     )
   }
 
-  const endpoints = getMultiplayerConfig()
-
   return (
     <section className="multiplayerPanel" aria-label="Multiplayer">
       <h3>Online play</h3>
@@ -200,11 +198,6 @@ export function MultiplayerPanel({
           {error}
         </p>
       )}
-      <p className="multiplayerPanel__meta">
-        <small>
-          Signaling server: {endpoints.wsUrl?.replace(/^wss?:\/\//, '') ?? '—'}
-        </small>
-      </p>
     </section>
   )
 }
