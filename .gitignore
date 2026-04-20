@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Operator-only notes (kept out of the repo on purpose).
+AWS_SETUP.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

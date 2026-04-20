@@ -593,3 +593,76 @@
 .app__rulesUl li:last-child {
   margin-bottom: 0;
 }
+
+
+.multiplayerPanel {
+  margin: 0.75rem 0 1.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.multiplayerPanel h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.multiplayerPanel--disabled p {
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
+
+.multiplayerPanel__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.multiplayerPanel__join {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.multiplayerPanel__join input {
+  width: 7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+.multiplayerPanel__code {
+  font-family: ui-monospace, Menlo, monospace;
+  letter-spacing: 0.2em;
+  font-size: 1.1rem;
+}
+
+.multiplayerPanel__roster {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+
+.multiplayerPanel__roster li {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+.multiplayerPanel__status {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.multiplayerPanel__error {
+  margin: 0.5rem 0 0;
+  color: #f87171;
+  font-size: 0.9rem;
+}
+
+.multiplayerPanel__meta {
+  margin: 0.5rem 0 0;
+  opacity: 0.6;
+}
