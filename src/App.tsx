@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { AI_DIFFICULTY_OPTIONS, normalizeAiDifficulty, type AiDifficulty } from './core/aiContext'
 import { type MatchState } from './core/match'
-import { playerSeatLabel } from './core/playerLabels'
+import { aiPlayerMenuLabel, playerSeatLabel } from './core/playerLabels'
 import { parseGameManifestYaml } from './core/loadYaml'
 import { createSession, startNextMatchRound, type CreateSessionOptions, type GameSession } from './session'
 import { createSessionOptionsHouseRules } from './data/houseRules'
@@ -19,7 +19,7 @@ import {
 } from './session/playerConfig'
 import { GameHouseRulesPanel } from './ui/GameHouseRulesPanel'
 import type { RoomClient } from './net/client'
-import type { RoomHost } from './net/host'
+import type { HostedPeer, RoomHost } from './net/host'
 import type { PeerClientIntent, PeerHostSnapshot } from './net/protocol'
 import { parseSessionSnapshot, serializeSessionSnapshot } from './net/sessionSnapshot'
 import { MultiplayerPanel } from './ui/MultiplayerPanel'
@@ -49,6 +49,13 @@ function firstAiSeatIndex(session: GameSession | null): number {
   return session.manifest.players.human
 }
 
+/** Server seat for “You” in score tables; null when spectating (no local seat). */
+function localViewerSeat(session: GameSession | null): number | null {
+  if (!session?.net) return 0
+  if (session.net.spectator) return null
+  return session.net.seat
+}
+
 function MatchCumulativePanel({
   match,
   toolbar,
@@ -56,6 +63,7 @@ function MatchCumulativePanel({
   caption = 'Cumulative scores',
   scoringMode = 'points',
   pendingRoundScores,
+  playerSeatCaption,
 }: {
   match: MatchState
   toolbar?: boolean
@@ -64,6 +72,8 @@ function MatchCumulativePanel({
   scoringMode?: 'points' | 'chips'
   /** Round scored in game state but not yet merged — updates Total column only (no layout change). */
   pendingRoundScores?: number[] | null
+  /** Row header for each seat (defaults to {@link playerSeatLabel}). */
+  playerSeatCaption?: (playerIndex: number) => string
 }) {
   const unit = scoringMode === 'chips' ? 'chips' : 'points'
   const history = match.completedRoundScores ?? []
@@ -73,6 +83,8 @@ function MatchCumulativePanel({
   const displayTotals = pending
     ? match.cumulativeScores.map((c, i) => c + (pending[i] ?? 0))
     : match.cumulativeScores
+
+  const rowCaption = playerSeatCaption ?? ((pi: number) => playerSeatLabel(pi))
 
   return (
     <div className={`matchCumulative${toolbar ? ' matchCumulative--toolbar' : ''}`}>
@@ -109,7 +121,7 @@ function MatchCumulativePanel({
             {match.cumulativeScores.map((_, pi) => (
               <tr key={pi}>
                 <th scope="row" className="matchCumulative__playerCell">
-                  {playerSeatLabel(pi)}
+                  {rowCaption(pi)}
                 </th>
                 {history.map((roundVec, ri) => (
                   <td
@@ -132,7 +144,7 @@ function MatchCumulativePanel({
         {' · '}
         Stop when someone reaches ≥{match.config.targetScore} {unit} · {match.config.winnerIs} total wins
         {match.complete && match.matchWinnerIndex !== null && (
-          <> — Winner: {playerSeatLabel(match.matchWinnerIndex)}</>
+          <> — Winner: {rowCaption(match.matchWinnerIndex)}</>
         )}
       </p>
     </div>
@@ -283,11 +295,47 @@ function App() {
   const [gfRank, setGfRank] = useState('A')
   const [skyjoDumpStep, setSkyjoDumpStep] = useState<SkyjoDumpUiStep>('idle')
   const [rulesOpen, setRulesOpen] = useState(false)
+  const [hostClientRoster, setHostClientRoster] = useState<HostedPeer[]>([])
 
   const selectedManifest = useMemo(() => parseGameManifestYaml(GAME_SOURCES[gameId]), [gameId])
 
   const onlineClientShell = joinedAsClient || !!session?.net
   const networkSpectator = !!session?.net?.spectator
+
+  const seatDisplayName = useCallback(
+    (serverPlayerIndex: number): string => {
+      if (!session) return `Player ${serverPlayerIndex + 1}`
+      const humanCount = session.manifest.players.human
+      if (serverPlayerIndex >= humanCount) {
+        return aiPlayerMenuLabel(serverPlayerIndex - humanCount)
+      }
+      if (session.net && !session.net.spectator) {
+        if (serverPlayerIndex === 0) return 'Host'
+        return `Player ${serverPlayerIndex + 1}`
+      }
+      if (!session.net) {
+        if (serverPlayerIndex === 0) return 'Host'
+        const peer = hostClientRoster.find((r) => r.seat === serverPlayerIndex)
+        if (peer) {
+          const id = peer.peerId
+          return id.length > 16 ? `${id.slice(0, 15)}…` : id
+        }
+        return `Player ${serverPlayerIndex + 1}`
+      }
+      if (serverPlayerIndex === 0) return 'Host'
+      return `Player ${serverPlayerIndex + 1}`
+    },
+    [session, hostClientRoster],
+  )
+
+  const cumulativeRowCaption = useCallback(
+    (pi: number) => {
+      const local = localViewerSeat(session)
+      if (local !== null && pi === local) return 'You'
+      return seatDisplayName(pi)
+    },
+    [session, seatDisplayName],
+  )
 
   useEffect(() => {
     sessionRef.current = session
@@ -397,6 +445,7 @@ function App() {
 
   const onHostStarted = useCallback((host: RoomHost) => {
     roomHostRef.current = host
+    setHostClientRoster(host.getRoster())
   }, [])
 
   const onClientStarted = useCallback((client: RoomClient) => {
@@ -452,13 +501,15 @@ function App() {
     roomHostRef.current = null
     roomClientRef.current = null
     setJoinedAsClient(false)
+    setHostClientRoster([])
     setSession(null)
     setGfAwaitingOpponent(false)
     setGfRank('A')
     setSkyjoDumpStep('idle')
   }, [])
 
-  const onHostingRosterChange = useCallback(() => {
+  const onHostingRosterChange = useCallback((peers?: HostedPeer[]) => {
+    if (peers) setHostClientRoster(peers)
     pushSnapshotRef.current()
   }, [])
 
@@ -1017,10 +1068,10 @@ function App() {
                 </div>
               </div>
               {gameSupportsPerSeatAiDifficulty(gameId) && aiOpponents >= 1 && (
-                <div className="app__toolbarRow app__toolbarRow--diff" role="group" aria-label="AI difficulty per seat">
+                <div className="app__toolbarRow app__toolbarRow--diff" role="group" aria-label="AI player difficulty">
                   {Array.from({ length: aiOpponents }, (_, i) => (
                     <label key={i} className="app__label app__label--inline">
-                      Player {i + 2}
+                      {aiPlayerMenuLabel(i)}
                       <select
                         className="app__select app__select--diff"
                         value={aiDifficulties[i] ?? 'medium'}
@@ -1076,6 +1127,7 @@ function App() {
                   }
                   scoringMode={session.manifest.match?.scoringMode === 'chips' ? 'chips' : 'points'}
                   pendingRoundScores={pendingMergeRoundScores}
+                  playerSeatCaption={cumulativeRowCaption}
                 />
               </div>
             )}
@@ -1120,7 +1172,7 @@ function App() {
               Totals if you merge this round:{' '}
               {matchPreviewTotals.map((s, i) => (
                 <span key={i}>
-                  {playerSeatLabel(i)}: {s}
+                  {cumulativeRowCaption(i)}: {s}
                   {i < matchPreviewTotals.length - 1 ? ' · ' : ''}
                 </span>
               ))}
@@ -1143,6 +1195,7 @@ function App() {
           <TableView
             table={session.table}
             humanPlayerIndex={tableViewHumanIndex(session)}
+            getSeatDisplayName={seatDisplayName}
             onTableIntent={tableIntentZones ? handleTableIntent : undefined}
             intentZoneAllowlist={tableIntentZones}
             pendingStacksColumn={
