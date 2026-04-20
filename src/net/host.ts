@@ -1,8 +1,10 @@
 import { PeerLink, type PeerState } from './peer'
 import {
   PROTOCOL_VERSION,
+  type PeerClientChatSend,
   type PeerClientIntent,
   type PeerClientSetDisplayName,
+  type PeerHostChatLine,
   type PeerHostSnapshot,
   type PeerMessage,
   type SignalingRelay,
@@ -22,8 +24,11 @@ export interface RoomHostOptions {
   token: string
   onRosterChange?: (peers: HostedPeer[]) => void
   onSignalingState?: (state: SignalingState) => void
-  /** Game intents and auxiliary seat updates from clients. */
-  onIntent?: (msg: PeerClientIntent | PeerClientSetDisplayName, fromPeerId: string) => void
+  /** Game intents, seat labels, and room chat from clients. */
+  onIntent?: (
+    msg: PeerClientIntent | PeerClientSetDisplayName | PeerClientChatSend,
+    fromPeerId: string,
+  ) => void
 }
 
 interface HostPeerRecord {
@@ -121,7 +126,7 @@ export class RoomHost {
   }
 
   private handlePeerMessage(msg: PeerMessage, fromPeerId: string) {
-    if (msg.type === 'intent' || msg.type === 'setDisplayName') {
+    if (msg.type === 'intent' || msg.type === 'setDisplayName' || msg.type === 'chatSend') {
       this.opts.onIntent?.(msg, fromPeerId)
     } else if (msg.type === 'ping') {
       const rec = this.peers.get(fromPeerId)
@@ -154,6 +159,13 @@ export class RoomHost {
   status(message: string): void {
     for (const rec of this.peers.values()) {
       rec.link.send({ type: 'status', message })
+    }
+  }
+
+  /** Broadcast one chat line to every connected client (host UI adds the line locally). */
+  broadcastChatLine(line: PeerHostChatLine): void {
+    for (const rec of this.peers.values()) {
+      rec.link.send(line)
     }
   }
 

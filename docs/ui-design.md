@@ -27,7 +27,7 @@ When a deal is on the table, host and client see a **compact** strip inside `.mu
 
 - Row: `.multiplayerPanel__compactRow.multiplayerPanel__compactRow--split`
 - **Lead** (left): `.multiplayerPanel__compactLead` — hosting/joined copy and room code (`flex: 1 1 …`, grows, truncates).
-- **Tail** (right): `.multiplayerPanel__compactTail` — inline name editor (`Name` + input + **Save**) and **Close room** / **Leave room**.
+- **Tail** (right): `.multiplayerPanel__compactTail` — inline name editor (`Name` + input + **Save**), **Open chat**, and **Close room** / **Leave room**.
 - The tail uses **`margin-left: auto`** so the name + actions stay **right-aligned** on the row (and align to the end of the line when the row wraps on narrow widths).
 
 **Buttons**
@@ -45,6 +45,8 @@ The inline display-name input uses theme-aligned borders/background (`--border`,
 ## Expanded hosting / client (room open, no table)
 
 **Close room** / **Leave room** in the non-compact blocks also use **`app__btnSecondary app__btnToolbar`**.
+
+**Open chat** (compact and expanded multiplayer rows) uses the same button classes. It stays disabled for a joined client until a table snapshot assigns a seat. Behavior of the chat window and main-window toasts is documented in [`multiplayer-chat.md`](multiplayer-chat.md).
 
 ## When you change something
 

@@ -8,7 +8,7 @@
  * host sends back. Incrementing {@link PROTOCOL_VERSION} is a breaking change.
  */
 
-export const PROTOCOL_VERSION = 2
+export const PROTOCOL_VERSION = 3
 
 /** Room codes are 6 uppercase alphanumeric chars, ambiguous glyphs dropped. */
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -147,6 +147,38 @@ export interface PeerClientSetDisplayName {
   displayName: string
 }
 
+/** Host → all peers: one room chat line (in-memory; not persisted server-side). */
+export interface PeerHostChatLine {
+  type: 'chatLine'
+  id: string
+  seat: number
+  senderLabel: string
+  text: string
+  ts: number
+}
+
+/** Client → host: send a chat message from a human seat. */
+export interface PeerClientChatSend {
+  type: 'chatSend'
+  seat: number
+  text: string
+}
+
+/** Room chat body; max 140 chars after trim / control strip. */
+export function sanitizeChatText(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const t = raw
+    .trim()
+    .split('')
+    .filter((ch) => {
+      const c = ch.charCodeAt(0)
+      return c >= 32 && c !== 127
+    })
+    .join('')
+    .slice(0, 140)
+  return t.length ? t : null
+}
+
 /** Single-line display name for UI; returns null if empty after trim / invalid type. */
 export function sanitizeDisplayName(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
@@ -177,8 +209,10 @@ export type PeerMessage =
   | PeerHostSnapshot
   | PeerHostAck
   | PeerHostStatus
+  | PeerHostChatLine
   | PeerClientIntent
   | PeerClientSetDisplayName
+  | PeerClientChatSend
   | PeerClientPing
   | PeerHostPong
 
@@ -206,6 +240,8 @@ export function isPeerMessage(value: unknown): value is PeerMessage {
     t === 'status' ||
     t === 'intent' ||
     t === 'setDisplayName' ||
+    t === 'chatSend' ||
+    t === 'chatLine' ||
     t === 'ping' ||
     t === 'pong'
   )

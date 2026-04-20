@@ -27,6 +27,8 @@ Then open the URL Vite prints (usually `http://localhost:5173`).
 
 After you have deployed once, copy the **HTTP API** and **WebSocket API** URLs from the GitHub **Deploy** workflow summary (or run `terraform output -raw http_api_url` / `ws_api_url` under `deploy/terraform/aws`). Create `.env.local` from [`.env.example`](.env.example) and set `VITE_MULTIPLAYER_HTTP_URL` and `VITE_MULTIPLAYER_WS_URL`, then restart `npm run dev`.
 
+In a live room, use **Open chat** in the **Online play** strip for [ephemeral room chat](docs/multiplayer-chat.md) (second window + toasts when the window is closed).
+
 Choosing another entry in the **Game** menu updates the selection only; press **Start deal** (or **New deal** when a hand is already on the table) to shuffle and play.
 
 Use **Rules** (next to **End game**) to open a modal with the in-app rules for the **currently selected** game (you can read them before **Start deal**).
@@ -83,6 +85,7 @@ Pick a game from the in-app **Game** menu. Each row links to a short note in [`d
 | [`src/rules/`](src/rules/) | In-app rules copy (markdown) shown in the **Rules** modal; see [`src/data/rulesSources.ts`](src/data/rulesSources.ts). |
 | [`docs/`](docs/) | Longer per-game notes (repo docs; can diverge slightly from the modal text). |
 | [`docs/ui-design.md`](docs/ui-design.md) | Shared shell UI (toolbar buttons, online multiplayer strip layout). |
+| [`docs/multiplayer-chat.md`](docs/multiplayer-chat.md) | Room chat (DataChannel + chat popout + toasts). |
 
 ## Contributing
 

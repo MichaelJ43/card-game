@@ -1,7 +1,9 @@
 import { PeerLink, type PeerState } from './peer'
 import {
+  type PeerClientChatSend,
   type PeerClientIntent,
   type PeerClientSetDisplayName,
+  type PeerHostChatLine,
   type PeerHostSnapshot,
   type PeerMessage,
   type SignalingRelay,
@@ -21,6 +23,8 @@ export interface RoomClientOptions {
   onAck?: (nonce: string, ok: boolean, error: string | undefined) => void
   /** Host closed the room or disconnected; stop signaling and data channel. */
   onHostEnded?: () => void
+  /** Host broadcast room chat line. */
+  onChatLine?: (line: PeerHostChatLine) => void
 }
 
 /**
@@ -84,6 +88,7 @@ export class RoomClient {
     if (msg.type === 'snapshot') this.opts.onSnapshot?.(msg)
     else if (msg.type === 'status') this.opts.onStatus?.(msg.message)
     else if (msg.type === 'ack') this.opts.onAck?.(msg.nonce, msg.ok, msg.error)
+    else if (msg.type === 'chatLine') this.opts.onChatLine?.(msg)
   }
 
   sendIntent(intent: Omit<PeerClientIntent, 'type'>): void {
@@ -92,6 +97,10 @@ export class RoomClient {
 
   sendSetDisplayName(body: Omit<PeerClientSetDisplayName, 'type'>): void {
     this.link?.send({ type: 'setDisplayName', ...body })
+  }
+
+  sendChat(body: Omit<PeerClientChatSend, 'type'>): void {
+    this.link?.send({ type: 'chatSend', ...body })
   }
 
   close(): void {
