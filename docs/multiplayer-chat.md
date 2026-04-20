@@ -5,8 +5,8 @@ When **online multiplayer** is enabled in the build, hosts and joined clients ca
 ## How to use it
 
 1. **Host a room** or **join** with a room code (same flow as normal online play).
-2. Click **Open chat**. The browser opens a **second window** with a short transcript and a composer.
-3. Type a message and press **Send** or **Enter**. Everyone in the room sees the line (after the host validates it).
+2. Click **Open chat** as soon as you are in the room (you do not need to wait for the host to start a deal). The browser opens a **second window** with a short transcript and a composer.
+3. Type a message and press **Send** or **Enter**. Everyone in the room sees the line (after the host validates it). Until the host has sent at least one table snapshot, your **seat** for the wire protocol may not be known yet — **Send** does nothing until then (you can still read the transcript if others chat).
 
 If the chat window is **closed**, new messages still appear as **toasts** in the bottom-right of the **main** game window (up to **five** at a time, each for about **three seconds**). While the chat popout is **open**, new lines appear **only** in the transcript there (no duplicate toasts in the popout).
 

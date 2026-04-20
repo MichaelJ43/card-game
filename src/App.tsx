@@ -342,6 +342,8 @@ function App() {
 
   const roomHostRef = useRef<RoomHost | null>(null)
   const roomClientRef = useRef<RoomClient | null>(null)
+  /** Host snapshot seat for this browser (joined client); set before parse so chat send works before first full session. */
+  const clientRemoteSeatRef = useRef<number | null>(null)
   const sessionRef = useRef<GameSession | null>(null)
   const pushSnapshotRef = useRef<() => void>(() => {})
 
@@ -377,8 +379,9 @@ function App() {
 
   const onlineClientShell = joinedAsClient || !!session?.net
   const networkSpectator = !!session?.net?.spectator
+  /** Open chat whenever in a room; joined clients can open before the first deal. Spectators stay disabled. */
   const multiplayerChatEnabled =
-    multiplayerHostActive || (!!session?.net && !session.net.spectator && joinedAsClient)
+    multiplayerHostActive || (joinedAsClient && (!session?.net || !session.net.spectator))
 
   const seatDisplayName = useCallback(
     (serverPlayerIndex: number): string => {
@@ -584,6 +587,7 @@ function App() {
   }, [])
 
   const onSessionSnapshot = useCallback((snap: PeerHostSnapshot) => {
+    clientRemoteSeatRef.current = snap.seat
     const parsed = parseSessionSnapshot(snap.state, snap.seat)
     if (!parsed) return
     setSession(parsed)
@@ -731,8 +735,11 @@ function App() {
       const sess = sessionRef.current
       const client = roomClientRef.current
       if (client) {
-        if (!sess?.net || sess.net.spectator) return
-        client.sendChat({ seat: sess.net.seat, text })
+        if (sess?.net?.spectator) return
+        const seat =
+          sess?.net && !sess.net.spectator ? sess.net.seat : clientRemoteSeatRef.current
+        if (seat == null || seat < 0) return
+        client.sendChat({ seat, text })
         return
       }
       const host = roomHostRef.current
@@ -819,6 +826,7 @@ function App() {
       // ignore
     }
     chatPopoutRef.current = null
+    clientRemoteSeatRef.current = null
   }, [clearMainChatToasts])
 
   const onHostingRosterChange = useCallback((peers?: HostedPeer[]) => {
@@ -1539,6 +1547,7 @@ function App() {
           onRoomChatLine={onRoomChatLine}
           onOpenChat={handleOpenChat}
           chatEnabled={multiplayerChatEnabled}
+          chatDisabledTitle={networkSpectator ? 'Spectating — room chat is disabled.' : undefined}
           chatOpenFailed={chatOpenFailed}
           onHostingRosterChange={onHostingRosterChange}
           onTeardown={onMultiplayerTeardown}

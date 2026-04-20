@@ -46,7 +46,7 @@ The inline display-name input uses theme-aligned borders/background (`--border`,
 
 **Close room** / **Leave room** in the non-compact blocks also use **`app__btnSecondary app__btnToolbar`**.
 
-**Open chat** (compact and expanded multiplayer rows) uses the same button classes. It stays disabled for a joined client until a table snapshot assigns a seat. Behavior of the chat window and main-window toasts is documented in [`multiplayer-chat.md`](multiplayer-chat.md).
+**Open chat** (compact and expanded multiplayer rows) uses the same button classes. It is available whenever you are in a room (host or joined client); it stays disabled only while **spectating**. Behavior of the chat window and main-window toasts is documented in [`multiplayer-chat.md`](multiplayer-chat.md).
 
 ## When you change something
 
