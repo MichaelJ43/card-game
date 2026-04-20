@@ -9,6 +9,11 @@ import type { AiPlayerConfig, GameSession } from '../session'
 /** Wire shape sent in {@link PeerHostSnapshot.state} for table sync. */
 export interface SessionSnapshotWire {
   gameId: string
+  /**
+   * Effective deal manifest (runtime player counts, match overrides, etc.).
+   * When present, clients must prefer this over re-parsing YAML from {@link gameId} alone.
+   */
+  manifest?: GameManifestYaml
   table: TableState
   gameState: unknown
   match?: MatchState
@@ -30,6 +35,7 @@ export function serializeSessionSnapshot(session: GameSession): SessionSnapshotW
   try {
     const wire: SessionSnapshotWire = {
       gameId: session.manifest.id,
+      manifest: JSON.parse(JSON.stringify(session.manifest)) as GameManifestYaml,
       table: JSON.parse(JSON.stringify(session.table)) as TableState,
       gameState: JSON.parse(JSON.stringify(session.gameState)),
       match: session.match ? (JSON.parse(JSON.stringify(session.match)) as MatchState) : undefined,
@@ -49,7 +55,9 @@ export function parseSessionSnapshot(value: unknown, peerSeatFallback?: number):
   const gameId = w.gameId as keyof typeof GAME_SOURCES
   const raw = GAME_SOURCES[gameId]
   if (!raw) return null
-  const manifest = parseGameManifestYaml(raw) as GameManifestYaml
+  const manifest = (
+    w.manifest ? w.manifest : (parseGameManifestYaml(raw) as GameManifestYaml)
+  ) as GameManifestYaml
   const mod = getGameModule(manifest.module)
   if (!mod) return null
   const remoteHumans = Math.max(0, manifest.players.human - 1)
