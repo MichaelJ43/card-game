@@ -7,8 +7,6 @@ import {
   isMainToChatPopout,
   type ChatPopoutToMain,
 } from '../chat/chatPopoutMessages'
-import { useChatToasts } from '../chat/useChatToasts'
-import { ChatToastStack } from '../ui/ChatToastStack'
 import './chat-popout.css'
 
 function ChatPopoutApp() {
@@ -16,7 +14,6 @@ function ChatPopoutApp() {
   const [lines, setLines] = useState<PeerHostChatLine[]>([])
   const [draft, setDraft] = useState('')
   const [noOpener, setNoOpener] = useState(() => typeof window !== 'undefined' && !window.opener)
-  const { toasts, pushToast, clearToasts } = useChatToasts(5, 3000)
 
   const postToOpener = useCallback((msg: ChatPopoutToMain) => {
     const target = openerRef.current
@@ -40,16 +37,14 @@ function ChatPopoutApp() {
       if (!isMainToChatPopout(ev.data)) return
       if (ev.data.type === 'chat-sync') {
         setLines(ev.data.lines)
-        clearToasts()
         return
       }
       const { line } = ev.data
       setLines((prev) => [...prev, line].slice(-200))
-      pushToast({ id: line.id, senderLabel: line.senderLabel, text: line.text })
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [pushToast, clearToasts])
+  }, [])
 
   const send = useCallback(() => {
     const t = draft.trim()
@@ -81,10 +76,12 @@ function ChatPopoutApp() {
             <div key={l.id} className="chatPopout__line">
               <div className="chatPopout__meta">
                 <span className="chatPopout__sender">{l.senderLabel}</span>
-                <span> · </span>
-                <time dateTime={new Date(l.ts).toISOString()}>{new Date(l.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
+                <span className="chatPopout__metaSep"> · </span>
+                <time className="chatPopout__time" dateTime={new Date(l.ts).toISOString()}>
+                  {new Date(l.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </time>
               </div>
-              <div>{l.text}</div>
+              <div className="chatPopout__body">{l.text}</div>
             </div>
           ))
         )}
@@ -110,7 +107,6 @@ function ChatPopoutApp() {
         </button>
       </div>
       <p className="chatPopout__hint">Messages are not stored on the server and disappear when the room closes.</p>
-      <ChatToastStack toasts={toasts} />
     </div>
   )
 }

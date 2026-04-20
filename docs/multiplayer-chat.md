@@ -8,7 +8,7 @@ When **online multiplayer** is enabled in the build, hosts and joined clients ca
 2. Click **Open chat**. The browser opens a **second window** with a short transcript and a composer.
 3. Type a message and press **Send** or **Enter**. Everyone in the room sees the line (after the host validates it).
 
-If the chat window is **closed**, new messages still appear as **toasts** in the bottom-right of the **main** game window (up to **five** at a time, each for about **three seconds**). While the chat popout is **open**, toasts appear **only** in that window so you do not get duplicates.
+If the chat window is **closed**, new messages still appear as **toasts** in the bottom-right of the **main** game window (up to **five** at a time, each for about **three seconds**). While the chat popout is **open**, new lines appear **only** in the transcript there (no duplicate toasts in the popout).
 
 ## Names and limits
 
