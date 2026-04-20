@@ -9,4 +9,4 @@ Uses the same high-card duel flow and betting buttons.
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/red-dog.md`](../src/rules/red-dog.md)
-- **Project wiki:** [Red-dog](https://github.com/MichaelJ43/card-game/wiki/Red-dog)
+- **Wikipedia:** [Red dog (card game)](https://en.wikipedia.org/wiki/Red_dog_(card_game))

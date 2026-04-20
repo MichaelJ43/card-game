@@ -11,4 +11,4 @@ Heads-up **five-card draw**: pay the **ante**, receive five cards, then choose h
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/poker-draw.md`](../src/rules/poker-draw.md)
-- **Project wiki:** [Poker-draw](https://github.com/MichaelJ43/card-game/wiki/Poker-draw)
+- **Wikipedia:** [Five-card draw](https://en.wikipedia.org/wiki/Five-card_draw)

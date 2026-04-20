@@ -13,4 +13,4 @@ Use **Play round** (or the game’s primary control) as indicated in the UI to a
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/demo-custom.md`](../src/rules/demo-custom.md)
-- **Project wiki:** [Demo-custom](https://github.com/MichaelJ43/card-game/wiki/Demo-custom)
+- **Wikipedia:** [Card game](https://en.wikipedia.org/wiki/Card_game) (no article for this sample deck; general overview)

@@ -7,4 +7,4 @@
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/euchre.md`](../src/rules/euchre.md)
-- **Project wiki:** [Euchre](https://github.com/MichaelJ43/card-game/wiki/Euchre)
+- **Wikipedia:** [Euchre](https://en.wikipedia.org/wiki/Euchre)

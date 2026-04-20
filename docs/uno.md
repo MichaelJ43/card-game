@@ -15,4 +15,4 @@ Uno-style shedding: match the **current color** or the **face** of the top disca
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/uno.md`](../src/rules/uno.md)
-- **Project wiki:** [Uno](https://github.com/MichaelJ43/card-game/wiki/Uno)
+- **Wikipedia:** [Uno (card game)](https://en.wikipedia.org/wiki/Uno_(card_game))

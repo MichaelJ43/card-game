@@ -9,4 +9,4 @@ Same flow as **Baccarat**: choose bet size and side, then the round resolves fro
 ## See also
 
 - **In-app rules** (modal text bundled in the app): [`src/rules/mini-baccarat.md`](../src/rules/mini-baccarat.md)
-- **Project wiki:** [Mini-baccarat](https://github.com/MichaelJ43/card-game/wiki/Mini-baccarat)
+- **Wikipedia:** [Baccarat](https://en.wikipedia.org/wiki/Baccarat)
