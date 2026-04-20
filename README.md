@@ -61,12 +61,18 @@ Pick a game from the in-app **Game** menu. Each row links to a short note in [`d
 | `high-card-duel` | Higher single card wins the pot (5 or 10 chip bets). | [High-card duel](docs/high-card-duel.md) |
 | `red-dog` | Same engine as high-card duel (alternate manifest). | [Red Dog](docs/red-dog.md) |
 | `uno` | Uno-style shedding game on the custom **uno** deck (108 cards). | [Uno](docs/uno.md) |
+| `thirty-one` | Thirty-One / Scat on a 32-card deck (7–A); knock, draw, or take discard. | [Thirty-One](docs/thirty-one.md) |
+| `euchre` | Simplified four-hand Euchre trick race on 24 cards (9–A). | [Euchre](docs/euchre.md) |
+| `durak` | Two-player Durak-style attack/defend on 36 cards (6–A). | [Durak](docs/durak.md) |
+| `pinochle` | Two-player Pinochle trick race (double 48-card deck); meld omitted. | [Pinochle](docs/pinochle.md) |
+| `canasta` | Draw-two / discard-one practice on a 108-card shoe (not full canasta). | [Canasta](docs/canasta.md) |
+| `sequence-race` | Skip-Bo–style sequence builder on a custom 112-card deck. | [Sequence race](docs/sequence-race.md) |
 
 ## Repository layout (overview)
 
 | Path | Role |
 |------|------|
-| [`src/decks/`](src/decks/) | Deck YAML (standard 52, Skyjo, Uno, examples). |
+| [`src/decks/`](src/decks/) | Deck YAML (standard 52, Skyjo, Uno, regional/specialty decks, examples). |
 | [`src/games/<name>/`](src/games/) | Manifest YAML + `index.ts` game module per title or family. |
 | [`src/core/`](src/core/) | Table model, deck parsing, match state, registry. |
 | [`src/data/manifests.ts`](src/data/manifests.ts) | Wires game and deck ids to bundled YAML. |

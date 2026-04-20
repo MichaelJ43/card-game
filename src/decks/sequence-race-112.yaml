@@ -1,0 +1,67 @@
+id: sequence-race-112
+cards:
+  - id: wild
+    label: Wild
+    value: 0
+    rank: '2'
+    copies: 8
+  - id: n1
+    label: '1'
+    value: 1
+    rank: '3'
+    copies: 8
+  - id: n2
+    label: '2'
+    value: 2
+    rank: '4'
+    copies: 8
+  - id: n3
+    label: '3'
+    value: 3
+    rank: '5'
+    copies: 8
+  - id: n4
+    label: '4'
+    value: 4
+    rank: '6'
+    copies: 8
+  - id: n5
+    label: '5'
+    value: 5
+    rank: '7'
+    copies: 8
+  - id: n6
+    label: '6'
+    value: 6
+    rank: '8'
+    copies: 8
+  - id: n7
+    label: '7'
+    value: 7
+    rank: '9'
+    copies: 8
+  - id: n8
+    label: '8'
+    value: 8
+    rank: '10'
+    copies: 8
+  - id: n9
+    label: '9'
+    value: 9
+    rank: 'J'
+    copies: 8
+  - id: n10
+    label: '10'
+    value: 10
+    rank: 'Q'
+    copies: 8
+  - id: n11
+    label: '11'
+    value: 11
+    rank: 'K'
+    copies: 8
+  - id: n12
+    label: '12'
+    value: 12
+    rank: 'A'
+    copies: 8

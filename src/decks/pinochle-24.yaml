@@ -1,0 +1,4 @@
+id: pinochle-24
+generate:
+  suits: [spades, hearts, diamonds, clubs]
+  ranks: ['9', 'J', 'Q', 'K', '10', 'A']

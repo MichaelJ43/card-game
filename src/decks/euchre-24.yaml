@@ -1,0 +1,4 @@
+id: euchre-24
+generate:
+  suits: [spades, hearts, diamonds, clubs]
+  ranks: ['9', '10', 'J', 'Q', 'K', 'A']

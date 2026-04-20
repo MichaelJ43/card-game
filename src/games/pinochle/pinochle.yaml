@@ -1,0 +1,13 @@
+id: pinochle
+name: Pinochle (2-player trick race)
+module: pinochle
+deck: pinochle-24
+players:
+  human: 1
+  ai: 1
+match:
+  enabled: true
+  targetScore: 40
+  winnerIs: highest
+  endCondition: anyAtOrAbove
+  scoreLabel: Tricks won
