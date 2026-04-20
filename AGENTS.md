@@ -276,7 +276,7 @@ sweeper process.
   (plus a Route 53 hosted zone if you bring a custom domain).
 - No `Scan` on hot paths (`relay` uses `GetItem` on the reverse index;
   `listConnections` uses `Query` within a single partition).
-- See `AWS_SETUP.md` (gitignored) for secrets/variables and
+- See `AWS_SETUP.md` (gitignored) for repository secrets and
   `deploy/terraform/aws/README.md` for infra details.
 
 ### GitHub Actions
@@ -285,10 +285,9 @@ sweeper process.
 - `.github/workflows/deploy.yml` — OIDC-assumed role; applies Terraform, builds
   the site with endpoint URLs baked in, syncs to S3 and invalidates CloudFront.
 
-Required GitHub configuration:
+Required GitHub configuration (repository **secrets** only — no Variables for deploy):
 
-- Secrets: `AWS_ROLE_ARN`, `ROOM_JWT_SECRET`.
-- Variables: `AWS_REGION`, `TF_STATE_BUCKET`, `TF_STATE_LOCK_TABLE`.
+- `AWS_ROLE_ARN`, `ROOM_JWT_SECRET`, `AWS_REGION`, `TF_STATE_BUCKET`, `TF_STATE_LOCK_TABLE`.
 
 ### Future backlog (not in this PR)
 

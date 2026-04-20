@@ -9,7 +9,8 @@ Creates:
 
 ## Inputs you must provide
 
-Either via `terraform.tfvars`, environment variables, or the GitHub deploy workflow:
+Either via `terraform.tfvars`, environment variables, or the GitHub deploy workflow
+(repository **secrets** supply `TF_VAR_room_jwt_secret` and backend config; see `AWS_SETUP.md`):
 
 - `room_jwt_secret` — any strong random string (e.g. 64 hex chars). Do not commit.
 - `http_lambda_zip`, `ws_lambda_zip` — paths to bundles produced by
