@@ -95,3 +95,49 @@ resource "aws_lambda_permission" "ws_invoke" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.ws.execution_arn}/*/*"
 }
+
+# Regional custom hostnames (TLS) for api.<custom_domain> and ws.<custom_domain>.
+# Certificate must be in the same region as var.aws_region (same ARN as CloudFront when aws_region = us-east-1).
+resource "aws_apigatewayv2_domain_name" "http" {
+  count = local.use_custom_domain ? 1 : 0
+
+  domain_name = "api.${local.custom_domain_host}"
+
+  domain_name_configuration {
+    certificate_arn = trimspace(var.acm_certificate_arn)
+    endpoint_type   = "REGIONAL"
+    security_policy = "TLS_1_2"
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_apigatewayv2_domain_name" "ws" {
+  count = local.use_custom_domain ? 1 : 0
+
+  domain_name = "ws.${local.custom_domain_host}"
+
+  domain_name_configuration {
+    certificate_arn = trimspace(var.acm_certificate_arn)
+    endpoint_type   = "REGIONAL"
+    security_policy = "TLS_1_2"
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_apigatewayv2_api_mapping" "http" {
+  count = local.use_custom_domain ? 1 : 0
+
+  api_id      = aws_apigatewayv2_api.http.id
+  domain_name = aws_apigatewayv2_domain_name.http[0].domain_name
+  stage       = aws_apigatewayv2_stage.http.name
+}
+
+resource "aws_apigatewayv2_api_mapping" "ws" {
+  count = local.use_custom_domain ? 1 : 0
+
+  api_id      = aws_apigatewayv2_api.ws.id
+  domain_name = aws_apigatewayv2_domain_name.ws[0].domain_name
+  stage       = aws_apigatewayv2_stage.ws.name
+}

@@ -29,7 +29,13 @@ variable "custom_domain" {
 }
 
 variable "acm_certificate_arn" {
-  description = "ACM cert ARN in us-east-1 for custom_domain. Required when custom_domain is set."
+  description = "ACM public cert ARN used for CloudFront (must be in us-east-1) and, when custom_domain is set, for API Gateway custom domains api./ws. (must be in the same region as aws_region — use us-east-1 for both). Must cover custom_domain and api.* / ws.* (e.g. include *.cardgame.example.com)."
+  type        = string
+  default     = null
+}
+
+variable "route53_hosted_zone_id" {
+  description = "Optional Route 53 public hosted zone id (e.g. Z…) whose domain name equals custom_domain. When set with custom_domain + acm_certificate_arn, creates alias records: apex → CloudFront, api → HTTP API, ws → WebSocket API."
   type        = string
   default     = null
 }
