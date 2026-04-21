@@ -39,6 +39,7 @@ This document summarizes how the **card-game** repository is structured, how gam
 | `src/ui/GameHouseRulesPanel.tsx` | Per-game toggles/inputs saved to **`houseRules`** storage. |
 | `src/ui/CardView.tsx` | Card face/back, Skyjo tiers, standard ranks/suits. |
 | `docs/*.md` | Longer **repo documentation** per game (can diverge slightly from modal text). |
+| `docs/architecture.md` | **System architecture**: multiplayer, WebRTC vs signaling, optional TURN, Lambdas; references **`deploy/terraform/aws/README.md`**. |
 | `docs/ui-design.md` | **Shell UI**: header toolbar button classes (`app__btn*`), multiplayer compact row layout (`multiplayerPanel__compact*` in `App.css`). |
 | `README.md` | User-facing run instructions and game table linking to `docs/`. |
 
