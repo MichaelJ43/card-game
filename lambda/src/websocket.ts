@@ -20,10 +20,30 @@ import {
   type ConnectionRecord,
 } from './storage'
 
+/**
+ * API Gateway Management API (@connections) endpoint for PostToConnection.
+ * Must use the execute-api hostname (`{apiId}.execute-api.{region}.amazonaws.com/{stage}`),
+ * even when clients connected via a custom domain. Using `domainName` from the event with a
+ * vanity host + `/prod` breaks PostToConnection (welcome/relay never reach peers).
+ * @see https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-how-to-call-websocket-api-connections.html
+ */
+export function managementApiEndpoint(event: APIGatewayProxyWebsocketEventV2): string {
+  const ctx = event.requestContext as {
+    apiId?: string
+    domainName: string
+    stage: string
+  }
+  const { domainName, stage } = ctx
+  const apiId = ctx.apiId
+  const region = process.env.AWS_REGION
+  if (apiId && region) {
+    return `https://${apiId}.execute-api.${region}.amazonaws.com/${stage}`
+  }
+  return `https://${domainName}/${stage}`
+}
+
 function mgmtClient(event: APIGatewayProxyWebsocketEventV2): ApiGatewayManagementApiClient {
-  const { domainName, stage } = event.requestContext
-  const endpoint = `https://${domainName}/${stage}`
-  return new ApiGatewayManagementApiClient({ endpoint })
+  return new ApiGatewayManagementApiClient({ endpoint: managementApiEndpoint(event) })
 }
 
 function getJwtSecret(): string {
