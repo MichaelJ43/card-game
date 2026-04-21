@@ -11,10 +11,10 @@ import { GAME_IDS, GAME_SOURCES } from './data/manifests'
 import { rulesTextForGame, type RulesGameId } from './data/rulesSources'
 import {
   clampAiOpponentCount,
+  configurableAiOpponentLimits,
   gameSupportsConfigurableAi,
   gameSupportsOnlineMultiplayer,
   gameSupportsPerSeatAiDifficulty,
-  MAX_AI_OPPONENTS,
   MAX_REMOTE_HUMANS,
   normalizeAiDifficultiesForCount,
 } from './session/playerConfig'
@@ -376,6 +376,7 @@ function App() {
   }, [hostClientRoster])
 
   const selectedManifest = useMemo(() => parseGameManifestYaml(GAME_SOURCES[gameId]), [gameId])
+  const aiOpponentLimits = useMemo(() => configurableAiOpponentLimits(gameId), [gameId])
 
   const onlineClientShell = joinedAsClient || !!session?.net
   const networkSpectator = !!session?.net?.spectator
@@ -536,6 +537,7 @@ function App() {
 
   const onGameIdChange = useCallback((id: (typeof GAME_IDS)[number]) => {
     setGameId(id)
+    setAiOpponents((prev) => clampAiOpponentCount(id, prev))
     setSession(null)
     setGfAwaitingOpponent(false)
     setGfRank('A')
@@ -593,7 +595,7 @@ function App() {
     setSession(parsed)
     setGameId(parsed.manifest.id as (typeof GAME_IDS)[number])
     if (gameSupportsConfigurableAi(parsed.manifest.id)) {
-      setAiOpponents(parsed.manifest.players.ai)
+      setAiOpponents(clampAiOpponentCount(parsed.manifest.id, parsed.manifest.players.ai))
     }
     if (parsed.aiPlayerConfig?.difficulties?.length) {
       setAiDifficulties(parsed.aiPlayerConfig.difficulties)
@@ -1413,8 +1415,8 @@ function App() {
                       <input
                         className="app__inputNumber"
                         type="number"
-                        min={1}
-                        max={MAX_AI_OPPONENTS}
+                        min={aiOpponentLimits.min}
+                        max={aiOpponentLimits.max}
                         value={aiOpponents}
                         disabled={aiCountLocked || onlineClientShell}
                         title={
@@ -1422,7 +1424,7 @@ function App() {
                             ? 'Player count is set by the host while you are in an online room.'
                             : aiCountLocked
                               ? 'Finish or advance the match before changing player count.'
-                              : `1–${MAX_AI_OPPONENTS} computer players (${1 + aiOpponents} total). Applies on Start deal / New deal.`
+                              : `${aiOpponentLimits.min}–${aiOpponentLimits.max} computer opponents (${1 + aiOpponents} seats including you). 0 = human-only where supported. Applies on Start deal / New deal.`
                         }
                         onChange={(e) => {
                           const n = clampAiOpponentCount(gameId, Number(e.target.value))
