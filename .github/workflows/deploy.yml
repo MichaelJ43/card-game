@@ -20,6 +20,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  deployments: write
 
 concurrency:
   group: deploy-${{ github.event.inputs.environment || 'prod' }}
@@ -28,6 +29,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://cardgame.michaelj43.dev
     env:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}

@@ -285,8 +285,9 @@ sweeper process.
 - `.github/workflows/ci.yml` — lint, test (site + lambda), build on every PR/push.
 - `.github/workflows/deploy.yml` — OIDC-assumed role; applies Terraform, builds
   the site with endpoint URLs baked in, syncs to S3 and invalidates CloudFront.
+  The deploy job targets GitHub **Environment** `production` (deployment history + URL in the repo UI).
 
-Required GitHub configuration (repository **secrets** only — no Variables for deploy):
+Required repository **Secrets** for deploy:
 
 - `AWS_ROLE_ARN`, `ROOM_JWT_SECRET`, `AWS_REGION`, `TF_STATE_BUCKET`, `TF_STATE_LOCK_TABLE`.
 
