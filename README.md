@@ -87,7 +87,7 @@ Pick a game from the in-app **Game** menu. Each row links to a short note in [`d
 | [`docs/ui-design.md`](docs/ui-design.md) | Shared shell UI (toolbar buttons, online multiplayer strip layout). |
 | [`docs/multiplayer-chat.md`](docs/multiplayer-chat.md) | Room chat (DataChannel + chat popout + toasts). |
 | [`docs/audio-cues.md`](docs/audio-cues.md) | Optional chat / turn / card sounds (`public/sounds/*.wav`). |
-| [`deploy/terraform/aws/README.md`](deploy/terraform/aws/README.md) | AWS deploy (S3, CloudFront, Lambda, APIs); includes **custom subdomain** (e.g. `cardgame.michaelj43.dev`) + GitHub Variables. |
+| [`deploy/terraform/aws/README.md`](deploy/terraform/aws/README.md) | Terraform module reference: AWS resources, variables, outputs, file layout. |
 
 ## Contributing
 

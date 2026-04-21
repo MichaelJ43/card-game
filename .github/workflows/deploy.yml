@@ -81,7 +81,7 @@ jobs:
             -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
             -backend-config="encrypt=true"
 
-      # Optional custom domain: TF_CUSTOM_DOMAIN (variable) + TF_ACM_CERTIFICATE_ARN (secret); optional TF_ROUTE53_HOSTED_ZONE_ID (secret). See deploy/terraform/aws/README.md.
+      # Optional custom domain: TF_CUSTOM_DOMAIN (var) + TF_ACM_CERTIFICATE_ARN + TF_ROUTE53_HOSTED_ZONE_ID (secrets). See AGENTS.md / AWS_SETUP.md.
       # Empty GitHub vars must not export TF_VAR_* or Terraform sees "" instead of null.
       - name: Terraform apply
         working-directory: deploy/terraform/aws

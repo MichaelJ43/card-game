@@ -277,8 +277,8 @@ sweeper process.
   (plus a Route 53 hosted zone if you bring a custom domain).
 - No `Scan` on hot paths (`relay` uses `GetItem` on the reverse index;
   `listConnections` uses `Query` within a single partition).
-- See `AWS_SETUP.md` (gitignored) for repository secrets and
-  `deploy/terraform/aws/README.md` for infra details.
+- See `AWS_SETUP.md` (gitignored) for repository secrets / CI wiring, and
+  `deploy/terraform/aws/README.md` for the Terraform module (resources, inputs, outputs).
 
 ### GitHub Actions
 
@@ -299,7 +299,7 @@ only on the Terraform step output in the same job:
 
 Deploy resolves URLs as: **Variables if non-empty, else Terraform outputs** for that run. Copy the two lines from the last successful **Deploy** job summary into Variables once, then re-run **Deploy** (or push) so CloudFront serves a bundle with multiplayer enabled.
 
-Custom site hostname (e.g. `cardgame.michaelj43.dev`): set repository **Variable** `TF_CUSTOM_DOMAIN` and **Secret** `TF_ACM_CERTIFICATE_ARN` (ACM cert must be in **us-east-1**). Optional **Secret** `TF_ROUTE53_HOSTED_ZONE_ID` for Terraform-managed Route 53 aliases. See **`deploy/terraform/aws/README.md`** and **`AWS_SETUP.md`** §7.
+Custom site hostname (e.g. `cardgame.michaelj43.dev`): set repository **Variable** `TF_CUSTOM_DOMAIN` and **Secret** `TF_ACM_CERTIFICATE_ARN` (ACM cert must be in **us-east-1**). Optional **Secret** `TF_ROUTE53_HOSTED_ZONE_ID` for Terraform-managed Route 53 aliases. See **`AWS_SETUP.md`** §7 and **`.github/workflows/deploy.yml`**; **`deploy/terraform/aws/README.md`** documents what Terraform creates.
 
 ### Future backlog (not in this PR)
 
