@@ -136,6 +136,10 @@ jobs:
         env:
           VITE_MULTIPLAYER_HTTP_URL: ${{ steps.mp.outputs.http }}
           VITE_MULTIPLAYER_WS_URL: ${{ steps.mp.outputs.ws }}
+          # Optional coturn (hostname only, no https:// — see src/net/config.ts).
+          VITE_MULTIPLAYER_TURN_HOST: ${{ vars.VITE_MULTIPLAYER_TURN_HOST }}
+          VITE_MULTIPLAYER_TURN_USER: ${{ vars.VITE_MULTIPLAYER_TURN_USER }}
+          VITE_MULTIPLAYER_TURN_CREDENTIAL: ${{ secrets.VITE_MULTIPLAYER_TURN_CREDENTIAL }}
         run: npm run build
 
       # 4. Sync static assets to S3 + invalidate CloudFront.
@@ -167,4 +171,4 @@ jobs:
           if [ -n "$HR" ]; then echo "- Route 53 alias target (api → HTTP API): \`$HR\`" >> "$GITHUB_STEP_SUMMARY"; fi
           if [ -n "$WR" ]; then echo "- Route 53 alias target (ws → WebSocket API): \`$WR\`" >> "$GITHUB_STEP_SUMMARY"; fi
           TH="$(terraform output -raw turn_hostname 2>/dev/null || true)"
-          if [ -n "$TH" ] && [ "$TH" != "null" ]; then echo "- TURN hostname (coturn): \`$TH\` — set \`VITE_MULTIPLAYER_TURN_*\` and redeploy if newly enabled." >> "$GITHUB_STEP_SUMMARY"; fi
+          if [ -n "$TH" ] && [ "$TH" != "null" ]; then echo "- TURN hostname (coturn): \`$TH\` — set Variables \`VITE_MULTIPLAYER_TURN_HOST\` / \`VITE_MULTIPLAYER_TURN_USER\` and Secret \`VITE_MULTIPLAYER_TURN_CREDENTIAL\`, then redeploy." >> "$GITHUB_STEP_SUMMARY"; fi
