@@ -94,6 +94,13 @@ variable "turn_ec2_enabled" {
   default     = false
 }
 
+variable "turn_coturn_static_password" {
+  description = "Long-term coturn credential (username fixed as cardgame in user-data). Required when the TURN EC2 stack applies — use the same value as the site build secret (e.g. GitHub Actions secret TURN_COTURN_STATIC_PASSWORD). Min 8 characters after trim. Leave empty when turn_ec2_enabled is false."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "turn_instance_type" {
   description = "Instance type for the optional coturn EC2 (e.g. t3.micro)."
   type        = string

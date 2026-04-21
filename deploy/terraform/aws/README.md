@@ -37,6 +37,7 @@ Notable optional inputs:
 - **`allowed_origin`** — override browser origin string for CORS / Lambda when non-empty.
 - **`aws_region`**, **`project`**, **`environment`**, **`tags`**, **`site_bucket_name`**, room / connection TTLs, zip paths, **`site_assets_dir`** (used by automation that syncs `dist/`).
 - **`turn_ec2_enabled`** (default `false`) — optional coturn stack; requires **`custom_domain`**, **`acm_certificate_arn`**, and **`route53_hosted_zone_id`**. **`turn_instance_type`**, **`scheduled_lambda_zip`**. **GitHub Deploy** exports `TF_VAR_turn_ec2_enabled` when repository **Variable** **`TF_TURN_EC2_ENABLED`** is `true`; otherwise apply only updates the existing **http** / **ws** Lambdas and APIs (no EC2 or `turn.*` record).
+- **`turn_coturn_static_password`** (default `""`, sensitive) — **required** when the TURN stack applies: long-term coturn password for user **`cardgame`**. You choose it once (e.g. password generator); pass the same value as GitHub Actions **Secret** **`TURN_COTURN_STATIC_PASSWORD`** so Terraform user-data and the Vite build both use it. Min **8** characters (after trim).
 
 ---
 
@@ -60,17 +61,21 @@ Notable optional inputs:
 | `http_regional_domain_name` | `d-…execute-api…` target for the **HTTP** custom domain (compare to Route 53 `api` alias) |
 | `ws_regional_domain_name` | `d-…execute-api…` target for the **WebSocket** custom domain (compare to Route 53 `ws` alias) |
 | `turn_hostname` | e.g. `turn.<custom_domain>` when TURN stack is enabled; else `null` |
-| `turn_coturn_static_password` | Sensitive coturn password (user **`cardgame`** in user-data); set **`VITE_MULTIPLAYER_TURN_CREDENTIAL`** to match at site build |
+| `turn_coturn_static_password` | Sensitive echo of the configured coturn password when TURN is on (avoid printing in CI); user **`cardgame`** in user-data |
 
-**TURN / DNS:** After `terraform apply` with TURN on, run **`terraform output -raw turn_coturn_static_password`** once. There is **no** `VITE_MULTIPLAYER_TURN_URL` — WebRTC uses a `turn:` URL, which the app builds from the host. Configure for the **Deploy** “Build site” step:
+**TURN / DNS:** There is **no** `VITE_MULTIPLAYER_TURN_URL` — WebRTC uses a `turn:` URL, which the app builds from the host. **One password, one secret:** create a strong password (min 8 characters), store it as GitHub Actions **Secret** **`TURN_COTURN_STATIC_PASSWORD`**. The **Deploy** workflow passes it to Terraform as **`TF_VAR_turn_coturn_static_password`** (coturn on EC2) and to Vite as **`VITE_MULTIPLAYER_TURN_CREDENTIAL`**, so you do not copy values out of `terraform output` after each apply.
 
 | GitHub Actions | Value |
 |----------------|--------|
+| **Secret** `TURN_COTURN_STATIC_PASSWORD` | Your chosen coturn password (same value for Terraform + browser bundle). |
 | **Variable** `VITE_MULTIPLAYER_TURN_HOST` | Hostname only, e.g. `turn.cardgame.michaelj43.dev` (same as `terraform output -raw turn_hostname`). **Do not** use `https://` or a path. |
 | **Variable** `VITE_MULTIPLAYER_TURN_USER` | `cardgame` (matches Terraform user-data). |
-| **Secret** `VITE_MULTIPLAYER_TURN_CREDENTIAL` | Output of `terraform output -raw turn_coturn_static_password` (sensitive). |
 
-**Why store it in GitHub at all?** Terraform **does** use the generated password: it is written into **EC2 user-data** so **coturn** knows which `username` / `password` to accept. You are not inventing a separate password. The **browser** must also know that same credential: WebRTC passes it in `RTCIceServer`, and this app bakes `import.meta.env.VITE_*` into the **static JS** at `npm run build`. The deploy job runs **after** Terraform apply but does not read Terraform state files, so CI needs the value supplied as a **Secret** (avoids repo Variable leaks and log exposure). Use a **Secret** not a Variable because anyone with repo settings access can read Variables. Note the value still appears inside the shipped bundle to anyone who inspects network or sources—long-term TURN creds in the client are inherently public to players; for stricter models use a TURN REST API or short-lived credentials (future backlog).
+If you previously used **`VITE_MULTIPLAYER_TURN_CREDENTIAL`** as a separate Actions secret, remove it and use **`TURN_COTURN_STATIC_PASSWORD`** only (both Terraform and Vite read that name in deploy).
+
+**Why a Secret?** The password must exist in **two** places: EC2 user-data (via Terraform) and the static site (via Vite). CI supplies one GitHub **Secret** to both steps. It still ends up in client JS for anyone who inspects the bundle; **short-lived / on-demand credentials** (e.g. TURN REST API) remain a future improvement for stricter threat models.
+
+**Migrating from older Terraform that used `random_password`:** the coturn instance **user-data** changes; Terraform will typically **replace** the EC2 instance once. Put the password you want to keep (or a new one) in **`TURN_COTURN_STATIC_PASSWORD`** before apply.
 
 Then redeploy the site. The HTTP Lambda waits for **EC2 status checks OK** before updating Route 53; the scheduled Lambda stops the instance only after **4h uptime** and **15m** without usage heartbeats (see app).
 

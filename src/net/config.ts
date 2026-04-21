@@ -5,7 +5,7 @@
  *   - VITE_MULTIPLAYER_WS_URL     → e.g. wss://def456.execute-api.us-east-1.amazonaws.com/prod, or wss://ws.example.com (no path) with API Gateway custom domain + mapping
  *   - VITE_MULTIPLAYER_STUN_URLS  → comma-separated STUN urls (default: Google public STUN)
  *   - VITE_MULTIPLAYER_ICE_JSON   → optional JSON array of RTCIceServer objects (overrides STUN-only default)
- *   - VITE_MULTIPLAYER_TURN_HOST / TURN_USER / TURN_CREDENTIAL → optional long-term TURN (coturn) in addition to STUN
+ *   - VITE_MULTIPLAYER_TURN_HOST / TURN_USER / TURN_CREDENTIAL → optional long-term TURN (coturn) in addition to STUN (in GitHub Deploy, TURN_CREDENTIAL is set from secret TURN_COTURN_STATIC_PASSWORD alongside TF_VAR_turn_coturn_static_password)
  *
  * If HTTP/WS URLs are missing, multiplayer is disabled at runtime and the UI hides join/host.
  *

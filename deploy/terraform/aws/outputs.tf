@@ -49,7 +49,7 @@ output "turn_hostname" {
 }
 
 output "turn_coturn_static_password" {
-  description = "Static coturn long-term credential password (sensitive). Set VITE_MULTIPLAYER_TURN_CREDENTIAL to match at build time; user is cardgame."
-  value       = try(random_password.turn_coturn[0].result, null)
+  description = "Echo of turn_coturn_static_password when TURN stack is on (sensitive). Prefer defining the password only in CI/GitHub secret TURN_COTURN_STATIC_PASSWORD; do not log this output in pipelines."
+  value       = local.turn_stack && length(trimspace(var.turn_coturn_static_password)) > 0 ? trimspace(var.turn_coturn_static_password) : null
   sensitive   = true
 }

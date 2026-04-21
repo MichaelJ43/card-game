@@ -290,6 +290,7 @@ sweeper process.
 Required repository **Secrets** for deploy:
 
 - `AWS_ROLE_ARN`, `ROOM_JWT_SECRET`, `AWS_REGION`, `TF_STATE_BUCKET`, `TF_STATE_LOCK_TABLE`.
+- Optional coturn: **`TURN_COTURN_STATIC_PASSWORD`** — required when **`TF_TURN_EC2_ENABLED`** is `true` (same value for Terraform `turn_coturn_static_password` and `VITE_MULTIPLAYER_TURN_CREDENTIAL` in the site build).
 
 Optional repository **Variables** (plaintext) for Vite — set these so every
 `npm run build` (CI and deploy) bakes in stable API endpoints without depending
@@ -297,7 +298,7 @@ only on the Terraform step output in the same job:
 
 - `VITE_MULTIPLAYER_HTTP_URL` — same value as `terraform output -raw http_api_url` (no trailing slash).
 - `VITE_MULTIPLAYER_WS_URL` — same value as `terraform output -raw ws_api_url` (with a custom domain this is `wss://ws.<custom_domain>` with **no** `/prod` path; the default execute-api URL still uses `/prod`).
-- Optional **coturn on EC2** (Terraform `turn_ec2_enabled`): after apply, set **`VITE_MULTIPLAYER_TURN_HOST`** to the **hostname only** (e.g. `turn.cardgame.michaelj43.dev` from `terraform output -raw turn_hostname` — not `https://…`), **`VITE_MULTIPLAYER_TURN_USER`**=`cardgame`, and **`VITE_MULTIPLAYER_TURN_CREDENTIAL`** via an Actions **Secret** (value from `terraform output -raw turn_coturn_static_password`). Deploy passes these into the Vite build. Or **`VITE_MULTIPLAYER_ICE_JSON`** for full `RTCIceServer[]` control.
+- Optional **coturn on EC2** (Terraform `turn_ec2_enabled`): create one strong password and store it as Actions **Secret** **`TURN_COTURN_STATIC_PASSWORD`** — deploy passes it to **Terraform** (`turn_coturn_static_password` / EC2 user-data) and to **Vite** as **`VITE_MULTIPLAYER_TURN_CREDENTIAL`**. Set **`VITE_MULTIPLAYER_TURN_HOST`** (hostname only, e.g. `turn.…` from `terraform output -raw turn_hostname` — not `https://…`) and **`VITE_MULTIPLAYER_TURN_USER`**=`cardgame`. Or **`VITE_MULTIPLAYER_ICE_JSON`** for full `RTCIceServer[]` control.
 
 Deploy resolves URLs as: **Variables if non-empty, else Terraform outputs** for that run. Copy the two lines from the last successful **Deploy** job summary into Variables once, then re-run **Deploy** (or push) so CloudFront serves a bundle with multiplayer enabled.
 
