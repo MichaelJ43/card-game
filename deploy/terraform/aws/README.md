@@ -55,8 +55,12 @@ Notable optional inputs:
 | `http_api_url` | `https://api.<custom_domain>` when custom domain is on, else HTTP API `api_endpoint` |
 | `ws_api_url` | `wss://ws.<custom_domain>/<stage>` when custom domain is on, else default **execute-api** WebSocket URL |
 | `rooms_table` | DynamoDB table name |
+| `http_regional_domain_name` | `d-…execute-api…` target for the **HTTP** custom domain (compare to Route 53 `api` alias) |
+| `ws_regional_domain_name` | `d-…execute-api…` target for the **WebSocket** custom domain (compare to Route 53 `ws` alias) |
 
 The site build consumes **`http_api_url`** and **`ws_api_url`** as **`VITE_MULTIPLAYER_HTTP_URL`** / **`VITE_MULTIPLAYER_WS_URL`** when those env vars are not overridden in CI.
+
+If **`wss://ws.<domain>/…` returns 403** but **`wss://<api-id>.execute-api…/…` works**, the **`ws`** Route 53 alias likely points at the **HTTP** API’s regional hostname (or vice versa): **`ws`** must alias only to **`ws_regional_domain_name`**, not **`http_regional_domain_name`**.
 
 ---
 

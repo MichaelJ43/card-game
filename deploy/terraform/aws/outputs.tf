@@ -32,3 +32,13 @@ output "rooms_table" {
   description = "DynamoDB rooms table name."
   value       = aws_dynamodb_table.rooms.name
 }
+
+output "http_regional_domain_name" {
+  description = "Regional API Gateway hostname for the HTTP custom domain (Route 53 `api` alias target must match exactly)."
+  value       = local.use_custom_domain ? aws_apigatewayv2_domain_name.http[0].domain_name_configuration[0].target_domain_name : null
+}
+
+output "ws_regional_domain_name" {
+  description = "Regional API Gateway hostname for the WebSocket custom domain (Route 53 `ws` alias target must match exactly)."
+  value       = local.use_custom_domain ? aws_apigatewayv2_domain_name.ws[0].domain_name_configuration[0].target_domain_name : null
+}
