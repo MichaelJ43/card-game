@@ -297,11 +297,13 @@ only on the Terraform step output in the same job:
 
 - `VITE_MULTIPLAYER_HTTP_URL` — same value as `terraform output -raw http_api_url` (no trailing slash).
 - `VITE_MULTIPLAYER_WS_URL` — same value as `terraform output -raw ws_api_url` (with a custom domain this is `wss://ws.<custom_domain>` with **no** `/prod` path; the default execute-api URL still uses `/prod`).
-- Optional **coturn on EC2** (Terraform `turn_ec2_enabled`): after apply, set **`VITE_MULTIPLAYER_TURN_HOST`** (see `terraform output turn_hostname`), **`VITE_MULTIPLAYER_TURN_USER`**=`cardgame`, **`VITE_MULTIPLAYER_TURN_CREDENTIAL`**=`terraform output -raw turn_coturn_static_password`. Or **`VITE_MULTIPLAYER_ICE_JSON`** for full `RTCIceServer[]` control.
+- Optional **coturn on EC2** (Terraform `turn_ec2_enabled`): after apply, set **`VITE_MULTIPLAYER_TURN_HOST`** to the **hostname only** (e.g. `turn.cardgame.michaelj43.dev` from `terraform output -raw turn_hostname` — not `https://…`), **`VITE_MULTIPLAYER_TURN_USER`**=`cardgame`, and **`VITE_MULTIPLAYER_TURN_CREDENTIAL`** via an Actions **Secret** (value from `terraform output -raw turn_coturn_static_password`). Deploy passes these into the Vite build. Or **`VITE_MULTIPLAYER_ICE_JSON`** for full `RTCIceServer[]` control.
 
 Deploy resolves URLs as: **Variables if non-empty, else Terraform outputs** for that run. Copy the two lines from the last successful **Deploy** job summary into Variables once, then re-run **Deploy** (or push) so CloudFront serves a bundle with multiplayer enabled.
 
 Custom site hostname (e.g. `cardgame.michaelj43.dev`): set repository **Variable** `TF_CUSTOM_DOMAIN` and **Secret** `TF_ACM_CERTIFICATE_ARN` (ACM cert must be in **us-east-1**). Optional **Secret** `TF_ROUTE53_HOSTED_ZONE_ID` for Terraform-managed Route 53 aliases. See **`AWS_SETUP.md`** §7 and **`.github/workflows/deploy.yml`**; **`deploy/terraform/aws/README.md`** documents what Terraform creates.
+
+Optional **coturn EC2** (Terraform `turn_ec2_enabled`): set repository **Variable** `TF_TURN_EC2_ENABLED` to **`true`** so deploy exports `TF_VAR_turn_ec2_enabled` (no effect without `TF_ROUTE53_HOSTED_ZONE_ID`). Defaults stay off to avoid surprise EC2 cost.
 
 ### Future backlog (not in this PR)
 

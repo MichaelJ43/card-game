@@ -36,7 +36,7 @@ Notable optional inputs:
 - **`route53_hosted_zone_id`** — manage the DNS records above (only with custom domain + cert).
 - **`allowed_origin`** — override browser origin string for CORS / Lambda when non-empty.
 - **`aws_region`**, **`project`**, **`environment`**, **`tags`**, **`site_bucket_name`**, room / connection TTLs, zip paths, **`site_assets_dir`** (used by automation that syncs `dist/`).
-- **`turn_ec2_enabled`** (default `false`) — optional coturn stack; requires **`custom_domain`**, **`acm_certificate_arn`**, and **`route53_hosted_zone_id`**. **`turn_instance_type`**, **`scheduled_lambda_zip`**.
+- **`turn_ec2_enabled`** (default `false`) — optional coturn stack; requires **`custom_domain`**, **`acm_certificate_arn`**, and **`route53_hosted_zone_id`**. **`turn_instance_type`**, **`scheduled_lambda_zip`**. **GitHub Deploy** sets `TF_VAR_turn_ec2_enabled` when repository **Variable** **`TF_TURN_EC2_ENABLED`** is `true`.
 
 ---
 
@@ -62,7 +62,15 @@ Notable optional inputs:
 | `turn_hostname` | e.g. `turn.<custom_domain>` when TURN stack is enabled; else `null` |
 | `turn_coturn_static_password` | Sensitive coturn password (user **`cardgame`** in user-data); set **`VITE_MULTIPLAYER_TURN_CREDENTIAL`** to match at site build |
 
-**TURN / DNS:** After `terraform apply` with TURN on, run **`terraform output -raw turn_coturn_static_password`** once, configure GitHub Variables **`VITE_MULTIPLAYER_TURN_HOST`** (= `turn_hostname`), **`VITE_MULTIPLAYER_TURN_USER`**=`cardgame`, **`VITE_MULTIPLAYER_TURN_CREDENTIAL`**=that password, then redeploy the site. The HTTP Lambda waits for **EC2 status checks OK** before updating Route 53; the scheduled Lambda stops the instance only after **4h uptime** and **15m** without usage heartbeats (see app).
+**TURN / DNS:** After `terraform apply` with TURN on, run **`terraform output -raw turn_coturn_static_password`** once. There is **no** `VITE_MULTIPLAYER_TURN_URL` — WebRTC uses a `turn:` URL, which the app builds from the host. Configure for the **Deploy** “Build site” step:
+
+| GitHub Actions | Value |
+|----------------|--------|
+| **Variable** `VITE_MULTIPLAYER_TURN_HOST` | Hostname only, e.g. `turn.cardgame.michaelj43.dev` (same as `terraform output -raw turn_hostname`). **Do not** use `https://` or a path. |
+| **Variable** `VITE_MULTIPLAYER_TURN_USER` | `cardgame` (matches Terraform user-data). |
+| **Secret** `VITE_MULTIPLAYER_TURN_CREDENTIAL` | Output of `terraform output -raw turn_coturn_static_password` (sensitive). |
+
+Then redeploy the site. The HTTP Lambda waits for **EC2 status checks OK** before updating Route 53; the scheduled Lambda stops the instance only after **4h uptime** and **15m** without usage heartbeats (see app).
 
 The site build consumes **`http_api_url`** and **`ws_api_url`** as **`VITE_MULTIPLAYER_HTTP_URL`** / **`VITE_MULTIPLAYER_WS_URL`** when those env vars are not overridden in CI.
 
