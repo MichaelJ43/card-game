@@ -6,6 +6,10 @@
 
 A **browser-only** card table built with **React**, **TypeScript**, and **Vite**. Games load **YAML** deck definitions and per-game manifests; each title is implemented as a TypeScript **game module** that drives table zones, legal actions, and optional **multi-round match** scoring (points or chip-style bankrolls).
 
+## Architecture
+
+End-to-end flows (browser shell, **WebRTC** game channel vs **WebSocket** signaling relay, optional **TURN/coturn**, AWS **Lambdas** / **DynamoDB**, and how they connect to deploy) are described in **[`docs/architecture.md`](docs/architecture.md)**. For Terraform inputs, DNS/TLS, and CI deploy steps, that doc points at **[`deploy/terraform/aws/README.md`](deploy/terraform/aws/README.md)**.
+
 ## Requirements
 
 - **Node.js** (20+ or current LTS recommended)
@@ -88,6 +92,7 @@ Pick a game from the in-app **Game** menu. Each row links to a short note in [`d
 | [`src/data/manifests.ts`](src/data/manifests.ts) | Wires game and deck ids to bundled YAML. |
 | [`src/rules/`](src/rules/) | In-app rules copy (markdown) shown in the **Rules** modal; see [`src/data/rulesSources.ts`](src/data/rulesSources.ts). |
 | [`docs/`](docs/) | Longer per-game notes (repo docs; can diverge slightly from the modal text). |
+| [`docs/architecture.md`](docs/architecture.md) | System architecture: multiplayer, WebRTC, signaling, optional TURN, Lambdas; links to **[`deploy/terraform/aws/README.md`](deploy/terraform/aws/README.md)**. |
 | [`docs/ui-design.md`](docs/ui-design.md) | Shared shell UI (toolbar buttons, online multiplayer strip layout). |
 | [`docs/multiplayer-chat.md`](docs/multiplayer-chat.md) | Room chat (DataChannel + chat popout + toasts). |
 | [`docs/audio-cues.md`](docs/audio-cues.md) | Optional chat / turn / card sounds (`public/sounds/*.wav`). |
