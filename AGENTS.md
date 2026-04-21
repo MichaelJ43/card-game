@@ -303,6 +303,8 @@ Deploy resolves URLs as: **Variables if non-empty, else Terraform outputs** for 
 
 Custom site hostname (e.g. `cardgame.michaelj43.dev`): set repository **Variable** `TF_CUSTOM_DOMAIN` and **Secret** `TF_ACM_CERTIFICATE_ARN` (ACM cert must be in **us-east-1**). Optional **Secret** `TF_ROUTE53_HOSTED_ZONE_ID` for Terraform-managed Route 53 aliases. See **`AWS_SETUP.md`** §7 and **`.github/workflows/deploy.yml`**; **`deploy/terraform/aws/README.md`** documents what Terraform creates.
 
+Optional **coturn on EC2** (separate Lambda `turn-scheduled`, `turn.<domain>` A record, EC2 instance): set repository **Variable** `TF_TURN_EC2_ENABLED` to the literal string **`true`** (same repo **Variables** UI as `TF_CUSTOM_DOMAIN`). This sets **`TF_VAR_turn_ec2_enabled`** on deploy. It has no effect unless **`TF_ROUTE53_HOSTED_ZONE_ID`** is also set (TURN stack requires managed apex/api/ws DNS). Defaults stay **off** so merges do not surprise-bill EC2.
+
 ### Future backlog (not in this PR)
 
 - **Managed third-party TURN** (Twilio, etc.) with short-lived credentials if you outgrow the optional **Terraform coturn EC2** path (`turn_ec2_enabled`).

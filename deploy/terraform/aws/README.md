@@ -36,7 +36,7 @@ Notable optional inputs:
 - **`route53_hosted_zone_id`** — manage the DNS records above (only with custom domain + cert).
 - **`allowed_origin`** — override browser origin string for CORS / Lambda when non-empty.
 - **`aws_region`**, **`project`**, **`environment`**, **`tags`**, **`site_bucket_name`**, room / connection TTLs, zip paths, **`site_assets_dir`** (used by automation that syncs `dist/`).
-- **`turn_ec2_enabled`** (default `false`) — optional coturn stack; requires **`custom_domain`**, **`acm_certificate_arn`**, and **`route53_hosted_zone_id`**. **`turn_instance_type`**, **`scheduled_lambda_zip`**.
+- **`turn_ec2_enabled`** (default `false`) — optional coturn stack; requires **`custom_domain`**, **`acm_certificate_arn`**, and **`route53_hosted_zone_id`**. **`turn_instance_type`**, **`scheduled_lambda_zip`**. **GitHub Deploy** does not turn this on unless you set repository **Variable** **`TF_TURN_EC2_ENABLED`**=`true` (workflow exports `TF_VAR_turn_ec2_enabled`); otherwise apply only updates the existing **http** / **ws** Lambdas and APIs—no new EC2 or `turn.*` record.
 
 ---
 
