@@ -1,44 +1,76 @@
-# card-game Terraform (AWS)
+# AWS Terraform module (`deploy/terraform/aws`)
 
-Creates:
+Infrastructure-as-code for the **card-game** static site (S3 + CloudFront), **multiplayer** HTTP + WebSocket API Gateway v2 + Lambdas, **DynamoDB** rooms table, and optional **custom TLS hostnames** + **Route 53** aliases.
 
-- S3 bucket + CloudFront distribution for the static site.
-- DynamoDB table for room metadata and WebSocket connections (pay-per-request, TTL enabled).
-- Two Lambda functions (`http`, `websocket`) behind API Gateway v2 (HTTP API + WebSocket API).
-- IAM role + least-privilege inline policy.
+Human-facing setup and CI are documented in the repository **README**, **`AGENTS.md`**, and (if present locally) **`AWS_SETUP.md`** — not in this file.
 
-## Inputs you must provide
+---
 
-Either via `terraform.tfvars`, environment variables, or the GitHub deploy workflow
-(repository **secrets** supply `TF_VAR_room_jwt_secret` and backend config; see `AWS_SETUP.md`):
+## Resources (high level)
 
-- `room_jwt_secret` — any strong random string (e.g. 64 hex chars). Do not commit.
-- `http_lambda_zip`, `ws_lambda_zip` — paths to bundles produced by
-  `cd lambda && npm run build && npm run bundle` (default paths work when running from this dir).
+| Area | Resources |
+|------|-----------|
+| Site | `aws_s3_bucket.site`, OAC, bucket policy, `aws_cloudfront_distribution.site` |
+| APIs | `aws_apigatewayv2_api` (HTTP + WebSocket), integrations, routes, stages, Lambda invoke permissions |
+| Custom TLS | When `custom_domain` + `acm_certificate_arn` are set: CloudFront **aliases** + viewer cert; `aws_apigatewayv2_domain_name` + `aws_apigatewayv2_api_mapping` for `api.<custom_domain>` and `ws.<custom_domain>` |
+| DNS | When `custom_domain` + `acm_certificate_arn` + `route53_hosted_zone_id` are set: `aws_route53_record` apex **A/AAAA** → CloudFront; `api` / `ws` **A** aliases → API Gateway regional domain targets |
+| Data | `aws_dynamodb_table.rooms` (TTL) |
+| Compute | `aws_lambda_function` **http** / **ws**, log groups, IAM role + inline policy |
 
-Optional:
+**Certificate / region:** CloudFront requires an ACM cert in **`us-east-1`**. API Gateway regional custom domains use the same **`acm_certificate_arn`** in **`var.aws_region`** — use **`aws_region = "us-east-1"`** unless you split certs (not modeled as separate inputs). The cert must cover the site host and **`api.`** / **`ws.`** subdomains if those custom names are used.
 
-- `custom_domain` + `acm_certificate_arn` (must be in `us-east-1`) for a vanity hostname.
-- `site_bucket_name` to pin a particular bucket name.
+**Route 53:** `route53_hosted_zone_id` must refer to a **public** hosted zone whose **zone name equals** `custom_domain` (Terraform creates relative names `""`, `api`, `ws` under that zone). Apex cannot be a plain CNAME; aliases use Route 53 **alias A/AAAA** to CloudFront and **alias A** to API Gateway `regional_domain_name` / `regional_hosted_zone_id`.
 
-## Remote state
+**Lambda env:** HTTP Lambda `ALLOWED_ORIGIN` / CORS follow `site_browser_origin` in `site.tf` (`allowed_origin` override, else `https://<custom_domain>`, else CloudFront URL). `WS_PUBLIC_URL` switches to the vanity **`wss://ws.<custom_domain>/<ws_stage>`** when a custom domain is enabled (`lambda.tf`).
 
-`versions.tf` declares a stubbed `backend "s3" {}` block. Supply backend configuration via
-`-backend-config` flags during `terraform init` (the GitHub Actions workflow passes these).
+---
 
-Example manual init:
+## Inputs
 
-```bash
-terraform init \
-  -backend-config=bucket=<your-tfstate-bucket> \
-  -backend-config=key=card-game/terraform.tfstate \
-  -backend-config=region=us-east-1 \
-  -backend-config=dynamodb_table=<your-tfstate-lock-table>
-```
+Defined in **`variables.tf`**. Required for any apply: **`room_jwt_secret`**; Lambda zip paths default under `lambda/dist/`.
 
-## Outputs consumed by the site build
+Notable optional inputs:
 
-- `http_api_url` → feed into `VITE_MULTIPLAYER_HTTP_URL` when running `npm run build`.
-- `ws_api_url` → feed into `VITE_MULTIPLAYER_WS_URL`.
+- **`custom_domain`**, **`acm_certificate_arn`** — enable CloudFront alternate name + API Gateway custom domains + vanity-oriented outputs.
+- **`route53_hosted_zone_id`** — manage the DNS records above (only with custom domain + cert).
+- **`allowed_origin`** — override browser origin string for CORS / Lambda when non-empty.
+- **`aws_region`**, **`project`**, **`environment`**, **`tags`**, **`site_bucket_name`**, room / connection TTLs, zip paths, **`site_assets_dir`** (used by automation that syncs `dist/`).
 
-The GitHub Actions deploy workflow wires this automatically.
+---
+
+## State backend
+
+`versions.tf` declares **`backend "s3" {}`**. Pass **`-backend-config=...`** at `terraform init` (see workflow or local init examples in **`versions.tf`** comments). CI supplies bucket, key, region, and DynamoDB lock table.
+
+---
+
+## Outputs
+
+| Output | Meaning |
+|--------|---------|
+| `site_bucket` | S3 bucket name for static assets |
+| `cloudfront_distribution_id` | For `create-invalidation` |
+| `cloudfront_domain` | `*.cloudfront.net` hostname |
+| `site_url` | `https://<custom_domain>` when configured, else `https://<cloudfront_domain>` |
+| `http_api_url` | `https://api.<custom_domain>` when custom domain is on, else HTTP API `api_endpoint` |
+| `ws_api_url` | `wss://ws.<custom_domain>/<stage>` when custom domain is on, else default **execute-api** WebSocket URL |
+| `rooms_table` | DynamoDB table name |
+
+The site build consumes **`http_api_url`** and **`ws_api_url`** as **`VITE_MULTIPLAYER_HTTP_URL`** / **`VITE_MULTIPLAYER_WS_URL`** when those env vars are not overridden in CI.
+
+---
+
+## Source layout
+
+| File | Role |
+|------|------|
+| `main.tf` | Naming, tags, `random_id` |
+| `versions.tf` | Terraform / provider versions; default **`aws`** provider in `var.aws_region`; aliased **`aws.us_east_1`** (currently unused by resources — cert is passed by ARN) |
+| `variables.tf` | Input variables |
+| `outputs.tf` | Outputs |
+| `site.tf` | S3 site bucket, OAC, CloudFront, locals for custom domain / browser origin / Route 53 flags |
+| `route53.tf` | Conditional Route 53 alias records |
+| `apigateway.tf` | HTTP + WebSocket APIs, optional custom domain names + mappings |
+| `lambda.tf` | Lambdas, env, log groups |
+| `iam.tf` | Execution role + policies |
+| `dynamodb.tf` | Rooms table |

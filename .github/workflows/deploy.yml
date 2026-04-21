@@ -81,9 +81,17 @@ jobs:
             -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
             -backend-config="encrypt=true"
 
+      # Optional custom domain: TF_CUSTOM_DOMAIN (var) + TF_ACM_CERTIFICATE_ARN + TF_ROUTE53_HOSTED_ZONE_ID (secrets). See AGENTS.md / AWS_SETUP.md.
+      # Empty GitHub vars must not export TF_VAR_* or Terraform sees "" instead of null.
       - name: Terraform apply
         working-directory: deploy/terraform/aws
-        run: terraform apply -auto-approve
+        run: |
+          set -e
+          if [ -n "${{ vars.TF_CUSTOM_DOMAIN }}" ]; then export TF_VAR_custom_domain="${{ vars.TF_CUSTOM_DOMAIN }}"; fi
+          if [ -n "${{ secrets.TF_ACM_CERTIFICATE_ARN }}" ]; then export TF_VAR_acm_certificate_arn="${{ secrets.TF_ACM_CERTIFICATE_ARN }}"; fi
+          if [ -n "${{ vars.TF_ALLOWED_ORIGIN }}" ]; then export TF_VAR_allowed_origin="${{ vars.TF_ALLOWED_ORIGIN }}"; fi
+          if [ -n "${{ secrets.TF_ROUTE53_HOSTED_ZONE_ID }}" ]; then export TF_VAR_route53_hosted_zone_id="${{ secrets.TF_ROUTE53_HOSTED_ZONE_ID }}"; fi
+          terraform apply -auto-approve
 
       - name: Capture Terraform outputs
         id: tf
@@ -92,6 +100,7 @@ jobs:
           echo "site_bucket=$(terraform output -raw site_bucket)" >> "$GITHUB_OUTPUT"
           echo "cloudfront_distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
           echo "cloudfront_domain=$(terraform output -raw cloudfront_domain)" >> "$GITHUB_OUTPUT"
+          echo "site_url=$(terraform output -raw site_url)" >> "$GITHUB_OUTPUT"
           echo "http_api_url=$(terraform output -raw http_api_url)" >> "$GITHUB_OUTPUT"
           echo "ws_api_url=$(terraform output -raw ws_api_url)" >> "$GITHUB_OUTPUT"
 
@@ -142,6 +151,7 @@ jobs:
       - name: Summary
         run: |
           echo "### Deployment" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Site: https://${{ steps.tf.outputs.cloudfront_domain }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Site (public): ${{ steps.tf.outputs.site_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- CloudFront hostname: https://${{ steps.tf.outputs.cloudfront_domain }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- HTTP API: ${{ steps.tf.outputs.http_api_url }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- WS API: ${{ steps.tf.outputs.ws_api_url }}" >> "$GITHUB_STEP_SUMMARY"
