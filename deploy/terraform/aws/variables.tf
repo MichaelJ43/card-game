@@ -35,7 +35,7 @@ variable "acm_certificate_arn" {
 }
 
 variable "allowed_origin" {
-  description = "Allowed browser origin for the HTTP API (defaults to CloudFront distribution)."
+  description = "Override browser Origin for API CORS + Lambda ALLOWED_ORIGIN. Leave null to use https://<custom_domain> when set, else the CloudFront *.cloudfront.net hostname."
   type        = string
   default     = null
 }

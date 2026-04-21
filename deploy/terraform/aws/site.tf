@@ -33,7 +33,14 @@ resource "aws_cloudfront_origin_access_control" "site" {
 }
 
 locals {
-  use_custom_domain = var.custom_domain != null && var.acm_certificate_arn != null
+  custom_domain_host = var.custom_domain != null ? trimspace(var.custom_domain) : ""
+  use_custom_domain    = local.custom_domain_host != "" && var.acm_certificate_arn != null && trimspace(var.acm_certificate_arn) != ""
+  # Browser Origin header for CORS / Lambda: explicit override, else HTTPS custom host, else CloudFront hostname.
+  site_browser_origin = coalesce(
+    var.allowed_origin != null && trimspace(var.allowed_origin) != "" ? trimspace(var.allowed_origin) : null,
+    local.use_custom_domain ? "https://${local.custom_domain_host}" : null,
+    "https://${aws_cloudfront_distribution.site.domain_name}",
+  )
 }
 
 resource "aws_cloudfront_distribution" "site" {
@@ -43,7 +50,7 @@ resource "aws_cloudfront_distribution" "site" {
   comment             = "${local.name} static site"
   price_class         = "PriceClass_100"
 
-  aliases = local.use_custom_domain ? [var.custom_domain] : []
+  aliases = local.use_custom_domain ? [local.custom_domain_host] : []
 
   origin {
     domain_name              = aws_s3_bucket.site.bucket_regional_domain_name

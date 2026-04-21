@@ -27,7 +27,7 @@ resource "aws_lambda_function" "http" {
       ROOMS_TABLE      = aws_dynamodb_table.rooms.name
       ROOM_JWT_SECRET  = var.room_jwt_secret
       WS_PUBLIC_URL    = "wss://${aws_apigatewayv2_api.ws.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}"
-      ALLOWED_ORIGIN   = coalesce(var.allowed_origin, "https://${aws_cloudfront_distribution.site.domain_name}")
+      ALLOWED_ORIGIN   = local.site_browser_origin
       ROOM_TTL_SECONDS = tostring(var.room_ttl_seconds)
     }
   }
