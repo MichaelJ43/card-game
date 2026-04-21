@@ -48,8 +48,9 @@ function buildDefaultIceServers(stunUrls: string[]): RTCIceServer[] {
   const user = envString(import.meta.env.VITE_MULTIPLAYER_TURN_USER)
   const cred = envString(import.meta.env.VITE_MULTIPLAYER_TURN_CREDENTIAL)
   if (host && user && cred) {
+    // UDP first; TCP fallback helps VPNs / networks that block UDP to TURN (coturn listens on 3478/tcp too).
     out.push({
-      urls: [`turn:${host}:3478`],
+      urls: [`turn:${host}:3478?transport=udp`, `turn:${host}:3478?transport=tcp`],
       username: user,
       credential: cred,
     })
