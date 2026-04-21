@@ -110,10 +110,16 @@ resource "aws_route53_record" "turn_a" {
 data "aws_iam_policy_document" "lambda_turn" {
   count = local.turn_stack ? 1 : 0
   statement {
-    sid = "TurnEc2"
+    sid = "TurnEc2Describe"
     actions = [
       "ec2:DescribeInstances",
       "ec2:DescribeInstanceStatus",
+    ]
+    resources = ["*"]
+  }
+  statement {
+    sid = "TurnEc2StartStop"
+    actions = [
       "ec2:StartInstances",
       "ec2:StopInstances",
     ]
