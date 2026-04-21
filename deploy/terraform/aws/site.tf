@@ -37,9 +37,11 @@ locals {
   use_custom_domain    = local.custom_domain_host != "" && var.acm_certificate_arn != null && trimspace(var.acm_certificate_arn) != ""
   route53_zone_id      = var.route53_hosted_zone_id != null ? trimspace(var.route53_hosted_zone_id) : ""
   create_route53_records = local.use_custom_domain && local.route53_zone_id != ""
+  # Never call trimspace(null): Terraform may evaluate both branches of a ternary / coalesce args.
+  allowed_origin_trimmed = var.allowed_origin != null ? trimspace(var.allowed_origin) : ""
   # Browser Origin header for CORS / Lambda: explicit override, else HTTPS custom host, else CloudFront hostname.
   site_browser_origin = coalesce(
-    var.allowed_origin != null && trimspace(var.allowed_origin) != "" ? trimspace(var.allowed_origin) : null,
+    local.allowed_origin_trimmed != "" ? local.allowed_origin_trimmed : null,
     local.use_custom_domain ? "https://${local.custom_domain_host}" : null,
     "https://${aws_cloudfront_distribution.site.domain_name}",
   )
