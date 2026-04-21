@@ -24,12 +24,6 @@ data "aws_ami" "al2023_x86" {
   }
 }
 
-resource "random_password" "turn_coturn" {
-  count   = local.turn_stack ? 1 : 0
-  length  = 24
-  special = false
-}
-
 resource "aws_security_group" "turn" {
   count       = local.turn_stack ? 1 : 0
   name        = "${local.name}-coturn"
@@ -79,8 +73,15 @@ resource "aws_instance" "turn" {
   user_data = base64encode(templatefile("${path.module}/turn-user-data.sh.tpl", {
     realm         = local.custom_domain_host
     turn_user     = "cardgame"
-    turn_password = random_password.turn_coturn[0].result
+    turn_password = trimspace(var.turn_coturn_static_password)
   }))
+
+  lifecycle {
+    precondition {
+      condition     = !local.turn_stack || length(trimspace(var.turn_coturn_static_password)) >= 8
+      error_message = "When the TURN EC2 stack is enabled, set turn_coturn_static_password (e.g. TF_VAR_turn_coturn_static_password from GitHub secret TURN_COTURN_STATIC_PASSWORD) to a shared password (min 8 characters) used by both Terraform user-data and VITE_MULTIPLAYER_TURN_CREDENTIAL."
+    }
+  }
 
   metadata_options {
     http_tokens = "required"

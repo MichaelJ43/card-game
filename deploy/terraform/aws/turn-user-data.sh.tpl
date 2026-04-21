@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 dnf install -y coturn
-cat >/etc/turnserver.conf <<TURNCONF
+# Quoted heredoc so the coturn password is not re-expanded by bash (e.g. `$` in the secret).
+cat >/etc/turnserver.conf <<'TURNCONF'
 listening-port=3478
 no-tls
 fingerprint
