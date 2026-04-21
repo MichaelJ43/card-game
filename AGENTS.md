@@ -299,7 +299,7 @@ only on the Terraform step output in the same job:
 
 Deploy resolves URLs as: **Variables if non-empty, else Terraform outputs** for that run. Copy the two lines from the last successful **Deploy** job summary into Variables once, then re-run **Deploy** (or push) so CloudFront serves a bundle with multiplayer enabled.
 
-Custom site hostname (e.g. `cardgame.michaelj43.dev`): set repository **Variables** `TF_CUSTOM_DOMAIN` and `TF_ACM_CERTIFICATE_ARN` (ACM cert must be in **us-east-1**). See **`deploy/terraform/aws/README.md`** and **`AWS_SETUP.md`** §7.
+Custom site hostname (e.g. `cardgame.michaelj43.dev`): set repository **Variable** `TF_CUSTOM_DOMAIN` and **Secret** `TF_ACM_CERTIFICATE_ARN` (ACM cert must be in **us-east-1**). Optional **Secret** `TF_ROUTE53_HOSTED_ZONE_ID` for Terraform-managed Route 53 aliases. See **`deploy/terraform/aws/README.md`** and **`AWS_SETUP.md`** §7.
 
 ### Future backlog (not in this PR)
 

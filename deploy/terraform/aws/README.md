@@ -40,18 +40,25 @@ CloudFront only accepts certificates in `us-east-1`. This stack attaches the sam
 
 ### 2. Terraform / GitHub Actions
 
-The **Deploy** workflow exports optional `TF_VAR_*` only when repository **Variables** are non-empty (so Terraform still sees `null` when you omit them).
+The **Deploy** workflow exports optional `TF_VAR_*` only when the corresponding GitHub **Variable** or **Secret** is non-empty (so Terraform still sees `null` when you omit them).
 
-In GitHub: **Settings → Secrets and variables → Actions → Variables** (repository), add:
+**Variables** — **Settings → Secrets and variables → Actions → Variables**:
 
 | Variable | Example value | Required? |
 |----------|----------------|-----------|
 | `TF_CUSTOM_DOMAIN` | `cardgame.michaelj43.dev` | For custom hostnames |
-| `TF_ACM_CERTIFICATE_ARN` | `arn:aws:acm:us-east-1:…:certificate/…` | With `TF_CUSTOM_DOMAIN` |
-| `TF_ROUTE53_HOSTED_ZONE_ID` | `Z0ABCDEF123456` | Optional — set to let Terraform create **Route 53** alias records (see below) |
 | `TF_ALLOWED_ORIGIN` | *(omit unless needed)* | Optional exact CORS / Lambda origin override |
 
-**Route 53 variable:** In Route 53 → **Hosted zones** → open the zone whose name is exactly your `TF_CUSTOM_DOMAIN` → copy **Hosted zone ID** into `TF_ROUTE53_HOSTED_ZONE_ID`.
+**Secrets** — **Settings → Secrets and variables → Actions → Secrets** (values are masked in the UI and not printed by the workflow):
+
+| Secret | Example value | Required? |
+|--------|----------------|-----------|
+| `TF_ACM_CERTIFICATE_ARN` | `arn:aws:acm:us-east-1:…:certificate/…` | With `TF_CUSTOM_DOMAIN` |
+| `TF_ROUTE53_HOSTED_ZONE_ID` | `Z0ABCDEF123456` | Optional — set to let Terraform create **Route 53** alias records (see below) |
+
+If you previously stored **`TF_ACM_CERTIFICATE_ARN`** or **`TF_ROUTE53_HOSTED_ZONE_ID`** as repository **Variables**, move them to **Secrets** with the same names and delete the old variables so only one binding exists.
+
+**Route 53:** In Route 53 → **Hosted zones** → open the zone whose name is exactly your `TF_CUSTOM_DOMAIN` → copy **Hosted zone ID** into the **`TF_ROUTE53_HOSTED_ZONE_ID`** secret.
 
 Terraform will then:
 
@@ -60,7 +67,7 @@ Terraform will then:
 - Create **Route 53** alias **A** (and **AAAA** for the apex only) records: apex → CloudFront, `api` → HTTP API regional domain, `ws` → WebSocket API regional domain.
 - Set CORS / **`ALLOWED_ORIGIN`** and the HTTP Lambda **`WS_PUBLIC_URL`** to the vanity WebSocket URL when a custom domain is enabled.
 
-If you **omit** `TF_ROUTE53_HOSTED_ZONE_ID`, you must still point **DNS** for the apex, **api.**, and **ws.** at CloudFront / API Gateway yourself (same targets Terraform would have used).
+If you **omit** the **`TF_ROUTE53_HOSTED_ZONE_ID`** secret, you must still point **DNS** for the apex, **api.**, and **ws.** at CloudFront / API Gateway yourself (same targets Terraform would have used).
 
 **Apex DNS note:** You cannot use a plain **CNAME** at the zone apex. Use **Route 53 alias A/AAAA** to CloudFront (Terraform does this when the zone id is set).
 

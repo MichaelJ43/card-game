@@ -81,16 +81,16 @@ jobs:
             -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
             -backend-config="encrypt=true"
 
-      # Optional custom domain: TF_CUSTOM_DOMAIN + TF_ACM_CERTIFICATE_ARN; optional TF_ROUTE53_HOSTED_ZONE_ID (see deploy/terraform/aws/README.md).
+      # Optional custom domain: TF_CUSTOM_DOMAIN (variable) + TF_ACM_CERTIFICATE_ARN (secret); optional TF_ROUTE53_HOSTED_ZONE_ID (secret). See deploy/terraform/aws/README.md.
       # Empty GitHub vars must not export TF_VAR_* or Terraform sees "" instead of null.
       - name: Terraform apply
         working-directory: deploy/terraform/aws
         run: |
           set -e
           if [ -n "${{ vars.TF_CUSTOM_DOMAIN }}" ]; then export TF_VAR_custom_domain="${{ vars.TF_CUSTOM_DOMAIN }}"; fi
-          if [ -n "${{ vars.TF_ACM_CERTIFICATE_ARN }}" ]; then export TF_VAR_acm_certificate_arn="${{ vars.TF_ACM_CERTIFICATE_ARN }}"; fi
+          if [ -n "${{ secrets.TF_ACM_CERTIFICATE_ARN }}" ]; then export TF_VAR_acm_certificate_arn="${{ secrets.TF_ACM_CERTIFICATE_ARN }}"; fi
           if [ -n "${{ vars.TF_ALLOWED_ORIGIN }}" ]; then export TF_VAR_allowed_origin="${{ vars.TF_ALLOWED_ORIGIN }}"; fi
-          if [ -n "${{ vars.TF_ROUTE53_HOSTED_ZONE_ID }}" ]; then export TF_VAR_route53_hosted_zone_id="${{ vars.TF_ROUTE53_HOSTED_ZONE_ID }}"; fi
+          if [ -n "${{ secrets.TF_ROUTE53_HOSTED_ZONE_ID }}" ]; then export TF_VAR_route53_hosted_zone_id="${{ secrets.TF_ROUTE53_HOSTED_ZONE_ID }}"; fi
           terraform apply -auto-approve
 
       - name: Capture Terraform outputs
