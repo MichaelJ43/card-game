@@ -3,6 +3,7 @@ import type { GameManifestYaml } from '../core/types'
 import {
   clampAiOpponentCount,
   clampRemoteHumanCount,
+  configurableAiOpponentLimits,
   gameSupportsOnlineMultiplayer,
   manifestWithPlayerCounts,
   MAX_AI_OPPONENTS,
@@ -24,9 +25,25 @@ describe('clampAiOpponentCount', () => {
     expect(clampAiOpponentCount('blackjack', 5)).toBe(1)
   })
 
-  it('clamps to 1..MAX for normal games', () => {
-    expect(clampAiOpponentCount('go-fish', 0)).toBe(1)
+  it('allows 0..MAX for multi-seat configurable games', () => {
+    expect(clampAiOpponentCount('go-fish', 0)).toBe(0)
+    expect(clampAiOpponentCount('go-fish', -3)).toBe(0)
     expect(clampAiOpponentCount('go-fish', 100)).toBe(MAX_AI_OPPONENTS)
+  })
+
+  it('forces at least 1 AI for heads-up configurable titles', () => {
+    expect(clampAiOpponentCount('poker-draw', 0)).toBe(1)
+    expect(clampAiOpponentCount('poker-draw', 2)).toBe(1)
+  })
+})
+
+describe('configurableAiOpponentLimits', () => {
+  it('exposes 0..MAX for go-fish', () => {
+    expect(configurableAiOpponentLimits('go-fish')).toEqual({ min: 0, max: MAX_AI_OPPONENTS })
+  })
+
+  it('exposes 1..1 for poker-draw', () => {
+    expect(configurableAiOpponentLimits('poker-draw')).toEqual({ min: 1, max: 1 })
   })
 })
 

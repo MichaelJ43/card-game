@@ -2,11 +2,11 @@ import type { AiDifficulty } from '../core/aiContext'
 import { normalizeAiDifficulty } from '../core/aiContext'
 import type { GameManifestYaml } from '../core/types'
 
-/** Max AI opponents (player 0 is always human). Total players = 1 + this value, max 9. */
+/** Max AI opponents when the table is not heads-up-only. Total seats = `human + ai` (see manifest). */
 export const MAX_AI_OPPONENTS = 8
 
 export interface CreateSessionOptions {
-  /** AI opponent count; only applied for games in {@link gameSupportsConfigurableAi}. */
+  /** AI opponent count; only applied for games in {@link gameSupportsConfigurableAi}. Use **0** for human-only on supported titles; heads-up-only games still require **1**. */
   aiCount?: number
   /** One per AI seat (players 1…N); locked when the deal is created. */
   aiDifficulties?: AiDifficulty[]
@@ -83,8 +83,16 @@ const HEADS_UP_GAME_IDS = new Set([
 export function clampAiOpponentCount(gameId: string, requested: number): number {
   let n = Math.floor(Number(requested))
   if (!Number.isFinite(n)) n = 1
-  const maxAi = HEADS_UP_GAME_IDS.has(gameId) ? 1 : MAX_AI_OPPONENTS
-  return Math.min(maxAi, Math.max(1, n))
+  const headsUp = HEADS_UP_GAME_IDS.has(gameId)
+  const minAi = headsUp ? 1 : 0
+  const maxAi = headsUp ? 1 : MAX_AI_OPPONENTS
+  return Math.min(maxAi, Math.max(minAi, n))
+}
+
+/** Min/max for the shell AI-opponent control when {@link gameSupportsConfigurableAi} is true. */
+export function configurableAiOpponentLimits(gameId: string): { min: number; max: number } {
+  const headsUp = HEADS_UP_GAME_IDS.has(gameId)
+  return { min: headsUp ? 1 : 0, max: headsUp ? 1 : MAX_AI_OPPONENTS }
 }
 
 /**

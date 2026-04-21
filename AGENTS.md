@@ -17,7 +17,7 @@ This document summarizes how the **card-game** repository is structured, how gam
 |------|--------|
 | `src/App.tsx` | Game picker, session lifecycle, match panel, table intents (Go Fish, Skyjo, etc.), **Rules** modal, AI timers, optional **audio cues** (see `docs/audio-cues.md`, `src/audio/`). |
 | `src/session.ts` | **`createSession`**, **`startNextMatchRound`**, **`continuationOptionsFromSession`** (preserve house rules between match rounds). |
-| `src/session/playerConfig.ts` | **`CreateSessionOptions`** (AI count/difficulties, `skipMatch`, house-rule fields), **`gameSupportsConfigurableAi`**, **`clampAiOpponentCount`**, manifest AI count normalization. |
+| `src/session/playerConfig.ts` | **`CreateSessionOptions`** (AI count **0…8** on supported games, difficulties, `skipMatch`, house-rule fields), **`gameSupportsConfigurableAi`**, **`clampAiOpponentCount`**, **`configurableAiOpponentLimits`**, manifest AI count normalization. |
 | `src/core/` | **`GameModule`** contract, **`TableState`**, **`GameAction`**, **`MatchState`**, deck/build helpers, **`registerGameModule`**, shuffle, YAML parsing entry points. |
 | `src/core/discardRecycle.ts` | When the draw pile is empty, optionally **shuffle the discard pile into a new draw pile**; **`isDeckDrawAvailableAfterOptionalRecycle`** for legal-action checks without mutating the table. Used by games with both **`draw`** and **`discard`** when **`reshuffleDiscardWhenDrawEmpty`** is on. |
 | `src/core/types.ts` | Shared types: **`CardInstance`**, **`CardTemplate`**, zones, **`GameManifestYaml`**, **`MatchManifestYaml`**, **`GameAction`** variants. |
