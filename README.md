@@ -1,5 +1,9 @@
 # Card table
 
+**Live site:** [cardgame.michaelj43.dev](https://cardgame.michaelj43.dev)
+
+[![CI](https://github.com/MichaelJ43/card-game/actions/workflows/ci.yml/badge.svg)](https://github.com/MichaelJ43/card-game/actions/workflows/ci.yml) [![Deploy](https://github.com/MichaelJ43/card-game/actions/workflows/deploy.yml/badge.svg)](https://github.com/MichaelJ43/card-game/actions/workflows/deploy.yml)
+
 A **browser-only** card table built with **React**, **TypeScript**, and **Vite**. Games load **YAML** deck definitions and per-game manifests; each title is implemented as a TypeScript **game module** that drives table zones, legal actions, and optional **multi-round match** scoring (points or chip-style bankrolls).
 
 ## Requirements
