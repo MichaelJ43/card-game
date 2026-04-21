@@ -77,6 +77,16 @@ If you previously used **`VITE_MULTIPLAYER_TURN_CREDENTIAL`** as a separate Acti
 
 **Migrating from older Terraform that used `random_password`:** the coturn instance **user-data** changes; Terraform will typically **replace** the EC2 instance once. Put the password you want to keep (or a new one) in **`TURN_COTURN_STATIC_PASSWORD`** before apply.
 
+**Credential shape (practical limits):**
+
+| Topic | Notes |
+|--------|--------|
+| **Minimum length** | **8** characters after trim — enforced by Terraform `precondition`. |
+| **Maximum length** | No extra cap in this repo; stay within normal GitHub Secret size and EC2 user-data limits (multi‑KB script budget — very long passphrases are fine). |
+| **Characters** | Use a **single line** (no newlines). User-data uses a **quoted** heredoc so **dollar, backtick, and backslash** in the password are not interpreted by bash. Prefer **printable ASCII** for least surprise in coturn, the browser, and GitHub Secrets; leading/trailing spaces are trimmed by Terraform. |
+| **`:` in password** | coturn’s `user=name:secret` line treats the **first** `:` as the split between username and password, so a password may contain **additional** colons. |
+| **`#` in password** | Should be OK in the middle of a `user=` line in `turnserver.conf` (comments are line-oriented); if you hit parse issues, avoid `#` at the start of the password. |
+
 Then redeploy the site. The HTTP Lambda waits for **EC2 status checks OK** before updating Route 53; the scheduled Lambda stops the instance only after **4h uptime** and **15m** without usage heartbeats (see app).
 
 The site build consumes **`http_api_url`** and **`ws_api_url`** as **`VITE_MULTIPLAYER_HTTP_URL`** / **`VITE_MULTIPLAYER_WS_URL`** when those env vars are not overridden in CI.
