@@ -24,8 +24,8 @@ output "http_api_url" {
 }
 
 output "ws_api_url" {
-  description = "WebSocket URL for VITE_MULTIPLAYER_WS_URL: vanity wss://ws.<custom_domain>/<stage> when custom domain is enabled, else execute-api URL."
-  value       = local.use_custom_domain ? "wss://ws.${local.custom_domain_host}/${aws_apigatewayv2_stage.ws.name}" : "wss://${aws_apigatewayv2_api.ws.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}"
+  description = "WebSocket URL for VITE_MULTIPLAYER_WS_URL: vanity wss://ws.<custom_domain> (no path) when custom domain + API mapping bind the stage; default execute-api URL still uses /{stage}."
+  value       = local.use_custom_domain ? "wss://ws.${local.custom_domain_host}" : "wss://${aws_apigatewayv2_api.ws.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}"
 }
 
 output "rooms_table" {

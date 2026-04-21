@@ -2,7 +2,7 @@
  * Runtime configuration for multiplayer endpoints.
  * Populated from Vite env vars at build time:
  *   - VITE_MULTIPLAYER_HTTP_URL   → e.g. https://abc123.execute-api.us-east-1.amazonaws.com
- *   - VITE_MULTIPLAYER_WS_URL     → e.g. wss://def456.execute-api.us-east-1.amazonaws.com/prod
+ *   - VITE_MULTIPLAYER_WS_URL     → e.g. wss://def456.execute-api.us-east-1.amazonaws.com/prod, or wss://ws.example.com (no path) with API Gateway custom domain + mapping
  *   - VITE_MULTIPLAYER_STUN_URLS  → comma-separated STUN urls (default: Google public STUN)
  *
  * If HTTP/WS URLs are missing, multiplayer is disabled at runtime and the UI hides join/host.

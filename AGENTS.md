@@ -296,7 +296,7 @@ Optional repository **Variables** (plaintext) for Vite — set these so every
 only on the Terraform step output in the same job:
 
 - `VITE_MULTIPLAYER_HTTP_URL` — same value as `terraform output -raw http_api_url` (no trailing slash).
-- `VITE_MULTIPLAYER_WS_URL` — same value as `terraform output -raw ws_api_url` (includes stage path, e.g. `/prod`).
+- `VITE_MULTIPLAYER_WS_URL` — same value as `terraform output -raw ws_api_url` (with a custom domain this is `wss://ws.<custom_domain>` with **no** `/prod` path; the default execute-api URL still uses `/prod`).
 
 Deploy resolves URLs as: **Variables if non-empty, else Terraform outputs** for that run. Copy the two lines from the last successful **Deploy** job summary into Variables once, then re-run **Deploy** (or push) so CloudFront serves a bundle with multiplayer enabled.
 

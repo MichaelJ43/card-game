@@ -21,7 +21,7 @@ Human-facing setup and CI are documented in the repository **README**, **`AGENTS
 
 **Route 53:** `route53_hosted_zone_id` must refer to a **public** hosted zone whose **zone name equals** `custom_domain` (Terraform creates relative names `""`, `api`, `ws` under that zone). Apex cannot be a plain CNAME; aliases use Route 53 **alias A/AAAA** to CloudFront and **alias A** to API Gateway `domain_name_configuration.target_domain_name` / `hosted_zone_id`.
 
-**Lambda env:** HTTP Lambda `ALLOWED_ORIGIN` / CORS follow `site_browser_origin` in `site.tf` (`allowed_origin` override, else `https://<custom_domain>`, else CloudFront URL). `WS_PUBLIC_URL` switches to the vanity **`wss://ws.<custom_domain>/<ws_stage>`** when a custom domain is enabled (`lambda.tf`).
+**Lambda env:** HTTP Lambda `ALLOWED_ORIGIN` / CORS follow `site_browser_origin` in `site.tf` (`allowed_origin` override, else `https://<custom_domain>`, else CloudFront URL). `WS_PUBLIC_URL` uses **`wss://ws.<custom_domain>`** (no path) when a custom domain is enabled—the stage is bound by API mapping; the default execute-api URL still uses **`/{stage}`** (`lambda.tf`).
 
 ---
 
@@ -53,14 +53,14 @@ Notable optional inputs:
 | `cloudfront_domain` | `*.cloudfront.net` hostname |
 | `site_url` | `https://<custom_domain>` when configured, else `https://<cloudfront_domain>` |
 | `http_api_url` | `https://api.<custom_domain>` when custom domain is on, else HTTP API `api_endpoint` |
-| `ws_api_url` | `wss://ws.<custom_domain>/<stage>` when custom domain is on, else default **execute-api** WebSocket URL |
+| `ws_api_url` | `wss://ws.<custom_domain>` (no `/stage` path) when custom domain is on; else default **execute-api** `wss://…amazonaws.com/{stage}` |
 | `rooms_table` | DynamoDB table name |
 | `http_regional_domain_name` | `d-…execute-api…` target for the **HTTP** custom domain (compare to Route 53 `api` alias) |
 | `ws_regional_domain_name` | `d-…execute-api…` target for the **WebSocket** custom domain (compare to Route 53 `ws` alias) |
 
 The site build consumes **`http_api_url`** and **`ws_api_url`** as **`VITE_MULTIPLAYER_HTTP_URL`** / **`VITE_MULTIPLAYER_WS_URL`** when those env vars are not overridden in CI.
 
-If **`wss://ws.<domain>/…` returns 403** but **`wss://<api-id>.execute-api…/…` works**, the **`ws`** Route 53 alias likely points at the **HTTP** API’s regional hostname (or vice versa): **`ws`** must alias only to **`ws_regional_domain_name`**, not **`http_regional_domain_name`**.
+If **`wss://ws.<domain>/prod` returns 403** but **`wss://ws.<domain>` connects**, the stage is already set by **API mapping**—use **no path** in the client URL (Terraform outputs match this). If **`wss://ws.<domain>`** still fails, check the **`ws`** Route 53 alias targets **`ws_regional_domain_name`**, not the HTTP API’s regional hostname.
 
 ---
 
