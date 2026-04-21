@@ -48,6 +48,10 @@ The inline display-name input uses theme-aligned borders/background (`--border`,
 
 **Open chat** (compact and expanded multiplayer rows) uses the same button classes. It is available whenever you are in a room (host or joined client); it stays disabled only while **spectating**. Behavior of the chat window and main-window toasts is documented in [`multiplayer-chat.md`](multiplayer-chat.md).
 
+## Multiplayer idle warning (inactivity)
+
+When online play is active, a full-screen **`.multiplayerIdleModal__*`** overlay can appear after extended **keyboard/pointer** inactivity. It shows a **countdown**, a **Dismiss** button using **`app__btnSecondary` + `app__btnToolbar`**, and **backdrop click** dismisses the same way as Dismiss (resets the idle timer). See [`MultiplayerIdleModal.tsx`](../src/ui/MultiplayerIdleModal.tsx).
+
 ## When you change something
 
 1. Prefer reusing **`app__btnSecondary` + `app__btnToolbar`** for new shell-adjacent buttons instead of one-off panel button styles.

@@ -851,3 +851,53 @@ fieldset.app__houseRules {
   align-items: center;
   margin-top: 0.35rem;
 }
+
+.multiplayerIdleModal__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.multiplayerIdleModal__dialog {
+  max-width: 24rem;
+  width: 100%;
+  background: var(--bg, #16171d);
+  border: 1px solid var(--border, #2e303a);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.35rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  outline: none;
+}
+
+.multiplayerIdleModal__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.multiplayerIdleModal__body {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--text-h, #e8e9ef);
+}
+
+.multiplayerIdleModal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.multiplayerPanel__turnBtn--ready {
+  border-color: var(--accent-border, #6b9fff);
+  color: var(--accent-bg, #6b9fff);
+}
+
+.multiplayerPanel__turnBtn--off {
+  border-color: #f87171;
+  color: #f87171;
+}

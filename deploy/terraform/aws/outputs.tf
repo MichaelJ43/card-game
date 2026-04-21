@@ -42,3 +42,14 @@ output "ws_regional_domain_name" {
   description = "Regional API Gateway hostname for the WebSocket custom domain (Route 53 `ws` alias target must match exactly)."
   value       = local.use_custom_domain ? aws_apigatewayv2_domain_name.ws[0].domain_name_configuration[0].target_domain_name : null
 }
+
+output "turn_hostname" {
+  description = "FQDN for coturn when turn_ec2_enabled (use as VITE_MULTIPLAYER_TURN_HOST); null otherwise."
+  value       = local.turn_stack ? "turn.${local.custom_domain_host}" : null
+}
+
+output "turn_coturn_static_password" {
+  description = "Static coturn long-term credential password (sensitive). Set VITE_MULTIPLAYER_TURN_CREDENTIAL to match at build time; user is cardgame."
+  value       = try(random_password.turn_coturn[0].result, null)
+  sensitive   = true
+}

@@ -87,3 +87,21 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "turn_ec2_enabled" {
+  description = "When true (and custom_domain + Route 53 are configured), provisions a coturn EC2, turn.* A record (placeholder; Lambda updates IP on start), scheduled idle-stop Lambda, and extends HTTP Lambda IAM for EC2/Route53."
+  type        = bool
+  default     = false
+}
+
+variable "turn_instance_type" {
+  description = "Instance type for the optional coturn EC2 (e.g. t3.micro)."
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "scheduled_lambda_zip" {
+  description = "Path to turnScheduled.zip from lambda/scripts/bundle.mjs."
+  type        = string
+  default     = "../../../lambda/dist/turnScheduled.zip"
+}

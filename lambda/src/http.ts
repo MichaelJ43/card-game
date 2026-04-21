@@ -3,11 +3,12 @@ import { randomBytes } from 'node:crypto'
 import { signRoomToken } from './auth'
 import { generateRoomCode } from './roomCode'
 import {
-  getRoom,
-  putRoom,
-  ttlSecondsFromNow,
-  type RoomMeta,
-} from './storage'
+  handleGetTurnStatus,
+  handlePostAbandonIdle,
+  handlePostTurnHeartbeat,
+  handlePostTurnStart,
+} from './turnHttpHandlers'
+import { getRoom, putRoom, ttlSecondsFromNow, type RoomMeta } from './storage'
 
 const JSON_HEADERS = {
   'content-type': 'application/json',
@@ -18,7 +19,7 @@ function cors(origin?: string) {
   const match = allowed === '*' || !origin ? allowed : allowed.split(',').map((o) => o.trim()).includes(origin) ? origin : allowed
   return {
     'access-control-allow-origin': match,
-    'access-control-allow-methods': 'POST,OPTIONS',
+    'access-control-allow-methods': 'GET,POST,OPTIONS',
     'access-control-allow-headers': 'content-type',
     vary: 'Origin',
   }
@@ -67,7 +68,6 @@ interface JoinRoomRequest {
   roomCode?: string
 }
 
-/** URL-safe ~12-char suffix; avoids nanoid (ESM-only in v5) under Lambda CommonJS `require`. */
 function randomPeerSuffix(): string {
   return randomBytes(9).toString('base64url').slice(0, 12)
 }
@@ -81,20 +81,28 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     return { statusCode: 204, headers: { ...cors(origin) } }
   }
 
-  if (method !== 'POST') return bad(405, 'Method not allowed', origin)
-
-  let body: unknown = {}
-  if (event.body) {
-    try {
-      body = JSON.parse(event.body)
-    } catch {
-      return bad(400, 'Malformed JSON', origin)
-    }
-  }
-
   try {
-    if (path.endsWith('/rooms')) return await handleCreateRoom(body as CreateRoomRequest, origin)
+    if (method === 'GET' && path.endsWith('/turn/status')) {
+      return await handleGetTurnStatus(origin)
+    }
+
+    if (method !== 'POST') return bad(405, 'Method not allowed', origin)
+
+    let body: unknown = {}
+    if (event.body) {
+      try {
+        body = JSON.parse(event.body)
+      } catch {
+        return bad(400, 'Malformed JSON', origin)
+      }
+    }
+
+    if (path.endsWith('/rooms/abandon-idle')) return await handlePostAbandonIdle(body as { token?: string }, origin)
     if (path.endsWith('/rooms/join')) return await handleJoinRoom(body as JoinRoomRequest, origin)
+    if (path.endsWith('/rooms')) return await handleCreateRoom(body as CreateRoomRequest, origin)
+    if (path.endsWith('/turn/start')) return await handlePostTurnStart(origin)
+    if (path.endsWith('/turn/heartbeat')) return await handlePostTurnHeartbeat(body as { token?: string }, origin)
+
     return bad(404, 'Not found', origin)
   } catch (err) {
     console.error('http handler error', err)

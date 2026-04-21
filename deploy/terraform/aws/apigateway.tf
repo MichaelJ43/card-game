@@ -5,7 +5,7 @@ resource "aws_apigatewayv2_api" "http" {
 
   cors_configuration {
     allow_origins = [local.site_browser_origin]
-    allow_methods = ["POST", "OPTIONS"]
+    allow_methods = ["GET", "POST", "OPTIONS"]
     allow_headers = ["content-type"]
     max_age       = 600
   }
@@ -30,6 +30,30 @@ resource "aws_apigatewayv2_route" "http_create" {
 resource "aws_apigatewayv2_route" "http_join" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "POST /rooms/join"
+  target    = "integrations/${aws_apigatewayv2_integration.http.id}"
+}
+
+resource "aws_apigatewayv2_route" "http_turn_status" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "GET /turn/status"
+  target    = "integrations/${aws_apigatewayv2_integration.http.id}"
+}
+
+resource "aws_apigatewayv2_route" "http_turn_start" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "POST /turn/start"
+  target    = "integrations/${aws_apigatewayv2_integration.http.id}"
+}
+
+resource "aws_apigatewayv2_route" "http_turn_heartbeat" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "POST /turn/heartbeat"
+  target    = "integrations/${aws_apigatewayv2_integration.http.id}"
+}
+
+resource "aws_apigatewayv2_route" "http_abandon_idle" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "POST /rooms/abandon-idle"
   target    = "integrations/${aws_apigatewayv2_integration.http.id}"
 }
 

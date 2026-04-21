@@ -74,6 +74,12 @@ export interface SignalingPeerLeft {
   peerId: string
 }
 
+/** Server is tearing down the room (e.g. host idle timeout); close signaling and UI session. */
+export interface SignalingRoomClosing {
+  type: 'room-closing'
+  reason: string
+}
+
 export interface SignalingError {
   type: 'error'
   code:
@@ -93,6 +99,7 @@ export type SignalingMessage =
   | SignalingRelay
   | SignalingPeerJoined
   | SignalingPeerLeft
+  | SignalingRoomClosing
   | SignalingError
 
 // ---------- Peer-to-peer (WebRTC DataChannel) ----------
@@ -227,6 +234,7 @@ export function isSignalingMessage(value: unknown): value is SignalingMessage {
     t === 'relay' ||
     t === 'peer-joined' ||
     t === 'peer-left' ||
+    t === 'room-closing' ||
     t === 'error'
   )
 }
