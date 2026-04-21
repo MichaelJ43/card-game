@@ -46,3 +46,7 @@ jobs:
       - name: Lambda tests
         working-directory: lambda
         run: npm run test
+
+      - name: Lambda bundle (zips for deploy parity)
+        working-directory: lambda
+        run: npm run bundle

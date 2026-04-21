@@ -30,10 +30,8 @@ export class PeerLink {
 
   constructor(opts: PeerLinkOptions) {
     this.opts = opts
-    const { stunUrls } = getMultiplayerConfig()
-    this.pc = new RTCPeerConnection({
-      iceServers: stunUrls.map((url) => ({ urls: url })),
-    })
+    const { iceServers } = getMultiplayerConfig()
+    this.pc = new RTCPeerConnection({ iceServers })
 
     this.pc.addEventListener('icecandidate', (ev) => {
       if (ev.candidate) {

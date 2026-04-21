@@ -1,6 +1,6 @@
 // Produces deployable zip bundles for each Lambda handler.
 // Run after `npm run build` (creates dist/).
-// Output: dist/http.zip, dist/websocket.zip
+// Output: dist/http.zip, dist/websocket.zip, dist/turnScheduled.zip
 
 import { execSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -20,7 +20,6 @@ if (!existsSync(dist)) {
 
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
 
-// Write a minimal package.json inside dist so node_modules resolves at runtime.
 writeFileSync(
   resolve(dist, 'package.json'),
   JSON.stringify(
@@ -35,19 +34,16 @@ writeFileSync(
   ) + '\n',
 )
 
-// Install production deps into dist/node_modules
 execSync('npm install --omit=dev --silent --no-audit --no-fund', { cwd: dist, stdio: 'inherit' })
 
-async function zipHandler(entry, zipName) {
+async function zipPackage(files, zipName) {
   const out = resolve(dist, zipName)
   const output = createWriteStream(out)
   const archive = archiver('zip', { zlib: { level: 9 } })
   archive.pipe(output)
-  archive.file(resolve(dist, entry), { name: entry })
-  archive.file(resolve(dist, 'auth.js'), { name: 'auth.js' })
-  archive.file(resolve(dist, 'storage.js'), { name: 'storage.js' })
-  archive.file(resolve(dist, 'roomCode.js'), { name: 'roomCode.js' })
-  archive.file(resolve(dist, 'package.json'), { name: 'package.json' })
+  for (const f of files) {
+    archive.file(resolve(dist, f), { name: f })
+  }
   archive.directory(resolve(dist, 'node_modules'), 'node_modules')
   await new Promise((res, rej) => {
     output.on('close', res)
@@ -59,5 +55,27 @@ async function zipHandler(entry, zipName) {
 
 mkdirSync(dist, { recursive: true })
 
-await zipHandler('http.js', 'http.zip')
-await zipHandler('websocket.js', 'websocket.zip')
+const common = ['package.json']
+
+await zipPackage(
+  [
+    'http.js',
+    'auth.js',
+    'storage.js',
+    'roomCode.js',
+    'turnHttpHandlers.js',
+    'turnState.js',
+    'turnEc2Ops.js',
+    'wsRoomNotify.js',
+    'turnBackoff.js',
+    ...common,
+  ],
+  'http.zip',
+)
+
+await zipPackage(['websocket.js', 'auth.js', 'storage.js', 'roomCode.js', ...common], 'websocket.zip')
+
+await zipPackage(
+  ['turnScheduled.js', 'turnState.js', 'turnEc2Ops.js', 'turnBackoff.js', 'storage.js', ...common],
+  'turnScheduled.zip',
+)

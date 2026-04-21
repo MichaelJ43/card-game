@@ -297,6 +297,7 @@ only on the Terraform step output in the same job:
 
 - `VITE_MULTIPLAYER_HTTP_URL` — same value as `terraform output -raw http_api_url` (no trailing slash).
 - `VITE_MULTIPLAYER_WS_URL` — same value as `terraform output -raw ws_api_url` (with a custom domain this is `wss://ws.<custom_domain>` with **no** `/prod` path; the default execute-api URL still uses `/prod`).
+- Optional **coturn on EC2** (Terraform `turn_ec2_enabled`): after apply, set **`VITE_MULTIPLAYER_TURN_HOST`** (see `terraform output turn_hostname`), **`VITE_MULTIPLAYER_TURN_USER`**=`cardgame`, **`VITE_MULTIPLAYER_TURN_CREDENTIAL`**=`terraform output -raw turn_coturn_static_password`. Or **`VITE_MULTIPLAYER_ICE_JSON`** for full `RTCIceServer[]` control.
 
 Deploy resolves URLs as: **Variables if non-empty, else Terraform outputs** for that run. Copy the two lines from the last successful **Deploy** job summary into Variables once, then re-run **Deploy** (or push) so CloudFront serves a bundle with multiplayer enabled.
 
@@ -304,9 +305,7 @@ Custom site hostname (e.g. `cardgame.michaelj43.dev`): set repository **Variable
 
 ### Future backlog (not in this PR)
 
-- **TURN relay** for symmetric-NAT / strict-firewall peers (STUN-only may
-  fail). Plan is to add an env-configured managed TURN (Twilio, Cloudflare, or
-  self-hosted coturn) behind a feature flag.
+- **Managed third-party TURN** (Twilio, etc.) with short-lived credentials if you outgrow the optional **Terraform coturn EC2** path (`turn_ec2_enabled`).
 - **Per-game host-broadcast integration**: wire each supported game module’s
   `applyAction` output into `RoomHost.broadcastSnapshot` with per-seat
   redaction of hidden information (opponent hands).

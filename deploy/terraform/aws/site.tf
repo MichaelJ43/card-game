@@ -37,6 +37,8 @@ locals {
   use_custom_domain    = local.custom_domain_host != "" && var.acm_certificate_arn != null && trimspace(var.acm_certificate_arn) != ""
   route53_zone_id      = var.route53_hosted_zone_id != null ? trimspace(var.route53_hosted_zone_id) : ""
   create_route53_records = local.use_custom_domain && local.route53_zone_id != ""
+  /** Optional coturn EC2 + turn.* DNS + scheduled stop (requires Route 53 on custom domain). */
+  turn_stack = var.turn_ec2_enabled && local.create_route53_records
   # Never call trimspace(null): Terraform may evaluate both branches of a ternary / coalesce args.
   allowed_origin_trimmed = var.allowed_origin != null ? trimspace(var.allowed_origin) : ""
   # Browser Origin header for CORS / Lambda: explicit override, else HTTPS custom host, else CloudFront hostname.

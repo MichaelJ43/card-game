@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createRoom, joinRoom } from '../net/api'
+import { abandonIdleRoom, createRoom, getTurnStatus, joinRoom, startTurnServer, turnHeartbeat } from '../net/api'
 import { isMultiplayerConfigured } from '../net/config'
 import { RoomClient } from '../net/client'
 import { RoomHost, type HostedPeer } from '../net/host'
@@ -13,6 +13,7 @@ import {
 } from '../net/protocol'
 import type { PeerState } from '../net/peer'
 import type { SignalingState } from '../net/signaling'
+import { MultiplayerIdleModal } from './MultiplayerIdleModal'
 
 export interface MultiplayerNameplateProps {
   seat: number
@@ -63,6 +64,9 @@ export interface MultiplayerPanelProps {
 
 type Mode = 'idle' | 'hosting' | 'client'
 
+const IDLE_WARN_MS = 60 * 60 * 1000
+const IDLE_COUNTDOWN_SEC = 5 * 60
+
 export function MultiplayerPanel({
   gameId,
   maxClients,
@@ -92,8 +96,16 @@ export function MultiplayerPanel({
   const [peerState, setPeerState] = useState<PeerState>('new')
   const [roster, setRoster] = useState<HostedPeer[]>([])
   const [error, setError] = useState<string>('')
+  const [idleModalOpen, setIdleModalOpen] = useState(false)
+  const [idleSecondsLeft, setIdleSecondsLeft] = useState(IDLE_COUNTDOWN_SEC)
+  const [turnControlAvailable, setTurnControlAvailable] = useState(false)
+  const [turnReady, setTurnReady] = useState(false)
+  const [turnStarting, setTurnStarting] = useState(false)
   const hostRef = useRef<RoomHost | null>(null)
   const clientRef = useRef<RoomClient | null>(null)
+  const hostJwtRef = useRef<string | null>(null)
+  const clientJwtRef = useRef<string | null>(null)
+  const lastShellActivityRef = useRef(0)
 
   const configured = isMultiplayerConfigured()
 
@@ -104,24 +116,147 @@ export function MultiplayerPanel({
     else if (s === 'closed') setStatus('Disconnected from host.')
   }, [])
 
-  const teardown = useCallback((opts?: { clientKickedByHost?: boolean }) => {
+  const teardown = useCallback((opts?: { clientKickedByHost?: boolean; idleTimeout?: boolean }) => {
     const wasHost = hostRef.current !== null
     hostRef.current?.close()
     hostRef.current = null
     clientRef.current?.close()
     clientRef.current = null
+    hostJwtRef.current = null
+    clientJwtRef.current = null
     setMode('idle')
     setRoomCode('')
     setRoster([])
     setSignalingState('closed')
     setPeerState('new')
-    setStatus(opts?.clientKickedByHost ? 'Host closed the room or disconnected.' : '')
+    setIdleModalOpen(false)
+    setIdleSecondsLeft(IDLE_COUNTDOWN_SEC)
+    setStatus(
+      opts?.idleTimeout
+        ? 'Session ended after inactivity.'
+        : opts?.clientKickedByHost
+          ? 'Host closed the room or disconnected.'
+          : '',
+    )
     setError('')
+    lastShellActivityRef.current = 0
     onTeardown?.(wasHost)
     onClosed?.()
   }, [onClosed, onTeardown])
 
   useEffect(() => () => teardown(), [teardown])
+
+  useEffect(() => {
+    if (mode === 'idle') return
+    if (lastShellActivityRef.current === 0) {
+      lastShellActivityRef.current = Date.now()
+    }
+  }, [mode])
+
+  const touchShellActivity = useCallback(() => {
+    lastShellActivityRef.current = Date.now()
+    if (idleModalOpen) {
+      setIdleModalOpen(false)
+      setIdleSecondsLeft(IDLE_COUNTDOWN_SEC)
+    }
+  }, [idleModalOpen])
+
+  useEffect(() => {
+    if (mode === 'idle') return
+    const onAct = () => touchShellActivity()
+    window.addEventListener('pointerdown', onAct, true)
+    window.addEventListener('keydown', onAct, true)
+    return () => {
+      window.removeEventListener('pointerdown', onAct, true)
+      window.removeEventListener('keydown', onAct, true)
+    }
+  }, [mode, touchShellActivity])
+
+  useEffect(() => {
+    if (mode === 'idle' || idleModalOpen) return
+    const t = window.setInterval(() => {
+      if (Date.now() - lastShellActivityRef.current >= IDLE_WARN_MS) {
+        setIdleModalOpen(true)
+        setIdleSecondsLeft(IDLE_COUNTDOWN_SEC)
+      }
+    }, 15_000)
+    return () => window.clearInterval(t)
+  }, [mode, idleModalOpen])
+
+  const onIdleExpire = useCallback(async () => {
+    setIdleModalOpen(false)
+    const token = hostJwtRef.current
+    if (hostRef.current && token) {
+      try {
+        await abandonIdleRoom({ token })
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      }
+    }
+    teardown({ idleTimeout: true })
+  }, [teardown])
+
+  const wakeTurnServer = useCallback(async () => {
+    setTurnStarting(true)
+    setError('')
+    try {
+      await startTurnServer()
+      const st = await getTurnStatus()
+      setTurnReady(Boolean(st.ready))
+      setStatus(st.message ? String(st.message) : 'Relay server is starting — try again in a minute if needed.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setTurnStarting(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!idleModalOpen) return
+    setIdleSecondsLeft(IDLE_COUNTDOWN_SEC)
+    let s = IDLE_COUNTDOWN_SEC
+    const id = window.setInterval(() => {
+      s -= 1
+      setIdleSecondsLeft(s)
+      if (s <= 0) {
+        window.clearInterval(id)
+        void onIdleExpire()
+      }
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [idleModalOpen, onIdleExpire])
+
+  useEffect(() => {
+    if (mode !== 'hosting' && mode !== 'client') return
+    const tick = () => {
+      const token = mode === 'hosting' ? hostJwtRef.current : clientJwtRef.current
+      if (!token) return
+      void turnHeartbeat({ token }).catch(() => {})
+    }
+    tick()
+    const t = window.setInterval(tick, 60_000)
+    return () => window.clearInterval(t)
+  }, [mode])
+
+  useEffect(() => {
+    if (mode !== 'hosting') return
+    const poll = async () => {
+      try {
+        const st = await getTurnStatus()
+        if (!st.enabled) {
+          setTurnControlAvailable(false)
+          return
+        }
+        setTurnControlAvailable(true)
+        setTurnReady(Boolean(st.ready))
+      } catch {
+        setTurnControlAvailable(false)
+      }
+    }
+    void poll()
+    const t = window.setInterval(poll, 20_000)
+    return () => window.clearInterval(t)
+  }, [mode])
 
   const startHost = useCallback(async () => {
     setError('')
@@ -131,12 +266,17 @@ export function MultiplayerPanel({
         gameId,
         maxClients,
       })
+      hostJwtRef.current = token
+      lastShellActivityRef.current = Date.now()
       const host = new RoomHost({
         wsUrl,
         roomCode: code,
         hostPeerId,
         token,
         onSignalingState: setSignalingState,
+        onRoomClosing: () => {
+          teardown({ idleTimeout: true })
+        },
         onRosterChange: (peers) => {
           setRoster(peers)
           onHostingRosterChange?.(peers)
@@ -164,6 +304,7 @@ export function MultiplayerPanel({
     onRemoteIntent,
     onRemoteSetDisplayName,
     onRemoteChatSend,
+    teardown,
   ])
 
   const startClient = useCallback(async () => {
@@ -178,6 +319,8 @@ export function MultiplayerPanel({
       const { roomCode: rc, hostPeerId, clientPeerId, token, wsUrl } = await joinRoom({
         roomCode: code,
       })
+      clientJwtRef.current = token
+      lastShellActivityRef.current = Date.now()
       const client = new RoomClient({
         wsUrl,
         roomCode: rc,
@@ -192,6 +335,9 @@ export function MultiplayerPanel({
         onChatLine: (line) => onRoomChatLine?.(line),
         onHostEnded: () => {
           teardown({ clientKickedByHost: true })
+        },
+        onRoomClosing: () => {
+          teardown({ idleTimeout: true })
         },
       })
       clientRef.current = client
@@ -281,6 +427,21 @@ export function MultiplayerPanel({
                   Open chat
                 </button>
               )}
+              {turnControlAvailable && (
+                <button
+                  type="button"
+                  className={`app__btnSecondary app__btnToolbar multiplayerPanel__turnBtn${turnReady ? ' multiplayerPanel__turnBtn--ready' : ' multiplayerPanel__turnBtn--off'}`}
+                  disabled={turnReady || turnStarting}
+                  title={
+                    turnReady
+                      ? 'Relay server is ready.'
+                      : 'Start the optional TURN relay VM (may take 1–3 minutes).'
+                  }
+                  onClick={() => void wakeTurnServer()}
+                >
+                  {turnReady ? 'Relay ready' : turnStarting ? 'Starting relay…' : 'Start relay'}
+                </button>
+              )}
               <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => teardown()}>
                 Close room
               </button>
@@ -357,6 +518,21 @@ export function MultiplayerPanel({
                 Open chat
               </button>
             )}
+            {turnControlAvailable && (
+              <button
+                type="button"
+                className={`app__btnSecondary app__btnToolbar multiplayerPanel__turnBtn${turnReady ? ' multiplayerPanel__turnBtn--ready' : ' multiplayerPanel__turnBtn--off'}`}
+                disabled={turnReady || turnStarting}
+                title={
+                  turnReady
+                    ? 'Relay server is ready.'
+                    : 'Start the optional TURN relay VM (may take 1–3 minutes).'
+                }
+                onClick={() => void wakeTurnServer()}
+              >
+                {turnReady ? 'Relay ready' : turnStarting ? 'Starting relay…' : 'Start relay'}
+              </button>
+            )}
             <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => teardown()}>
               Close room
             </button>
@@ -398,6 +574,14 @@ export function MultiplayerPanel({
         </p>
       )}
       {chatOpenFailed ? <p className="multiplayerPanel__chatFail">{chatOpenFailed}</p> : null}
+
+      <MultiplayerIdleModal
+        open={idleModalOpen}
+        secondsRemaining={idleSecondsLeft}
+        onDismiss={() => {
+          touchShellActivity()
+        }}
+      />
     </section>
   )
 }

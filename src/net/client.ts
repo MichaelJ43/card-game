@@ -23,6 +23,8 @@ export interface RoomClientOptions {
   onAck?: (nonce: string, ok: boolean, error: string | undefined) => void
   /** Host closed the room or disconnected; stop signaling and data channel. */
   onHostEnded?: () => void
+  /** Server closed the room (e.g. idle); stop signaling and data channel. */
+  onRoomClosing?: () => void
   /** Host broadcast room chat line. */
   onChatLine?: (line: PeerHostChatLine) => void
 }
@@ -45,7 +47,9 @@ export class RoomClient {
       peerId: opts.clientPeerId,
       onStateChange: (s) => opts.onSignalingState?.(s),
       onMessage: (msg) => {
-        if (msg.type === 'welcome') {
+        if (msg.type === 'room-closing') {
+          opts.onRoomClosing?.()
+        } else if (msg.type === 'welcome') {
           this.ensureLink()
         } else if (msg.type === 'relay' && msg.to === opts.clientPeerId) {
           this.ensureLink().acceptSignal(msg.payload)

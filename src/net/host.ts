@@ -24,6 +24,8 @@ export interface RoomHostOptions {
   token: string
   onRosterChange?: (peers: HostedPeer[]) => void
   onSignalingState?: (state: SignalingState) => void
+  /** Server closed the room (idle policy); tear down multiplayer UI. */
+  onRoomClosing?: () => void
   /** Game intents, seat labels, and room chat from clients. */
   onIntent?: (
     msg: PeerClientIntent | PeerClientSetDisplayName | PeerClientChatSend,
@@ -58,7 +60,9 @@ export class RoomHost {
       peerId: opts.hostPeerId,
       onStateChange: (s) => opts.onSignalingState?.(s),
       onMessage: (msg) => {
-        if (msg.type === 'peer-joined') {
+        if (msg.type === 'room-closing') {
+          opts.onRoomClosing?.()
+        } else if (msg.type === 'peer-joined') {
           this.addClient(msg.peerId)
         } else if (msg.type === 'peer-left') {
           this.removeClient(msg.peerId)

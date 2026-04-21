@@ -15,7 +15,8 @@ Human-facing setup and CI are documented in the repository **README**, **`AGENTS
 | Custom TLS | When `custom_domain` + `acm_certificate_arn` are set: CloudFront **aliases** + viewer cert; `aws_apigatewayv2_domain_name` + `aws_apigatewayv2_api_mapping` for `api.<custom_domain>` and `ws.<custom_domain>` |
 | DNS | When `custom_domain` + `acm_certificate_arn` + `route53_hosted_zone_id` are set: `aws_route53_record` apex **A/AAAA** → CloudFront; `api` / `ws` **A** aliases → API Gateway regional domain targets |
 | Data | `aws_dynamodb_table.rooms` (TTL) |
-| Compute | `aws_lambda_function` **http** / **ws**, log groups, IAM role + inline policy |
+| Compute | `aws_lambda_function` **http** / **ws** (+ optional **turn-scheduled**), log groups, IAM role + inline policy (+ optional **turn** inline policy) |
+| Optional TURN | When **`turn_ec2_enabled`** and Route 53 are on: coturn **EC2** (default VPC), **`turn.<custom_domain>`** A record (placeholder `127.0.0.1`; **HTTP Lambda** overwrites with public IP after `/turn/start`), EventBridge **15m** → idle-stop Lambda. **No EIP** (avoids EIP hourly charge while instance is stopped). |
 
 **Certificate / region:** CloudFront requires an ACM cert in **`us-east-1`**. API Gateway regional custom domains use the same **`acm_certificate_arn`** in **`var.aws_region`** — use **`aws_region = "us-east-1"`** unless you split certs (not modeled as separate inputs). The cert must cover the site host and **`api.`** / **`ws.`** subdomains if those custom names are used.
 
@@ -35,6 +36,7 @@ Notable optional inputs:
 - **`route53_hosted_zone_id`** — manage the DNS records above (only with custom domain + cert).
 - **`allowed_origin`** — override browser origin string for CORS / Lambda when non-empty.
 - **`aws_region`**, **`project`**, **`environment`**, **`tags`**, **`site_bucket_name`**, room / connection TTLs, zip paths, **`site_assets_dir`** (used by automation that syncs `dist/`).
+- **`turn_ec2_enabled`** (default `false`) — optional coturn stack; requires **`custom_domain`**, **`acm_certificate_arn`**, and **`route53_hosted_zone_id`**. **`turn_instance_type`**, **`scheduled_lambda_zip`**.
 
 ---
 
@@ -57,6 +59,10 @@ Notable optional inputs:
 | `rooms_table` | DynamoDB table name |
 | `http_regional_domain_name` | `d-…execute-api…` target for the **HTTP** custom domain (compare to Route 53 `api` alias) |
 | `ws_regional_domain_name` | `d-…execute-api…` target for the **WebSocket** custom domain (compare to Route 53 `ws` alias) |
+| `turn_hostname` | e.g. `turn.<custom_domain>` when TURN stack is enabled; else `null` |
+| `turn_coturn_static_password` | Sensitive coturn password (user **`cardgame`** in user-data); set **`VITE_MULTIPLAYER_TURN_CREDENTIAL`** to match at site build |
+
+**TURN / DNS:** After `terraform apply` with TURN on, run **`terraform output -raw turn_coturn_static_password`** once, configure GitHub Variables **`VITE_MULTIPLAYER_TURN_HOST`** (= `turn_hostname`), **`VITE_MULTIPLAYER_TURN_USER`**=`cardgame`, **`VITE_MULTIPLAYER_TURN_CREDENTIAL`**=that password, then redeploy the site. The HTTP Lambda waits for **EC2 status checks OK** before updating Route 53; the scheduled Lambda stops the instance only after **4h uptime** and **15m** without usage heartbeats (see app).
 
 The site build consumes **`http_api_url`** and **`ws_api_url`** as **`VITE_MULTIPLAYER_HTTP_URL`** / **`VITE_MULTIPLAYER_WS_URL`** when those env vars are not overridden in CI.
 
@@ -78,3 +84,4 @@ If **`wss://ws.<domain>/prod` returns 403** but **`wss://ws.<domain>` connects**
 | `lambda.tf` | Lambdas, env, log groups |
 | `iam.tf` | Execution role + policies |
 | `dynamodb.tf` | Rooms table |
+| `turn.tf` | Optional coturn EC2, SG, Route 53 `turn` A, IAM for EC2/R53, scheduled Lambda + EventBridge |

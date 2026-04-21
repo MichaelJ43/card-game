@@ -151,3 +151,17 @@ export async function listConnections(roomCode: string): Promise<ConnectionRecor
 export function ttlSecondsFromNow(seconds: number): number {
   return Math.floor(Date.now() / 1000) + seconds
 }
+
+/** Delete all CONN rows for a room, index rows, and ROOM META (after optional WS notify). */
+export async function deleteRoomCascade(roomCode: string): Promise<void> {
+  const peers = await listConnections(roomCode)
+  for (const p of peers) {
+    await deleteConnection(roomCode, p.connectionId)
+  }
+  await ddb.send(
+    new DeleteCommand({
+      TableName: TABLE(),
+      Key: { pk: roomPk(roomCode), sk: 'META' },
+    }),
+  )
+}

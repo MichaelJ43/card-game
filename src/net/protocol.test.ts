@@ -63,6 +63,7 @@ describe('message type guards', () => {
   it('isSignalingMessage', () => {
     expect(isSignalingMessage({ type: 'hello' })).toBe(true)
     expect(isSignalingMessage({ type: 'relay' })).toBe(true)
+    expect(isSignalingMessage({ type: 'room-closing', reason: 'idle' })).toBe(true)
     expect(isSignalingMessage({ type: 'nope' })).toBe(false)
     expect(isSignalingMessage(null)).toBe(false)
   })
