@@ -10,5 +10,5 @@ Shedding game: play a card that matches the **current suit** or **rank** of the 
 
 ## See also
 
-- **In-app rules** (modal text bundled in the app): [`src/rules/crazy-eights.md`](../src/rules/crazy-eights.md)
+- **In-app rules** (modal text bundled in the app): [`src/rules/crazy-eights.md`](../../src/rules/crazy-eights.md)
 - **Wikipedia:** [Crazy Eights](https://en.wikipedia.org/wiki/Crazy_Eights)

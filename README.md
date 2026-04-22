@@ -56,31 +56,31 @@ npm run lint
 
 ## Available games
 
-Pick a game from the in-app **Game** menu. Each row links to a short note in [`docs/`](docs/).
+Pick a game from the in-app **Game** menu. Each row links to a short note in [`docs/games/`](docs/games/).
 
 | Game id | Description | Doc |
 |--------|-------------|-----|
-| `war` | Compare high cards; winner takes the trick. | [War](docs/war.md) |
-| `demo-custom` | Simple duel using the small **example-custom** deck. | [Custom deck duel](docs/demo-custom.md) |
-| `go-fish` | Ask opponents for ranks and collect books (configurable AI count). | [Go Fish](docs/go-fish.md) |
-| `skyjo` | Flip/swap/dump on a numbered Skyjo deck; match play to a target score. | [Skyjo](docs/skyjo.md) |
-| `blackjack` | Heads-up blackjack vs dealer with chip match. | [Blackjack](docs/blackjack.md) |
-| `casino-blackjack` | Same rules as blackjack; different default stacks / match target. | [Casino Blackjack](docs/casino-blackjack.md) |
-| `baccarat` | Bet player or banker; two-card totals modulo 10. | [Baccarat](docs/baccarat.md) |
-| `mini-baccarat` | Same engine as baccarat; tuned manifest defaults. | [Mini Baccarat](docs/mini-baccarat.md) |
-| `crazy-eights` | Shed cards; match suit/rank or play an 8 and call suit. | [Crazy Eights](docs/crazy-eights.md) |
-| `switch` | Same engine as Crazy Eights (alternate manifest). | [Switch](docs/switch.md) |
-| `poker-draw` | Heads-up 5-card draw with ante and simplified showdown. | [Poker (5-card draw)](docs/poker-draw.md) |
-| `heads-up-poker` | Same module as poker-draw; alternate match settings. | [Heads-up poker](docs/heads-up-poker.md) |
-| `high-card-duel` | Higher single card wins the pot (5 or 10 chip bets). | [High-card duel](docs/high-card-duel.md) |
-| `red-dog` | Same engine as high-card duel (alternate manifest). | [Red Dog](docs/red-dog.md) |
-| `uno` | Uno-style shedding game on the custom **uno** deck (108 cards). | [Uno](docs/uno.md) |
-| `thirty-one` | Thirty-One / Scat on a 32-card deck (7–A); knock, draw, or take discard. | [Thirty-One](docs/thirty-one.md) |
-| `euchre` | Simplified four-hand Euchre trick race on 24 cards (9–A). | [Euchre](docs/euchre.md) |
-| `durak` | Two-player Durak-style attack/defend on 36 cards (6–A). | [Durak](docs/durak.md) |
-| `pinochle` | Two-player Pinochle trick race (double 48-card deck); meld omitted. | [Pinochle](docs/pinochle.md) |
-| `canasta` | Draw-two / discard-one practice on a 108-card shoe (not full canasta). | [Canasta](docs/canasta.md) |
-| `sequence-race` | Skip-Bo–style sequence builder on a custom 112-card deck. | [Sequence race](docs/sequence-race.md) |
+| `war` | Compare high cards; winner takes the trick. | [War](docs/games/war.md) |
+| `demo-custom` | Simple duel using the small **example-custom** deck. | [Custom deck duel](docs/games/demo-custom.md) |
+| `go-fish` | Ask opponents for ranks and collect books (configurable AI count). | [Go Fish](docs/games/go-fish.md) |
+| `skyjo` | Flip/swap/dump on a numbered Skyjo deck; match play to a target score. | [Skyjo](docs/games/skyjo.md) |
+| `blackjack` | Heads-up blackjack vs dealer with chip match. | [Blackjack](docs/games/blackjack.md) |
+| `casino-blackjack` | Same rules as blackjack; different default stacks / match target. | [Casino Blackjack](docs/games/casino-blackjack.md) |
+| `baccarat` | Bet player or banker; two-card totals modulo 10. | [Baccarat](docs/games/baccarat.md) |
+| `mini-baccarat` | Same engine as baccarat; tuned manifest defaults. | [Mini Baccarat](docs/games/mini-baccarat.md) |
+| `crazy-eights` | Shed cards; match suit/rank or play an 8 and call suit. | [Crazy Eights](docs/games/crazy-eights.md) |
+| `switch` | Same engine as Crazy Eights (alternate manifest). | [Switch](docs/games/switch.md) |
+| `poker-draw` | Heads-up 5-card draw with ante and simplified showdown. | [Poker (5-card draw)](docs/games/poker-draw.md) |
+| `heads-up-poker` | Same module as poker-draw; alternate match settings. | [Heads-up poker](docs/games/heads-up-poker.md) |
+| `high-card-duel` | Higher single card wins the pot (5 or 10 chip bets). | [High-card duel](docs/games/high-card-duel.md) |
+| `red-dog` | Same engine as high-card duel (alternate manifest). | [Red Dog](docs/games/red-dog.md) |
+| `uno` | Uno-style shedding game on the custom **uno** deck (108 cards). | [Uno](docs/games/uno.md) |
+| `thirty-one` | Thirty-One / Scat on a 32-card deck (7–A); knock, draw, or take discard. | [Thirty-One](docs/games/thirty-one.md) |
+| `euchre` | Simplified four-hand Euchre trick race on 24 cards (9–A). | [Euchre](docs/games/euchre.md) |
+| `durak` | Two-player Durak-style attack/defend on 36 cards (6–A). | [Durak](docs/games/durak.md) |
+| `pinochle` | Two-player Pinochle trick race (double 48-card deck); meld omitted. | [Pinochle](docs/games/pinochle.md) |
+| `canasta` | Draw-two / discard-one practice on a 108-card shoe (not full canasta). | [Canasta](docs/games/canasta.md) |
+| `sequence-race` | Skip-Bo–style sequence builder on a custom 112-card deck. | [Sequence race](docs/games/sequence-race.md) |
 
 ## Repository layout (overview)
 
@@ -91,7 +91,8 @@ Pick a game from the in-app **Game** menu. Each row links to a short note in [`d
 | [`src/core/`](src/core/) | Table model, deck parsing, match state, registry. |
 | [`src/data/manifests.ts`](src/data/manifests.ts) | Wires game and deck ids to bundled YAML. |
 | [`src/rules/`](src/rules/) | In-app rules copy (markdown) shown in the **Rules** modal; see [`src/data/rulesSources.ts`](src/data/rulesSources.ts). |
-| [`docs/`](docs/) | Longer per-game notes (repo docs; can diverge slightly from the modal text). |
+| [`docs/games/`](docs/games/) | Longer per-game notes (repo docs; can diverge slightly from the modal text). |
+| [`docs/`](docs/) | Project / app docs at repo root (architecture, shell UI, multiplayer chat, audio — see rows below). |
 | [`docs/architecture.md`](docs/architecture.md) | System architecture: multiplayer, WebRTC, signaling, optional TURN, Lambdas; links to **[`deploy/terraform/aws/README.md`](deploy/terraform/aws/README.md)**. |
 | [`docs/ui-design.md`](docs/ui-design.md) | Shared shell UI (toolbar buttons, online multiplayer strip layout). |
 | [`docs/multiplayer-chat.md`](docs/multiplayer-chat.md) | Room chat (DataChannel + chat popout + toasts). |
@@ -100,4 +101,4 @@ Pick a game from the in-app **Game** menu. Each row links to a short note in [`d
 
 ## Contributing
 
-Add or change a game by extending the registry, deck, and module pattern used in `src/games/`. See the relevant file under [`docs/`](docs/) for behavior-specific notes.
+Add or change a game by extending the registry, deck, and module pattern used in `src/games/`. See the relevant file under [`docs/games/`](docs/games/) for behavior-specific notes.

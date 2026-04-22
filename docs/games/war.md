@@ -12,5 +12,5 @@ See the in-app status line for the current phase and outcome text.
 
 ## See also
 
-- **In-app rules** (modal text bundled in the app): [`src/rules/war.md`](../src/rules/war.md)
+- **In-app rules** (modal text bundled in the app): [`src/rules/war.md`](../../src/rules/war.md)
 - **Wikipedia:** [War (card game)](https://en.wikipedia.org/wiki/War_(card_game))

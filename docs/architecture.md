@@ -8,6 +8,7 @@ This document explains how the **browser app**, **AWS multiplayer stack**, **Web
 
 Other useful links:
 
+- **[`docs/games/`](games/)** — longer per-game notes (companion to **`src/rules/`**).
 - **[`docs/ui-design.md`](ui-design.md)** — shell + multiplayer strip UI.
 - **[`docs/multiplayer-chat.md`](multiplayer-chat.md)** — room chat over the data channel + popout.
 
@@ -197,6 +198,7 @@ For **variables, secrets, custom domains, TURN secrets, and outputs**, use:
 | Topic | Location |
 |--------|----------|
 | Per-game modules, `GameModule`, AI | [`AGENTS.md`](../AGENTS.md) |
+| Per-game repo notes (markdown) | [`docs/games/`](games/) |
 | Room chat UX + protocol | [`docs/multiplayer-chat.md`](multiplayer-chat.md) |
 | Wire protocol types | `src/net/protocol.ts` |
 | Terraform resource list | [`deploy/terraform/aws/README.md`](../deploy/terraform/aws/README.md) |

@@ -6,5 +6,5 @@
 
 ## See also
 
-- **In-app rules** (modal text bundled in the app): [`src/rules/euchre.md`](../src/rules/euchre.md)
+- **In-app rules** (modal text bundled in the app): [`src/rules/euchre.md`](../../src/rules/euchre.md)
 - **Wikipedia:** [Euchre](https://en.wikipedia.org/wiki/Euchre)

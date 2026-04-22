@@ -6,5 +6,5 @@
 
 ## See also
 
-- **In-app rules** (modal text bundled in the app): [`src/rules/durak.md`](../src/rules/durak.md)
+- **In-app rules** (modal text bundled in the app): [`src/rules/durak.md`](../../src/rules/durak.md)
 - **Wikipedia:** [Durak](https://en.wikipedia.org/wiki/Durak)

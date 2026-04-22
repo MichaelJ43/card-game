@@ -6,5 +6,5 @@
 
 ## See also
 
-- **In-app rules** (modal text bundled in the app): [`src/rules/sequence-race.md`](../src/rules/sequence-race.md)
+- **In-app rules** (modal text bundled in the app): [`src/rules/sequence-race.md`](../../src/rules/sequence-race.md)
 - **Wikipedia:** [Skip-Bo](https://en.wikipedia.org/wiki/Skip-Bo) (similar commercial sequence-builder)
