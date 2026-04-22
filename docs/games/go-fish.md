@@ -10,5 +10,5 @@ Classic **Go Fish**: ask another player for a rank you hold; if they have any, y
 
 ## See also
 
-- **In-app rules** (modal text bundled in the app): [`src/rules/go-fish.md`](../src/rules/go-fish.md)
+- **In-app rules** (modal text bundled in the app): [`src/rules/go-fish.md`](../../src/rules/go-fish.md)
 - **Wikipedia:** [Go Fish](https://en.wikipedia.org/wiki/Go_Fish)

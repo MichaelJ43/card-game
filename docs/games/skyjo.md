@@ -8,9 +8,9 @@ Skyjo-style round play: grid of face-down/face-up cards, draw pile, discard, and
 
 **UI:** follow the on-screen hints for dump & flip, swap, and discard flows.
 
-See [`src/games/skyjo/skyjo.yaml`](../src/games/skyjo/skyjo.yaml) for bundled match parameters.
+See [`src/games/skyjo/skyjo.yaml`](../../src/games/skyjo/skyjo.yaml) for bundled match parameters.
 
 ## See also
 
-- **In-app rules** (modal text bundled in the app): [`src/rules/skyjo.md`](../src/rules/skyjo.md)
+- **In-app rules** (modal text bundled in the app): [`src/rules/skyjo.md`](../../src/rules/skyjo.md)
 - **Wikipedia:** [Skyjo](https://de.wikipedia.org/wiki/Skyjo) (English Wikipedia has no article yet; German article)

@@ -38,10 +38,10 @@ This document summarizes how the **card-game** repository is structured, how gam
 | `src/ui/RulesModal.tsx` | Dialog: optional **house-rules panel** + markdown body (headings, lists). |
 | `src/ui/GameHouseRulesPanel.tsx` | Per-game toggles/inputs saved to **`houseRules`** storage. |
 | `src/ui/CardView.tsx` | Card face/back, Skyjo tiers, standard ranks/suits. |
-| `docs/*.md` | Longer **repo documentation** per game (can diverge slightly from modal text). |
+| `docs/games/*.md` | Longer **per-game** repo documentation (can diverge slightly from modal text). |
 | `docs/architecture.md` | **System architecture**: multiplayer, WebRTC vs signaling, optional TURN, Lambdas; references **`deploy/terraform/aws/README.md`**. |
 | `docs/ui-design.md` | **Shell UI**: header toolbar button classes (`app__btn*`), multiplayer compact row layout (`multiplayerPanel__compact*` in `App.css`). |
-| `README.md` | User-facing run instructions and game table linking to `docs/`. |
+| `README.md` | User-facing run instructions; **Game** menu links **`docs/games/`**; project docs live at **`docs/`** root. |
 
 ---
 
@@ -135,7 +135,7 @@ Not all games use **`onTableIntent`**. **`App.tsx`** builds an **`intentZoneAllo
 ## Rules documentation (two layers)
 
 1. **`src/rules/<gameId>.md`** — Bundled as raw markdown; **`rulesTextForGame`**; shown in **Rules** modal. **`RulesModal`** renders `#` title separately and supports **`##`**, ordered lists, bullets.
-2. **`docs/<topic>.md`** — Repo-level notes; **`README.md`** links here for humans.
+2. **`docs/games/<gameId>.md`** — Longer per-game repo notes; **`README.md`** links each file. **`docs/`** root holds project / shell docs (**`architecture.md`**, **`ui-design.md`**, **`multiplayer-chat.md`**, **`audio-cues.md`**).
 
 Keep **`RulesGameId`** in sync with **`GAME_IDS`** in **`rulesSources.ts`**.
 
@@ -147,7 +147,7 @@ Keep **`RulesGameId`** in sync with **`GAME_IDS`** in **`rulesSources.ts`**.
 - **`GameHouseRulesPanel`** (in Rules modal) edits: **match target**, Skyjo **discard-on-face-up-only**, blackjack **dealer hits soft 17**, War **tie pile size** (1 vs 3), and for games in **`GAMES_WITH_DISCARD_RECYCLE_OPTION`** (**skyjo**, **uno**, **crazy-eights**, **canasta**, **poker-draw**, **thirty-one**): **reshuffle discard into draw when the draw pile is empty** (stored as **`reshuffleDiscardWhenDrawEmpty`**).
 - **`createSessionOptionsHouseRules`** merges into **`createSession`**; **`continuationOptionsFromSession`** spreads those options so house rules persist across **next match round**. **`GameModuleContext`** passes **`reshuffleDiscardWhenDrawEmpty`** (and other flags) into **`setup`**; modules that implement recycle call **`recycleDiscardIntoDrawWhenEmpty`** / **`isDeckDrawAvailableAfterOptionalRecycle`** from **`src/core/discardRecycle.ts`**.
 
-Agents changing rules behavior should update **both** the module logic and **`src/rules/*.md`** (and optionally **`docs/`**).
+Agents changing rules behavior should update **both** the module logic and **`src/rules/*.md`** (and optionally **`docs/games/`**).
 
 ---
 
@@ -185,7 +185,7 @@ Agents changing rules behavior should update **both** the module logic and **`sr
 2. Wire **`GAME_SOURCES`** and (if new) **`DECK_SOURCES`** in **`src/data/manifests.ts`** with `?raw` imports.
 3. Add **`src/rules/<id>.md`** and an entry in **`RULES_SOURCES`** (`src/data/rulesSources.ts`); extend **`GameHouseRules`** / panel only if new options are needed. For **draw + discard** games that should support “shuffle discard into draw when draw is empty,” wire **`src/core/discardRecycle.ts`**, set **`discardRecycleWhenDrawEmpty`** on the manifest, register the id in **`GAMES_WITH_DISCARD_RECYCLE_OPTION`**, and mirror the **`GameHouseRulesPanel`** + **`createSession`** pattern used by Skyjo / Uno.
 4. Update **`App.tsx`** if the shell must handle intents, custom buttons, or special UI (copy patterns from similar games).
-5. Add **`docs/<id>.md`** and a **README** table row if you want public doc parity.
+5. Add **`docs/games/<id>.md`** and a **README** table row if you want public doc parity.
 6. Run **`npm run build`** and **`npm run lint`**.
 
 ---

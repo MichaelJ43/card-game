@@ -6,5 +6,5 @@
 
 ## See also
 
-- **In-app rules** (modal text bundled in the app): [`src/rules/canasta.md`](../src/rules/canasta.md)
+- **In-app rules** (modal text bundled in the app): [`src/rules/canasta.md`](../../src/rules/canasta.md)
 - **Wikipedia:** [Canasta](https://en.wikipedia.org/wiki/Canasta)
