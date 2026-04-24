@@ -2,6 +2,7 @@ import { Fragment, useMemo, type MouseEvent } from 'react'
 import { playerSeatLabel } from '../core/playerLabels'
 import type { CardInstance, TableState, Zone } from '../core/types'
 import { CardView } from './CardView'
+import { shouldShowFaceForViewer } from './cardVisibility'
 import type { TableIntent } from './tableIntent'
 import { pointerModifiersFromEvent } from './tableIntent'
 import type { SkyjoDumpUiStep } from './tableUiFlow'
@@ -85,20 +86,6 @@ function zoneLabel(zone: Zone, humanPlayerIndex: number, getSeatDisplayName?: (i
     return i === humanPlayerIndex ? 'Your grid (3×4)' : `${other(i)}'s grid`
   }
   return zone.id
-}
-
-/** For stacks: show depth indicator; last card is visually on top */
-function shouldShowFaceForViewer(
-  zone: Zone,
-  card: CardInstance,
-  _cardIndex: number,
-  humanPlayerIndex: number,
-): boolean {
-  if (!card.faceUp) return false
-  if (zone.ownerPlayerIndex !== undefined && zone.ownerPlayerIndex !== humanPlayerIndex) {
-    if (zone.id.startsWith('pile:') || zone.id.startsWith('hand:')) return false
-  }
-  return true
 }
 
 type LayoutGroup =
