@@ -1,11 +1,11 @@
-# Public DNS in Route 53 when the hosted zone domain equals custom_domain
-# (e.g. zone "cardgame.michaelj43.dev" for site https://cardgame.michaelj43.dev).
+# Public DNS in Route 53 for configured custom hostnames.
+# The hosted zone must contain the site/API/TURN hostnames.
 
 resource "aws_route53_record" "site_apex_a" {
   count = local.create_route53_records ? 1 : 0
 
   zone_id = local.route53_zone_id
-  name    = ""
+  name    = local.site_hostname
   type    = "A"
 
   alias {
@@ -19,7 +19,7 @@ resource "aws_route53_record" "site_apex_aaaa" {
   count = local.create_route53_records ? 1 : 0
 
   zone_id = local.route53_zone_id
-  name    = ""
+  name    = local.site_hostname
   type    = "AAAA"
 
   alias {
@@ -33,7 +33,7 @@ resource "aws_route53_record" "http_api_a" {
   count = local.create_route53_records ? 1 : 0
 
   zone_id = local.route53_zone_id
-  name    = "api"
+  name    = local.http_api_hostname
   type    = "A"
 
   alias {
@@ -47,7 +47,7 @@ resource "aws_route53_record" "ws_api_a" {
   count = local.create_route53_records ? 1 : 0
 
   zone_id = local.route53_zone_id
-  name    = "ws"
+  name    = local.ws_api_hostname
   type    = "A"
 
   alias {

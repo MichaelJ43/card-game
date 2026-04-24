@@ -13,11 +13,11 @@ resource "aws_cloudwatch_log_group" "ws" {
 locals {
   http_lambda_env_turn = local.turn_stack ? {
     TURN_EC2_INSTANCE_ID     = aws_instance.turn[0].id
-    TURN_ROUTE53_ZONE_ID      = local.route53_zone_id
-    TURN_ROUTE53_RECORD_NAME  = "turn.${local.custom_domain_host}"
-    WS_MANAGEMENT_API_URL     = "https://${aws_apigatewayv2_api.ws.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}"
-    TURN_MAX_UPTIME_SECONDS   = "14400"
-    TURN_USAGE_GRACE_SECONDS   = "900"
+    TURN_ROUTE53_ZONE_ID     = local.route53_zone_id
+    TURN_ROUTE53_RECORD_NAME = local.turn_hostname
+    WS_MANAGEMENT_API_URL    = "https://${aws_apigatewayv2_api.ws.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}"
+    TURN_MAX_UPTIME_SECONDS  = "14400"
+    TURN_USAGE_GRACE_SECONDS = "900"
   } : {}
 }
 
@@ -36,9 +36,9 @@ resource "aws_lambda_function" "http" {
   environment {
     variables = merge(
       {
-        ROOMS_TABLE     = aws_dynamodb_table.rooms.name
-        ROOM_JWT_SECRET = var.room_jwt_secret
-        WS_PUBLIC_URL = local.use_custom_domain ? "wss://ws.${local.custom_domain_host}" : "wss://${aws_apigatewayv2_api.ws.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}"
+        ROOMS_TABLE      = aws_dynamodb_table.rooms.name
+        ROOM_JWT_SECRET  = var.room_jwt_secret
+        WS_PUBLIC_URL    = local.use_api_custom_domains ? "wss://${local.ws_api_hostname}" : "wss://${aws_apigatewayv2_api.ws.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}"
         ALLOWED_ORIGIN   = local.site_browser_origin
         ROOM_TTL_SECONDS = tostring(var.room_ttl_seconds)
       },
@@ -64,8 +64,8 @@ resource "aws_lambda_function" "ws" {
 
   environment {
     variables = {
-      ROOMS_TABLE              = aws_dynamodb_table.rooms.name
-      ROOM_JWT_SECRET          = var.room_jwt_secret
+      ROOMS_TABLE               = aws_dynamodb_table.rooms.name
+      ROOM_JWT_SECRET           = var.room_jwt_secret
       WS_CONNECTION_TTL_SECONDS = tostring(var.ws_connection_ttl_seconds)
     }
   }

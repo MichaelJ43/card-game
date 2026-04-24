@@ -21,7 +21,7 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
 
 data "aws_iam_policy_document" "lambda_inline" {
   statement {
-    sid     = "Dynamo"
+    sid = "Dynamo"
     actions = [
       "dynamodb:GetItem",
       "dynamodb:PutItem",

@@ -1,0 +1,291 @@
+name: Preview
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, closed]
+
+permissions:
+  id-token: write
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: preview-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+  TF_STATE_LOCK_TABLE: ${{ secrets.TF_STATE_LOCK_TABLE }}
+  TF_STATE_KEY: card-game/previews/pr-${{ github.event.pull_request.number }}/terraform.tfstate
+  TF_VAR_room_jwt_secret: ${{ secrets.ROOM_JWT_SECRET }}
+  TF_VAR_environment: pr-${{ github.event.pull_request.number }}
+  TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+  TF_VAR_custom_domain: pr-${{ github.event.pull_request.number }}.cardgame.michaelj43.dev
+  TF_VAR_site_hostname: pr-${{ github.event.pull_request.number }}.cardgame.michaelj43.dev
+  TF_VAR_http_api_hostname: api-pr-${{ github.event.pull_request.number }}.cardgame.michaelj43.dev
+  TF_VAR_ws_api_hostname: ws-pr-${{ github.event.pull_request.number }}.cardgame.michaelj43.dev
+  TF_VAR_turn_hostname: turn-pr-${{ github.event.pull_request.number }}.cardgame.michaelj43.dev
+  TF_VAR_site_bucket_force_destroy: "true"
+  TF_VAR_acm_certificate_arn: ${{ secrets.TF_ACM_CERTIFICATE_ARN }}
+  TF_VAR_route53_hosted_zone_id: ${{ secrets.TF_ROUTE53_HOSTED_ZONE_ID }}
+
+jobs:
+  deploy:
+    name: Deploy preview
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Install site deps
+        run: npm ci
+
+      - name: Install Lambda deps
+        working-directory: lambda
+        run: npm ci
+
+      - name: Build Lambdas
+        working-directory: lambda
+        run: npm run build
+
+      - name: Bundle Lambda zips
+        working-directory: lambda
+        run: npm run bundle
+
+      - name: Terraform init
+        working-directory: deploy/terraform/aws
+        run: |
+          terraform init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
+            -backend-config="encrypt=true"
+
+      - name: Terraform apply
+        working-directory: deploy/terraform/aws
+        env:
+          TF_PREVIEW_TURN_EC2_ENABLED: ${{ vars.TF_PREVIEW_TURN_EC2_ENABLED }}
+          TURN_COTURN_STATIC_PASSWORD: ${{ secrets.TURN_COTURN_STATIC_PASSWORD }}
+        run: |
+          set -e
+          if [ "${TF_PREVIEW_TURN_EC2_ENABLED}" = "true" ]; then
+            export TF_VAR_turn_ec2_enabled=true
+            export TF_VAR_turn_coturn_static_password="${TURN_COTURN_STATIC_PASSWORD}"
+          fi
+          terraform apply -auto-approve
+
+      - name: Capture Terraform outputs
+        id: tf
+        working-directory: deploy/terraform/aws
+        run: |
+          echo "site_bucket=$(terraform output -raw site_bucket)" >> "$GITHUB_OUTPUT"
+          echo "cloudfront_distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
+          echo "cloudfront_domain=$(terraform output -raw cloudfront_domain)" >> "$GITHUB_OUTPUT"
+          echo "site_url=$(terraform output -raw site_url)" >> "$GITHUB_OUTPUT"
+          echo "http_api_url=$(terraform output -raw http_api_url)" >> "$GITHUB_OUTPUT"
+          echo "ws_api_url=$(terraform output -raw ws_api_url)" >> "$GITHUB_OUTPUT"
+          TURN_HOST="$(terraform output -raw turn_hostname 2>/dev/null || true)"
+          if [ "$TURN_HOST" = "null" ]; then TURN_HOST=""; fi
+          echo "turn_hostname=${TURN_HOST}" >> "$GITHUB_OUTPUT"
+
+      - name: Build site
+        env:
+          VITE_MULTIPLAYER_HTTP_URL: ${{ steps.tf.outputs.http_api_url }}
+          VITE_MULTIPLAYER_WS_URL: ${{ steps.tf.outputs.ws_api_url }}
+          VITE_MULTIPLAYER_TURN_HOST: ${{ steps.tf.outputs.turn_hostname }}
+          VITE_MULTIPLAYER_TURN_USER: cardgame
+          VITE_MULTIPLAYER_TURN_CREDENTIAL: ${{ secrets.TURN_COTURN_STATIC_PASSWORD }}
+        run: npm run build
+
+      - name: Sync assets to S3
+        run: |
+          aws s3 sync dist/ "s3://${{ steps.tf.outputs.site_bucket }}" \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "index.html"
+          aws s3 cp dist/index.html "s3://${{ steps.tf.outputs.site_bucket }}/index.html" \
+            --cache-control "public, max-age=60, must-revalidate"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.tf.outputs.cloudfront_distribution_id }}" \
+            --paths "/*"
+
+      - name: Comment preview URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- card-game-preview -->';
+            const body = [
+              marker,
+              '### Preview deployment',
+              '',
+              '- Site: ${{ steps.tf.outputs.site_url }}',
+              '- HTTP API: ${{ steps.tf.outputs.http_api_url }}',
+              '- WebSocket API: ${{ steps.tf.outputs.ws_api_url }}',
+              '- CloudFront: https://${{ steps.tf.outputs.cloudfront_domain }}',
+              '',
+              'This preview is isolated to PR #${{ github.event.pull_request.number }} and will be destroyed when the PR closes.',
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) =>
+              comment.user.type === 'Bot' && comment.body.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
+
+      - name: Summary
+        run: |
+          echo "### Preview deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Site: ${{ steps.tf.outputs.site_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- HTTP API: ${{ steps.tf.outputs.http_api_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- WS API: ${{ steps.tf.outputs.ws_api_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Terraform state key: \`${TF_STATE_KEY}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  teardown:
+    name: Teardown preview
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Install Lambda deps
+        working-directory: lambda
+        run: npm ci
+
+      - name: Build Lambdas
+        working-directory: lambda
+        run: npm run build
+
+      - name: Bundle Lambda zips
+        working-directory: lambda
+        run: npm run bundle
+
+      - name: Terraform init
+        working-directory: deploy/terraform/aws
+        run: |
+          terraform init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
+            -backend-config="encrypt=true"
+
+      - name: Terraform destroy
+        working-directory: deploy/terraform/aws
+        env:
+          TF_PREVIEW_TURN_EC2_ENABLED: ${{ vars.TF_PREVIEW_TURN_EC2_ENABLED }}
+          TURN_COTURN_STATIC_PASSWORD: ${{ secrets.TURN_COTURN_STATIC_PASSWORD }}
+        run: |
+          set -e
+          if [ "${TF_PREVIEW_TURN_EC2_ENABLED}" = "true" ]; then
+            export TF_VAR_turn_ec2_enabled=true
+            export TF_VAR_turn_coturn_static_password="${TURN_COTURN_STATIC_PASSWORD}"
+          fi
+          terraform destroy -auto-approve
+
+      - name: Delete preview Terraform state
+        run: aws s3 rm "s3://${TF_STATE_BUCKET}/${TF_STATE_KEY}" || true
+
+      - name: Comment teardown
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- card-game-preview -->';
+            const body = [
+              marker,
+              '### Preview deployment',
+              '',
+              'Preview environment for PR #${{ github.event.pull_request.number }} has been destroyed.',
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) =>
+              comment.user.type === 'Bot' && comment.body.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
+
+      - name: Summary
+        run: |
+          echo "### Preview teardown" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Destroyed PR #${PR_NUMBER} preview resources." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Removed Terraform state key: \`${TF_STATE_KEY}\`" >> "$GITHUB_STEP_SUMMARY"

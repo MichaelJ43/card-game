@@ -1,5 +1,5 @@
-# Optional coturn EC2 + turn.<custom_domain> A record + EventBridge idle scheduler.
-# Requires: custom_domain, Route 53 zone, turn_ec2_enabled = true.
+# Optional coturn EC2 + TURN DNS record + EventBridge idle scheduler.
+# Requires: custom hostnames, Route 53 zone, turn_ec2_enabled = true.
 
 data "aws_vpc" "default" {
   count   = local.turn_stack ? 1 : 0
@@ -71,7 +71,7 @@ resource "aws_instance" "turn" {
   associate_public_ip_address = true
 
   user_data = base64encode(templatefile("${path.module}/turn-user-data.sh.tpl", {
-    realm         = local.custom_domain_host
+    realm         = local.turn_hostname
     turn_user     = "cardgame"
     turn_password = trimspace(var.turn_coturn_static_password)
   }))
@@ -97,7 +97,7 @@ resource "aws_instance" "turn" {
 resource "aws_route53_record" "turn_a" {
   count   = local.turn_stack ? 1 : 0
   zone_id = local.route53_zone_id
-  name    = "turn"
+  name    = local.turn_hostname
   type    = "A"
   ttl     = 60
   records = ["127.0.0.1"]
@@ -162,10 +162,10 @@ resource "aws_lambda_function" "turn_scheduled" {
 
   environment {
     variables = {
-      ROOMS_TABLE               = aws_dynamodb_table.rooms.name
-      TURN_EC2_INSTANCE_ID      = aws_instance.turn[0].id
-      TURN_MAX_UPTIME_SECONDS     = "14400"
-      TURN_USAGE_GRACE_SECONDS    = "900"
+      ROOMS_TABLE              = aws_dynamodb_table.rooms.name
+      TURN_EC2_INSTANCE_ID     = aws_instance.turn[0].id
+      TURN_MAX_UPTIME_SECONDS  = "14400"
+      TURN_USAGE_GRACE_SECONDS = "900"
     }
   }
 

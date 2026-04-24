@@ -3,8 +3,9 @@ locals {
 }
 
 resource "aws_s3_bucket" "site" {
-  bucket = local.site_bucket_name
-  tags   = local.common_tags
+  bucket        = local.site_bucket_name
+  force_destroy = var.site_bucket_force_destroy
+  tags          = local.common_tags
 }
 
 resource "aws_s3_bucket_public_access_block" "site" {
@@ -33,18 +34,43 @@ resource "aws_cloudfront_origin_access_control" "site" {
 }
 
 locals {
-  custom_domain_host = var.custom_domain != null ? trimspace(var.custom_domain) : ""
-  use_custom_domain    = local.custom_domain_host != "" && var.acm_certificate_arn != null && trimspace(var.acm_certificate_arn) != ""
-  route53_zone_id      = var.route53_hosted_zone_id != null ? trimspace(var.route53_hosted_zone_id) : ""
-  create_route53_records = local.use_custom_domain && local.route53_zone_id != ""
+  custom_domain_host  = var.custom_domain != null ? trimspace(var.custom_domain) : ""
+  site_hostname_input = var.site_hostname != null ? trimspace(var.site_hostname) : ""
+  site_hostname = coalesce(
+    local.site_hostname_input != "" ? local.site_hostname_input : null,
+    local.custom_domain_host != "" ? local.custom_domain_host : null,
+    "",
+  )
+  http_api_hostname_input = var.http_api_hostname != null ? trimspace(var.http_api_hostname) : ""
+  http_api_hostname = coalesce(
+    local.http_api_hostname_input != "" ? local.http_api_hostname_input : null,
+    local.site_hostname != "" ? "api.${local.site_hostname}" : null,
+    "",
+  )
+  ws_api_hostname_input = var.ws_api_hostname != null ? trimspace(var.ws_api_hostname) : ""
+  ws_api_hostname = coalesce(
+    local.ws_api_hostname_input != "" ? local.ws_api_hostname_input : null,
+    local.site_hostname != "" ? "ws.${local.site_hostname}" : null,
+    "",
+  )
+  turn_hostname_input = var.turn_hostname != null ? trimspace(var.turn_hostname) : ""
+  turn_hostname = coalesce(
+    local.turn_hostname_input != "" ? local.turn_hostname_input : null,
+    local.site_hostname != "" ? "turn.${local.site_hostname}" : null,
+    "",
+  )
+  use_custom_domain      = local.site_hostname != "" && var.acm_certificate_arn != null && trimspace(var.acm_certificate_arn) != ""
+  use_api_custom_domains = local.use_custom_domain && local.http_api_hostname != "" && local.ws_api_hostname != ""
+  route53_zone_id        = var.route53_hosted_zone_id != null ? trimspace(var.route53_hosted_zone_id) : ""
+  create_route53_records = local.use_api_custom_domains && local.route53_zone_id != ""
   /** Optional coturn EC2 + turn.* DNS + scheduled stop (requires Route 53 on custom domain). */
-  turn_stack = var.turn_ec2_enabled && local.create_route53_records
+  turn_stack = var.turn_ec2_enabled && local.create_route53_records && local.turn_hostname != ""
   # Never call trimspace(null): Terraform may evaluate both branches of a ternary / coalesce args.
   allowed_origin_trimmed = var.allowed_origin != null ? trimspace(var.allowed_origin) : ""
   # Browser Origin header for CORS / Lambda: explicit override, else HTTPS custom host, else CloudFront hostname.
   site_browser_origin = coalesce(
     local.allowed_origin_trimmed != "" ? local.allowed_origin_trimmed : null,
-    local.use_custom_domain ? "https://${local.custom_domain_host}" : null,
+    local.use_custom_domain ? "https://${local.site_hostname}" : null,
     "https://${aws_cloudfront_distribution.site.domain_name}",
   )
 }
@@ -56,7 +82,7 @@ resource "aws_cloudfront_distribution" "site" {
   comment             = "${local.name} static site"
   price_class         = "PriceClass_100"
 
-  aliases = local.use_custom_domain ? [local.custom_domain_host] : []
+  aliases = local.use_custom_domain ? [local.site_hostname] : []
 
   origin {
     domain_name              = aws_s3_bucket.site.bucket_regional_domain_name
@@ -109,8 +135,8 @@ resource "aws_cloudfront_distribution" "site" {
 
 data "aws_iam_policy_document" "site_bucket" {
   statement {
-    sid     = "CloudFrontRead"
-    actions = ["s3:GetObject"]
+    sid       = "CloudFrontRead"
+    actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.site.arn}/*"]
     principals {
       type        = "Service"

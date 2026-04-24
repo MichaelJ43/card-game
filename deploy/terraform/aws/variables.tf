@@ -22,20 +22,50 @@ variable "site_bucket_name" {
   default     = null
 }
 
+variable "site_bucket_force_destroy" {
+  description = "When true, delete all objects while destroying the site bucket. Intended for ephemeral preview environments."
+  type        = bool
+  default     = false
+}
+
 variable "custom_domain" {
-  description = "Optional CloudFront alias (e.g. card-game.example.com). Requires acm_certificate_arn."
+  description = "Optional default site hostname / CloudFront alias (e.g. card-game.example.com). Requires acm_certificate_arn."
+  type        = string
+  default     = null
+}
+
+variable "site_hostname" {
+  description = "Optional explicit site hostname. Defaults to custom_domain when unset."
+  type        = string
+  default     = null
+}
+
+variable "http_api_hostname" {
+  description = "Optional explicit HTTP API hostname. Defaults to api.<site hostname> when unset."
+  type        = string
+  default     = null
+}
+
+variable "ws_api_hostname" {
+  description = "Optional explicit WebSocket API hostname. Defaults to ws.<site hostname> when unset."
+  type        = string
+  default     = null
+}
+
+variable "turn_hostname" {
+  description = "Optional explicit TURN hostname. Defaults to turn.<site hostname> when unset."
   type        = string
   default     = null
 }
 
 variable "acm_certificate_arn" {
-  description = "ACM public cert ARN used for CloudFront (must be in us-east-1) and, when custom_domain is set, for API Gateway custom domains api./ws. (must be in the same region as aws_region — use us-east-1 for both). Must cover custom_domain and api.* / ws.* (e.g. include *.cardgame.example.com)."
+  description = "ACM public cert ARN used for CloudFront (must be in us-east-1) and, when custom hostnames are set, for API Gateway custom domains. (must be in the same region as aws_region — use us-east-1 for both). Must cover the site, HTTP API, WebSocket API, and optional TURN hostnames."
   type        = string
   default     = null
 }
 
 variable "route53_hosted_zone_id" {
-  description = "Optional Route 53 public hosted zone id (e.g. Z…) whose domain name equals custom_domain. When set with custom_domain + acm_certificate_arn, creates alias records: apex → CloudFront, api → HTTP API, ws → WebSocket API."
+  description = "Optional Route 53 public hosted zone id (e.g. Z…) that contains the configured hostnames. When set with hostnames + acm_certificate_arn, creates alias records for site, HTTP API, WebSocket API, and optional TURN."
   type        = string
   default     = null
 }

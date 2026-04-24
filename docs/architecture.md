@@ -186,6 +186,7 @@ DynamoDB is a **single table** for room meta, WebSocket connection rows, reverse
 
 - **CI** — lint, tests, site build, lambda bundle (see `.github/workflows/ci.yml`).
 - **Deploy** — Terraform apply → build site with baked `VITE_*` → S3 sync → CloudFront invalidation (see `.github/workflows/deploy.yml`).
+- **PR previews** — same AWS stack shape with per-PR Terraform state, preview DNS (`pr-<n>`, `api-pr-<n>`, `ws-pr-<n>`, optional `turn-pr-<n>`), and automatic `terraform destroy` on PR close (see `.github/workflows/preview.yml`).
 
 For **variables, secrets, custom domains, TURN secrets, and outputs**, use:
 
