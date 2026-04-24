@@ -32,7 +32,7 @@ import {
   type PeerHostChatLine,
   type PeerHostSnapshot,
 } from './net/protocol'
-import { parseSessionSnapshot, serializeSessionSnapshot } from './net/sessionSnapshot'
+import { parseSessionSnapshot, serializeSessionSnapshotForViewer } from './net/sessionSnapshot'
 import { ChatToastStack } from './ui/ChatToastStack'
 import { MultiplayerPanel } from './ui/MultiplayerPanel'
 import { openChatPopoutWindow } from './ui/openChatPopout'
@@ -476,14 +476,10 @@ function App() {
       if (!roster.some((r) => r.state === 'open')) return
       const sess = sessionRef.current
       if (!sess) return
-      const base = serializeSessionSnapshot(sess)
-      if (!base) return
       const remoteHumans = Math.max(0, sess.manifest.players.human - 1)
-      host.broadcastSnapshot((seat) => ({
-        ...base,
-        viewerSeat: seat,
-        spectator: seat > remoteHumans,
-      }))
+      host.broadcastSnapshot((seat) =>
+        serializeSessionSnapshotForViewer(sess, seat, seat > remoteHumans),
+      )
     }
     pushSnapshotRef.current()
   }, [session])

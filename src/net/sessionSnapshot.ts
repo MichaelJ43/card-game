@@ -2,10 +2,17 @@ import { parseGameManifestYaml } from '../core/loadYaml'
 import { getGameModule } from '../core/registry'
 import type { GameModule } from '../core/gameModule'
 import type { MatchState } from '../core/match'
-import type { GameManifestYaml, TableState } from '../core/types'
+import type { CardInstance, CardTemplate, GameManifestYaml, TableState, Zone } from '../core/types'
 import { GAME_SOURCES } from '../data/manifests'
 import type { AiPlayerConfig, GameSession } from '../session'
 import type { SeatProfile } from '../session/seatProfiles'
+
+export const HIDDEN_CARD_TEMPLATE_ID = '__hidden__'
+
+const HIDDEN_CARD_TEMPLATE: CardTemplate = {
+  id: HIDDEN_CARD_TEMPLATE_ID,
+  label: 'Hidden',
+}
 
 /**
  * When the client falls back to YAML-only manifests (older hosts omitting `manifest` on the wire),
@@ -81,6 +88,77 @@ export function isSessionSnapshotWire(value: unknown): value is SessionSnapshotW
   return typeof v.gameId === 'string' && v.table !== undefined && v.table !== null && 'gameState' in v
 }
 
+function handOwnerFromZone(zone: Zone): number | null {
+  if (!zone.id.startsWith('hand:')) return null
+  if (typeof zone.ownerPlayerIndex === 'number') return zone.ownerPlayerIndex
+  const m = /^hand:(\d+)$/.exec(zone.id)
+  return m ? Number(m[1]) : null
+}
+
+function cardVisibleToViewer(zone: Zone, card: CardInstance, viewerSeat: number, spectator: boolean): boolean {
+  if (card.faceUp) return true
+  if (spectator) return false
+  return handOwnerFromZone(zone) === viewerSeat
+}
+
+function hiddenCard(card: CardInstance): CardInstance {
+  return {
+    ...card,
+    templateId: HIDDEN_CARD_TEMPLATE_ID,
+    faceUp: false,
+  }
+}
+
+/**
+ * Build the table view a specific remote seat is allowed to render:
+ * visible public cards stay visible, the viewer's own hand is revealed, and
+ * other hidden cards are replaced with an opaque placeholder.
+ */
+export function projectTableForViewer(table: TableState, viewerSeat: number, spectator = false): TableState {
+  const projected = JSON.parse(JSON.stringify(table)) as TableState
+  let usedHiddenTemplate = false
+
+  for (const zone of Object.values(projected.zones)) {
+    zone.cards = zone.cards.map((card) => {
+      if (cardVisibleToViewer(zone, card, viewerSeat, spectator)) {
+        const owner = handOwnerFromZone(zone)
+        return owner === viewerSeat && !spectator ? { ...card, faceUp: true } : card
+      }
+      usedHiddenTemplate = true
+      return hiddenCard(card)
+    })
+  }
+
+  if (usedHiddenTemplate) {
+    projected.templates = {
+      ...projected.templates,
+      [HIDDEN_CARD_TEMPLATE_ID]: HIDDEN_CARD_TEMPLATE,
+    }
+  }
+
+  return projected
+}
+
+function projectGameStateForViewer(gameState: unknown, viewerSeat: number, spectator: boolean): unknown {
+  const projected = JSON.parse(JSON.stringify(gameState)) as unknown
+  if (!projected || typeof projected !== 'object') return projected
+
+  const state = projected as {
+    currentPlayer?: unknown
+    pendingDraw?: unknown
+  }
+  if (!state.pendingDraw || typeof state.pendingDraw !== 'object') return projected
+
+  const pending = state.pendingDraw as CardInstance
+  const currentPlayer = typeof state.currentPlayer === 'number' ? state.currentPlayer : null
+  if (!spectator && currentPlayer === viewerSeat) {
+    state.pendingDraw = { ...pending, faceUp: true }
+  } else {
+    state.pendingDraw = hiddenCard(pending)
+  }
+  return projected
+}
+
 /** JSON-safe clone for host → DataChannel (drops functions / cycles). */
 export function serializeSessionSnapshot(session: GameSession): SessionSnapshotWire | null {
   try {
@@ -100,6 +178,22 @@ export function serializeSessionSnapshot(session: GameSession): SessionSnapshotW
     return wire
   } catch {
     return null
+  }
+}
+
+export function serializeSessionSnapshotForViewer(
+  session: GameSession,
+  viewerSeat: number,
+  spectator = false,
+): SessionSnapshotWire | null {
+  const wire = serializeSessionSnapshot(session)
+  if (!wire) return null
+  return {
+    ...wire,
+    table: projectTableForViewer(session.table, viewerSeat, spectator),
+    gameState: projectGameStateForViewer(session.gameState, viewerSeat, spectator),
+    viewerSeat,
+    spectator,
   }
 }
 

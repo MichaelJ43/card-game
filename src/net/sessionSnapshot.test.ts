@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { GameManifestYaml, TableState } from '../core/types'
 import {
+  HIDDEN_CARD_TEMPLATE_ID,
   gridSeatCountFromTable,
   parseWireSeatProfiles,
+  projectTableForViewer,
   reconcileManifestPlayersForTable,
 } from './sessionSnapshot'
 
@@ -74,5 +76,80 @@ describe('parseWireSeatProfiles', () => {
     expect(parseWireSeatProfiles(null)).toBeUndefined()
     expect(parseWireSeatProfiles([])).toBeUndefined()
     expect(parseWireSeatProfiles([{ seat: 0, displayName: 'x' }])).toBeUndefined()
+  })
+})
+
+describe('projectTableForViewer', () => {
+  it('reveals only the viewer hand among hidden hands', () => {
+    const t: TableState = {
+      templates: {
+        a: { id: 'a', rank: 'A', suit: 'spades' },
+        k: { id: 'k', rank: 'K', suit: 'hearts' },
+        q: { id: 'q', rank: 'Q', suit: 'clubs' },
+      },
+      zones: {
+        'hand:0': {
+          id: 'hand:0',
+          kind: 'spread',
+          defaultFaceUp: false,
+          ownerPlayerIndex: 0,
+          cards: [{ instanceId: 'c0', templateId: 'a', faceUp: false }],
+        },
+        'hand:1': {
+          id: 'hand:1',
+          kind: 'spread',
+          defaultFaceUp: false,
+          ownerPlayerIndex: 1,
+          cards: [{ instanceId: 'c1', templateId: 'k', faceUp: false }],
+        },
+        'books:0': {
+          id: 'books:0',
+          kind: 'spread',
+          defaultFaceUp: true,
+          ownerPlayerIndex: 0,
+          cards: [{ instanceId: 'c2', templateId: 'q', faceUp: true }],
+        },
+      },
+      zoneOrder: ['hand:0', 'hand:1', 'books:0'],
+    }
+
+    const projected = projectTableForViewer(t, 1)
+
+    expect(projected.zones['hand:1']!.cards[0]).toMatchObject({
+      templateId: 'k',
+      faceUp: true,
+    })
+    expect(projected.zones['hand:0']!.cards[0]).toMatchObject({
+      templateId: HIDDEN_CARD_TEMPLATE_ID,
+      faceUp: false,
+    })
+    expect(projected.zones['books:0']!.cards[0]).toMatchObject({
+      templateId: 'q',
+      faceUp: true,
+    })
+    expect(t.zones['hand:1']!.cards[0]!.faceUp).toBe(false)
+  })
+
+  it('does not reveal a hand to spectators', () => {
+    const t: TableState = {
+      templates: { a: { id: 'a', rank: 'A', suit: 'spades' } },
+      zones: {
+        'hand:1': {
+          id: 'hand:1',
+          kind: 'spread',
+          defaultFaceUp: false,
+          ownerPlayerIndex: 1,
+          cards: [{ instanceId: 'c1', templateId: 'a', faceUp: false }],
+        },
+      },
+      zoneOrder: ['hand:1'],
+    }
+
+    const projected = projectTableForViewer(t, 1, true)
+
+    expect(projected.zones['hand:1']!.cards[0]).toMatchObject({
+      templateId: HIDDEN_CARD_TEMPLATE_ID,
+      faceUp: false,
+    })
   })
 })
