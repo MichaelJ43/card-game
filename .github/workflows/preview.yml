@@ -10,6 +10,7 @@ permissions:
   issues: write
   pull-requests: write
   actions: write
+  deployments: write
 
 concurrency:
   group: preview-pr-${{ github.event.pull_request.number }}
@@ -280,6 +281,21 @@ jobs:
               aws ec2 delete-snapshot --snapshot-id "$SNAPSHOT" || true
             done
           done
+
+      - name: Mark preview deployment inactive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ENV_NAME: preview-pr-${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          DEPLOYMENT_ID="$(gh api "repos/${GITHUB_REPOSITORY}/deployments" \
+            -f environment="${ENV_NAME}" \
+            --jq '.[0].id' || true)"
+          if [ -n "$DEPLOYMENT_ID" ] && [ "$DEPLOYMENT_ID" != "null" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" \
+              -f state=inactive \
+              -f description="Preview environment destroyed"
+          fi
 
       - name: Comment teardown
         uses: actions/github-script@v7
