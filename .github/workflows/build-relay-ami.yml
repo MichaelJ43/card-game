@@ -121,6 +121,16 @@ jobs:
       - name: Promote AMI variable
         if: inputs.promote && steps.capture.outputs.ami_id != ''
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_VARIABLES_TOKEN }}
           AMI_ID: ${{ steps.capture.outputs.ami_id }}
-        run: gh variable set TF_TURN_AMI_ID --body "$AMI_ID" --repo "$GITHUB_REPOSITORY"
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::GH_VARIABLES_TOKEN is not set; skipping TF_TURN_AMI_ID promotion. This deploy will still use AMI ${AMI_ID} from the current job output."
+            exit 0
+          fi
+          if gh variable set TF_TURN_AMI_ID --body "$AMI_ID" --repo "$GITHUB_REPOSITORY"; then
+            echo "Promoted TF_TURN_AMI_ID=${AMI_ID}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Could not update TF_TURN_AMI_ID. This deploy will still use AMI ${AMI_ID} from the current job output."
+          fi

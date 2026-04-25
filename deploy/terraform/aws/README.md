@@ -84,6 +84,7 @@ Root-level config files keep non-secret sizing defaults out of GitHub Variables:
 
 | GitHub Actions | Value |
 |----------------|--------|
+| **Secret** `GH_VARIABLES_TOKEN` | Fine-grained token with repository **Variables: read/write** permission. Used only by mainline Packer builds to promote `TF_TURN_AMI_ID`; promotion failure is non-blocking. |
 | **Secret** `TURN_COTURN_STATIC_PASSWORD` | Your chosen coturn password (same value for Terraform + browser bundle). |
 | **Variable** `VITE_MULTIPLAYER_TURN_HOST` | Hostname only, e.g. `turn.cardgame.michaelj43.dev` (same as `terraform output -raw turn_hostname`). **Do not** use `https://` or a path. |
 | **Variable** `VITE_MULTIPLAYER_TURN_USER` | `cardgame` (matches Terraform user-data). |
@@ -115,7 +116,7 @@ Then redeploy the site. The HTTP Lambda requests relay capacity on `/turn/start`
 `.github/workflows/build-relay-ami.yml` is used by deploy/preview workflows before Terraform:
 
 - PRs that change the Packer file build a PR-scoped AMI and pass it only to that PR preview deploy.
-- `main` builds promote the AMI by updating repository Variable **`TF_TURN_AMI_ID`**, and the same deploy run uses the fresh AMI output directly.
+- `main` builds promote the AMI by updating repository Variable **`TF_TURN_AMI_ID`** with **`GH_VARIABLES_TOKEN`**, and the same deploy run uses the fresh AMI output directly. If promotion fails, deploy still continues with that run's AMI output.
 - Runs without Packer changes fall back to the current **`TF_TURN_AMI_ID`** value.
 
 PR AMIs are tagged with `CardGameRelayAmiScope=pr` and `CardGamePullRequest=<number>` so preview teardown can deregister them.
