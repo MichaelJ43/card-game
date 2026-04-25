@@ -1,13 +1,11 @@
 import { verifyRoomToken } from './auth'
 import { deleteRoomCascade, getRoom, listConnections } from './storage'
 import {
-  describeInstanceState,
-  instanceStatusChecksOk,
-  startTurnInstance,
-  turnInstanceId,
+  describeTurnCapacity,
+  startTurnCapacity,
   turnRoute53Config,
-  upsertTurnARecord,
-  waitForRunningReady,
+  upsertTurnARecords,
+  type TurnCapacityState,
 } from './turnEc2Ops'
 import {
   ensureLiveRow,
@@ -63,33 +61,49 @@ function jwtSecret(): string {
   return s
 }
 
+async function publishTurnDns(capacity: TurnCapacityState): Promise<string | undefined> {
+  if (!capacity.ready || capacity.publicIps.length === 0) return undefined
+  const r53 = turnRoute53Config()
+  if (!r53) return capacity.publicIps.join(',')
+  await upsertTurnARecords(r53.hostedZoneId, r53.recordName, capacity.publicIps)
+  return capacity.publicIps.join(',')
+}
+
 export async function handleGetTurnStatus(origin?: string) {
-  const instanceId = turnInstanceId()
-  if (!instanceId) return ok({ enabled: false, reason: 'not_configured' }, origin)
   try {
     await ensureSchedulerRowExists()
     const sched = await getSchedulerState()
-    const { state, publicIp } = await describeInstanceState(instanceId)
-    if (state !== 'running') {
-      return ok(
-        {
-          enabled: true,
-          state: state ?? 'unknown',
-          ready: false,
-          publicIp: publicIp ?? null,
-        },
-        origin,
-      )
+    const capacity = await describeTurnCapacity()
+    if (!capacity.configured) return ok({ enabled: false, reason: 'not_configured' }, origin)
+
+    let dnsTarget = sched?.lastDnsIpv4
+    if (capacity.ready) {
+      const published = await publishTurnDns(capacity)
+      if (published && published !== sched?.lastDnsIpv4) {
+        const next: TurnSchedulerState = {
+          pk: TURN_SCHEDULER_PK,
+          sk: TURN_SCHEDULER_SK,
+          nextPollAt: Date.now(),
+          backoffStage: 0,
+          lastInstanceState: capacity.state,
+          lastDnsIpv4: published,
+        }
+        if (sched?.lastStopAt) next.lastStopAt = sched.lastStopAt
+        await putSchedulerState(next)
+        dnsTarget = published
+      }
     }
-    const checksOk = await instanceStatusChecksOk(instanceId)
-    const dnsTarget = sched?.lastDnsIpv4
-    const dnsAligned = !dnsTarget || !publicIp || dnsTarget === publicIp
+    const currentTarget = capacity.publicIps.join(',')
+    const dnsAligned = !dnsTarget || !currentTarget || dnsTarget === currentTarget
     return ok(
       {
         enabled: true,
-        state: 'running',
-        ready: checksOk && !!publicIp && dnsAligned,
-        publicIp: publicIp ?? null,
+        mode: capacity.mode,
+        state: capacity.state,
+        ready: capacity.ready && dnsAligned,
+        publicIp: capacity.publicIps[0] ?? null,
+        publicIps: capacity.publicIps,
+        desiredCapacity: capacity.desiredCapacity,
       },
       origin,
     )
@@ -100,28 +114,23 @@ export async function handleGetTurnStatus(origin?: string) {
 }
 
 export async function handlePostTurnStart(origin?: string) {
-  const instanceId = turnInstanceId()
-  if (!instanceId) return bad(400, 'TURN EC2 not configured', origin)
   await ensureSchedulerRowExists()
   await resetSchedulerBackoff()
   try {
-    await startTurnInstance(instanceId)
+    const started = await startTurnCapacity()
+    if (!started) return bad(400, 'TURN relay not configured', origin)
   } catch (e) {
-    console.error('start instance', e)
-    return bad(500, 'Failed to start instance', origin)
+    console.error('start relay capacity', e)
+    return bad(500, 'Failed to start relay capacity', origin)
   }
-  const ready = await waitForRunningReady(instanceId, { maxWaitMs: 180_000, pollMs: 3000 })
-  if ('error' in ready) {
-    return ok({ enabled: true, state: 'pending', ready: false, message: ready.error }, origin)
-  }
-  const r53 = turnRoute53Config()
-  if (r53) {
-    try {
-      await upsertTurnARecord(r53.hostedZoneId, r53.recordName, ready.publicIp)
-    } catch (e) {
-      console.error('route53', e)
-      return bad(500, 'Instance is up but DNS update failed', origin)
-    }
+
+  const capacity = await describeTurnCapacity()
+  let published: string | undefined
+  try {
+    published = await publishTurnDns(capacity)
+  } catch (e) {
+    console.error('route53', e)
+    return bad(500, 'Relay is starting but DNS update failed', origin)
   }
   const prev = await getSchedulerState()
   const next: TurnSchedulerState = {
@@ -129,12 +138,21 @@ export async function handlePostTurnStart(origin?: string) {
     sk: TURN_SCHEDULER_SK,
     nextPollAt: Date.now(),
     backoffStage: 0,
-    lastInstanceState: 'running',
-    lastDnsIpv4: ready.publicIp,
+    lastInstanceState: capacity.state,
   }
+  if (published) next.lastDnsIpv4 = published
   if (prev?.lastStopAt) next.lastStopAt = prev.lastStopAt
   await putSchedulerState(next)
-  return ok({ enabled: true, state: 'running', ready: true, publicIp: ready.publicIp, estimatedSeconds: 120 }, origin)
+  return ok({
+    enabled: true,
+    mode: capacity.mode,
+    state: capacity.state,
+    ready: capacity.ready && Boolean(published),
+    publicIp: capacity.publicIps[0] ?? null,
+    publicIps: capacity.publicIps,
+    estimatedSeconds: capacity.ready ? 0 : 120,
+    message: capacity.ready ? undefined : 'Relay capacity requested; polling will report ready after EC2 and DNS are ready.',
+  }, origin)
 }
 
 interface HeartbeatBody {

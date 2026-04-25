@@ -17,10 +17,13 @@ export interface JoinRoomResponse {
 
 export interface TurnStatusResponse {
   enabled: boolean
+  mode?: 'instance' | 'asg'
   reason?: string
   state?: string
   ready?: boolean
   publicIp?: string | null
+  publicIps?: string[]
+  desiredCapacity?: number
   message?: string
 }
 

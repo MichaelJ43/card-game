@@ -24,6 +24,12 @@ data "aws_ami" "al2023_x86" {
   }
 }
 
+locals {
+  turn_instance_stack = local.turn_stack && var.turn_compute_mode == "instance"
+  turn_asg_stack      = local.turn_stack && var.turn_compute_mode == "asg"
+  turn_ami_id         = local.turn_stack ? (trimspace(var.turn_ami_id) != "" ? trimspace(var.turn_ami_id) : data.aws_ami.al2023_x86[0].id) : ""
+}
+
 resource "aws_security_group" "turn" {
   count       = local.turn_stack ? 1 : 0
   name        = "${local.name}-coturn"
@@ -46,8 +52,8 @@ resource "aws_security_group" "turn" {
   }
   ingress {
     description = "TURN relay UDP range"
-    from_port   = 49152
-    to_port     = 65535
+    from_port   = var.turn_relay_min_port
+    to_port     = var.turn_relay_max_port
     protocol    = "udp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -63,8 +69,8 @@ resource "aws_security_group" "turn" {
 }
 
 resource "aws_instance" "turn" {
-  count                       = local.turn_stack ? 1 : 0
-  ami                         = data.aws_ami.al2023_x86[0].id
+  count                       = local.turn_instance_stack ? 1 : 0
+  ami                         = local.turn_ami_id
   instance_type               = var.turn_instance_type
   subnet_id                   = sort(tolist(data.aws_subnets.default[0].ids))[0]
   vpc_security_group_ids      = [aws_security_group.turn[0].id]
@@ -74,6 +80,8 @@ resource "aws_instance" "turn" {
     realm         = local.turn_hostname
     turn_user     = "cardgame"
     turn_password = trimspace(var.turn_coturn_static_password)
+    min_port      = var.turn_relay_min_port
+    max_port      = var.turn_relay_max_port
   }))
 
   lifecycle {
@@ -91,6 +99,109 @@ resource "aws_instance" "turn" {
     Name               = "${local.name}-coturn"
     CARDGAME_TURN_LINK = "coturn"
   })
+}
+
+resource "aws_launch_template" "turn" {
+  count = local.turn_asg_stack ? 1 : 0
+
+  name_prefix   = "${local.name}-coturn-"
+  image_id      = local.turn_ami_id
+  instance_type = var.turn_instance_type
+
+  user_data = base64encode(templatefile("${path.module}/turn-user-data.sh.tpl", {
+    realm         = local.turn_hostname
+    turn_user     = "cardgame"
+    turn_password = trimspace(var.turn_coturn_static_password)
+    min_port      = var.turn_relay_min_port
+    max_port      = var.turn_relay_max_port
+  }))
+
+  network_interfaces {
+    associate_public_ip_address = true
+    security_groups             = [aws_security_group.turn[0].id]
+  }
+
+  metadata_options {
+    http_tokens = "required"
+  }
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = merge(local.common_tags, {
+      Name               = "${local.name}-coturn"
+      CARDGAME_TURN_LINK = "coturn"
+    })
+  }
+
+  tag_specifications {
+    resource_type = "volume"
+    tags          = local.common_tags
+  }
+
+  tags = merge(local.common_tags, { CARDGAME_TURN_LINK = "coturn" })
+}
+
+resource "aws_autoscaling_group" "turn" {
+  count = local.turn_asg_stack ? 1 : 0
+
+  name                = "${local.name}-coturn"
+  min_size            = var.turn_asg_min_size
+  desired_capacity    = var.turn_asg_desired_capacity
+  max_size            = var.turn_asg_max_size
+  vpc_zone_identifier = sort(tolist(data.aws_subnets.default[0].ids))
+
+  launch_template {
+    id      = aws_launch_template.turn[0].id
+    version = "$Latest"
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "${local.name}-coturn"
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "CARDGAME_TURN_LINK"
+    value               = "coturn"
+    propagate_at_launch = true
+  }
+
+  dynamic "tag" {
+    for_each = local.common_tags
+    content {
+      key                 = tag.key
+      value               = tag.value
+      propagate_at_launch = true
+    }
+  }
+
+  lifecycle {
+    precondition {
+      condition     = !local.turn_stack || length(trimspace(var.turn_coturn_static_password)) >= 8
+      error_message = "When the TURN EC2 stack is enabled, set turn_coturn_static_password (e.g. TF_VAR_turn_coturn_static_password from GitHub secret TURN_COTURN_STATIC_PASSWORD) to a shared password (min 8 characters) used by both Terraform user-data and VITE_MULTIPLAYER_TURN_CREDENTIAL."
+    }
+    precondition {
+      condition     = var.turn_asg_min_size <= var.turn_asg_desired_capacity && var.turn_asg_desired_capacity <= var.turn_asg_max_size
+      error_message = "TURN ASG capacity must satisfy min <= desired <= max."
+    }
+  }
+}
+
+resource "aws_autoscaling_policy" "turn_cpu_target" {
+  count = local.turn_asg_stack && var.turn_asg_cpu_target_percent > 0 ? 1 : 0
+
+  name                   = "${local.name}-coturn-cpu-target"
+  autoscaling_group_name = aws_autoscaling_group.turn[0].name
+  policy_type            = "TargetTrackingScaling"
+
+  target_tracking_configuration {
+    target_value = var.turn_asg_cpu_target_percent
+
+    predefined_metric_specification {
+      predefined_metric_type = "ASGAverageCPUUtilization"
+    }
+  }
 }
 
 # Placeholder A; Lambda overwrites with live public IP on /turn/start (ignore drift).
@@ -117,14 +228,31 @@ data "aws_iam_policy_document" "lambda_turn" {
     ]
     resources = ["*"]
   }
-  statement {
-    sid = "TurnEc2StartStop"
-    actions = [
-      "ec2:StartInstances",
-      "ec2:StopInstances",
-    ]
-    resources = [aws_instance.turn[0].arn]
+
+  dynamic "statement" {
+    for_each = local.turn_instance_stack ? [1] : []
+    content {
+      sid = "TurnEc2StartStop"
+      actions = [
+        "ec2:StartInstances",
+        "ec2:StopInstances",
+      ]
+      resources = [aws_instance.turn[0].arn]
+    }
   }
+
+  dynamic "statement" {
+    for_each = local.turn_asg_stack ? [1] : []
+    content {
+      sid = "TurnAsgScale"
+      actions = [
+        "autoscaling:DescribeAutoScalingGroups",
+        "autoscaling:SetDesiredCapacity",
+      ]
+      resources = ["*"]
+    }
+  }
+
   statement {
     sid       = "TurnRoute53"
     actions   = ["route53:ChangeResourceRecordSets"]
@@ -163,7 +291,10 @@ resource "aws_lambda_function" "turn_scheduled" {
   environment {
     variables = {
       ROOMS_TABLE              = aws_dynamodb_table.rooms.name
-      TURN_EC2_INSTANCE_ID     = aws_instance.turn[0].id
+      TURN_CONTROL_MODE        = var.turn_compute_mode
+      TURN_EC2_INSTANCE_ID     = local.turn_instance_stack ? aws_instance.turn[0].id : ""
+      TURN_ASG_NAME            = local.turn_asg_stack ? aws_autoscaling_group.turn[0].name : ""
+      TURN_ASG_MIN_SIZE        = tostring(var.turn_asg_min_size)
       TURN_MAX_UPTIME_SECONDS  = "14400"
       TURN_USAGE_GRACE_SECONDS = "900"
     }

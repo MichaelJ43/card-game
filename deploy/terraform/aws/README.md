@@ -16,7 +16,7 @@ Human-facing setup and CI are documented in the repository **README**, **`AGENTS
 | DNS | When custom hostnames + `acm_certificate_arn` + `route53_hosted_zone_id` are set: site **A/AAAA** → CloudFront; HTTP / WebSocket **A** aliases → API Gateway regional domain targets |
 | Data | `aws_dynamodb_table.rooms` (TTL) |
 | Compute | `aws_lambda_function` **http** / **ws** (+ optional **turn-scheduled**), log groups, IAM role + inline policy (+ optional **turn** inline policy) |
-| Optional TURN | When **`turn_ec2_enabled`** and Route 53 are on: coturn **EC2** (default VPC), the configured TURN A record (placeholder `127.0.0.1`; **HTTP Lambda** overwrites with public IP after `/turn/start`), EventBridge **15m** → idle-stop Lambda. **No EIP** (avoids EIP hourly charge while instance is stopped). |
+| Optional TURN | When **`turn_ec2_enabled`** and Route 53 are on: coturn on either a single **EC2** instance or an **Auto Scaling Group** (`turn_compute_mode`), the configured TURN A record (placeholder `127.0.0.1`; Lambdas overwrite it with live public IPs), EventBridge **15m** → idle scale-down Lambda. **No EIP** (avoids EIP hourly charge while stopped / scaled to zero). |
 
 **Certificate / region:** CloudFront requires an ACM cert in **`us-east-1`**. API Gateway regional custom domains use the same **`acm_certificate_arn`** in **`var.aws_region`** — use **`aws_region = "us-east-1"`** unless you split certs (not modeled as separate inputs). The cert must cover the configured site, HTTP API, WebSocket API, and optional TURN hostnames. PR previews use wildcard sibling names such as `pr-123.cardgame.michaelj43.dev`, `api-pr-123.cardgame.michaelj43.dev`, `ws-pr-123.cardgame.michaelj43.dev`, and `turn-pr-123.cardgame.michaelj43.dev`.
 
@@ -37,8 +37,19 @@ Notable optional inputs:
 - **`route53_hosted_zone_id`** — manage the DNS records above (only with custom domain + cert).
 - **`allowed_origin`** — override browser origin string for CORS / Lambda when non-empty.
 - **`aws_region`**, **`project`**, **`environment`**, **`tags`**, **`site_bucket_name`**, **`site_bucket_force_destroy`** (preview teardown only), room / connection TTLs, zip paths, **`site_assets_dir`** (used by automation that syncs `dist/`).
-- **`turn_ec2_enabled`** (default `false`) — optional coturn stack; requires configured custom hostnames, **`acm_certificate_arn`**, and **`route53_hosted_zone_id`**. **`turn_instance_type`**, **`scheduled_lambda_zip`**. **GitHub Deploy** exports `TF_VAR_turn_ec2_enabled` when repository **Variable** **`TF_TURN_EC2_ENABLED`** is `true`; otherwise apply only updates the existing **http** / **ws** Lambdas and APIs (no EC2 or TURN record).
+- **`turn_ec2_enabled`** (default `false`) — optional coturn stack; requires configured custom hostnames, **`acm_certificate_arn`**, and **`route53_hosted_zone_id`**. **GitHub Deploy** exports `TF_VAR_turn_ec2_enabled` when repository **Variable** **`TF_TURN_EC2_ENABLED`** is `true`; otherwise apply only updates the existing **http** / **ws** Lambdas and APIs (no relay compute or TURN record).
+- **`turn_compute_mode`** (`instance` or `asg`) — `instance` preserves the original single-EC2 start/stop model; `asg` creates a launch template, Auto Scaling Group, target-tracking CPU policy, and Lambda desired-capacity control.
+- **`turn_ami_id`** — optional pre-baked coturn AMI. CI updates repository Variable **`TF_TURN_AMI_ID`** after successful mainline Packer builds; deploy/preview/perf pass it as `TF_VAR_turn_ami_id`. Empty falls back to latest AL2023 and user-data installs coturn.
+- **`turn_instance_type`**, **`turn_asg_min_size`**, **`turn_asg_desired_capacity`**, **`turn_asg_max_size`**, **`turn_asg_cpu_target_percent`**, **`turn_relay_min_port`**, **`turn_relay_max_port`** — relay sizing/scaling inputs. Defaults for prod/preview/perf live in root-level `terraform/*.tfvars`.
 - **`turn_coturn_static_password`** (default `""`, sensitive) — **required** when the TURN stack applies: long-term coturn password for user **`cardgame`**. You choose it once (e.g. password generator); pass the same value as GitHub Actions **Secret** **`TURN_COTURN_STATIC_PASSWORD`** so Terraform user-data and the Vite build both use it. Min **8** characters (after trim).
+
+Root-level config files keep non-secret sizing defaults out of GitHub Variables:
+
+| File | Role |
+|------|------|
+| `terraform/prod.tfvars` | Production relay mode and ASG sizing defaults. |
+| `terraform/preview.tfvars` | PR preview defaults, including force-destroy buckets and low-cost relay capacity. |
+| `terraform/relay-perf.tfvars` | Manual relay performance-test defaults. |
 
 ---
 
@@ -65,6 +76,8 @@ Notable optional inputs:
 | `http_regional_domain_name` | `d-…execute-api…` target for the **HTTP** custom domain (compare to Route 53 `api` alias) |
 | `ws_regional_domain_name` | `d-…execute-api…` target for the **WebSocket** custom domain (compare to Route 53 `ws` alias) |
 | `turn_hostname` | e.g. `turn.<custom_domain>` when TURN stack is enabled; else `null` |
+| `turn_compute_mode` | `instance` or `asg` when TURN is enabled; else `null` |
+| `turn_asg_name` | ASG name when `turn_compute_mode = "asg"`; else `null` |
 | `turn_coturn_static_password` | Sensitive echo of the configured coturn password when TURN is on (avoid printing in CI); user **`cardgame`** in user-data |
 
 **TURN / DNS:** There is **no** `VITE_MULTIPLAYER_TURN_URL` — WebRTC uses a `turn:` URL, which the app builds from the host. **One password, one secret:** create a strong password (min 8 characters), store it as GitHub Actions **Secret** **`TURN_COTURN_STATIC_PASSWORD`**. The **Deploy** workflow passes it to Terraform as **`TF_VAR_turn_coturn_static_password`** (coturn on EC2) and to Vite as **`VITE_MULTIPLAYER_TURN_CREDENTIAL`**, so you do not copy values out of `terraform output` after each apply.
@@ -74,6 +87,8 @@ Notable optional inputs:
 | **Secret** `TURN_COTURN_STATIC_PASSWORD` | Your chosen coturn password (same value for Terraform + browser bundle). |
 | **Variable** `VITE_MULTIPLAYER_TURN_HOST` | Hostname only, e.g. `turn.cardgame.michaelj43.dev` (same as `terraform output -raw turn_hostname`). **Do not** use `https://` or a path. |
 | **Variable** `VITE_MULTIPLAYER_TURN_USER` | `cardgame` (matches Terraform user-data). |
+| **Variable** `TF_TURN_AMI_ID` | Generated by mainline Packer builds; deploy/preview/perf use it as the promoted coturn AMI when no PR-scoped AMI was built. |
+| **Variable** `TF_RELAY_PERF_ENABLED` | Set to `true` only when intentionally allowing manual relay perf stacks. |
 
 If you previously used **`VITE_MULTIPLAYER_TURN_CREDENTIAL`** as a separate Actions secret, remove it and use **`TURN_COTURN_STATIC_PASSWORD`** only (both Terraform and Vite read that name in deploy).
 
@@ -91,7 +106,19 @@ If you previously used **`VITE_MULTIPLAYER_TURN_CREDENTIAL`** as a separate Acti
 | **`:` in password** | coturn’s `user=name:secret` line treats the **first** `:` as the split between username and password, so a password may contain **additional** colons. |
 | **`#` in password** | Should be OK in the middle of a `user=` line in `turnserver.conf` (comments are line-oriented); if you hit parse issues, avoid `#` at the start of the password. |
 
-Then redeploy the site. The HTTP Lambda waits for **EC2 status checks OK** before updating Route 53; the scheduled Lambda stops the instance only after **4h uptime** and **15m** without usage heartbeats (see app).
+Then redeploy the site. The HTTP Lambda requests relay capacity on `/turn/start` and returns quickly; `/turn/status` polls readiness and reconciles Route 53 when public relay IPs are healthy. The scheduled Lambda scales down only after **4h uptime** and **15m** without usage heartbeats (see app).
+
+### Packer-built relay AMIs
+
+`packer/relay-coturn.pkr.hcl` builds an Amazon Linux 2023 coturn AMI with packages installed and the service enabled. It does **not** bake TURN credentials into the image; Terraform user-data still writes `/etc/turnserver.conf` with the environment-specific realm, user, password, and relay port range.
+
+`.github/workflows/build-relay-ami.yml` is used by deploy/preview workflows before Terraform:
+
+- PRs that change the Packer file build a PR-scoped AMI and pass it only to that PR preview deploy.
+- `main` builds promote the AMI by updating repository Variable **`TF_TURN_AMI_ID`**, and the same deploy run uses the fresh AMI output directly.
+- Runs without Packer changes fall back to the current **`TF_TURN_AMI_ID`** value.
+
+PR AMIs are tagged with `CardGameRelayAmiScope=pr` and `CardGamePullRequest=<number>` so preview teardown can deregister them.
 
 The site build consumes **`http_api_url`** and **`ws_api_url`** as **`VITE_MULTIPLAYER_HTTP_URL`** / **`VITE_MULTIPLAYER_WS_URL`** when those env vars are not overridden in CI.
 
@@ -116,9 +143,19 @@ Preview hostnames are:
 | WebSocket API | `ws-pr-<number>.cardgame.michaelj43.dev` |
 | Optional TURN | `turn-pr-<number>.cardgame.michaelj43.dev` |
 
-The preview workflow reuses the production AWS secrets (`AWS_ROLE_ARN`, `AWS_REGION`, `TF_STATE_BUCKET`, `TF_STATE_LOCK_TABLE`, `ROOM_JWT_SECRET`, `TF_ACM_CERTIFICATE_ARN`, `TF_ROUTE53_HOSTED_ZONE_ID`). The ACM certificate must cover `*.cardgame.michaelj43.dev`. Per-PR TURN EC2 is controlled by repository Variable `TF_PREVIEW_TURN_EC2_ENABLED`; leave it `false` to avoid preview EC2 cost.
+The preview workflow reuses the production AWS secrets (`AWS_ROLE_ARN`, `AWS_REGION`, `TF_STATE_BUCKET`, `TF_STATE_LOCK_TABLE`, `ROOM_JWT_SECRET`, `TF_ACM_CERTIFICATE_ARN`, `TF_ROUTE53_HOSTED_ZONE_ID`). The ACM certificate must cover `*.cardgame.michaelj43.dev`. Per-PR TURN relay compute is controlled by repository Variable `TF_PREVIEW_TURN_EC2_ENABLED`; leave it `false` to avoid preview EC2/ASG cost. Multiple PRs can be active at once because state keys, environment names, DNS names, and optional relay resources are PR-number scoped.
 
 On PR close, the workflow runs `terraform destroy` with the same state key and variables, then removes the preview state object from S3. `site_bucket_force_destroy` is set for previews so the temporary S3 bucket can be deleted after assets have been uploaded.
+
+## Relay performance workflow
+
+`.github/workflows/relay-perf.yml` is a manual workflow for expensive relay checks. It deploys a separate `perf-pr-<number>` stack with state key:
+
+```bash
+card-game/perf/pr-<number>/terraform.tfstate
+```
+
+It calls `/turn/start`, waits for `/turn/status`, runs `turnutils_uclient` allocation/throughput steps against the TURN host, collects EC2/CloudWatch datapoints where available, uploads raw JSON/Markdown artifacts, and updates one PR comment marked `<!-- card-game-relay-perf -->`. It only runs when repository Variable **`TF_RELAY_PERF_ENABLED`** is `true` and someone starts it with `workflow_dispatch`.
 
 ---
 
@@ -136,4 +173,4 @@ On PR close, the workflow runs `terraform destroy` with the same state key and v
 | `lambda.tf` | Lambdas, env, log groups |
 | `iam.tf` | Execution role + policies |
 | `dynamodb.tf` | Rooms table |
-| `turn.tf` | Optional coturn EC2, SG, Route 53 `turn` A, IAM for EC2/R53, scheduled Lambda + EventBridge |
+| `turn.tf` | Optional coturn single EC2 or ASG, SG, Route 53 `turn` A, IAM for EC2/ASG/R53, scheduled Lambda + EventBridge |

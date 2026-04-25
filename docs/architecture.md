@@ -32,8 +32,8 @@ flowchart TB
     LWs["Lambda: card-game-*-ws"]
     DDB["DynamoDB — rooms + connections + TURN scheduler rows"]
     subgraph OptionalTURN["Optional: TURN stack (Terraform flag)"]
-      EC2["EC2 — coturn"]
-      R53["Route 53 — turn.<apex> A record"]
+      EC2["EC2 or ASG — coturn"]
+      R53["Route 53 — turn.apex A record"]
       LSched["Lambda: turn-scheduled + EventBridge"]
     end
   end
@@ -45,7 +45,7 @@ flowchart TB
   WS --> LWs
   LHttp --> DDB
   LWs --> DDB
-  LHttp -->|Start / Describe / R53 update| EC2
+  LHttp -->|Start or scale / Describe / R53 update| EC2
   LHttp --> R53
   LSched --> EC2
   LSched --> DDB
@@ -144,21 +144,25 @@ sequenceDiagram
   participant U as User (host UI)
   participant Site as Static site bundle
   participant API as HTTP Lambda
-  participant EC2 as coturn EC2
-  participant DNS as Route 53 turn.*
+  participant Relay as coturn EC2 or ASG
+  participant DNS as Route53 turn
 
   U->>Site: Start relay
   Site->>API: POST /turn/start
-  API->>EC2: StartInstances + wait healthy
-  API->>DNS: UPSERT turn A → public IPv4
-  API-->>Site: { ready, publicIp, … }
+  API->>Relay: StartInstances or SetDesiredCapacity
+  API-->>Site: { ready: false, state: pending, … }
+  Site->>API: GET /turn/status
+  API->>Relay: Describe capacity and status checks
+  API->>DNS: UPSERT turn A → live public IPv4s
+  API-->>Site: { ready, publicIps, … }
   Note over Site: WebRTC may now use TURN candidate in ICE
 ```
 
 - **`GET /turn/status`** — cheap poll for “is instance running / DNS aligned / checks OK”.
 - **`POST /turn/heartbeat`** — usage signal for scheduled idle-stop (Dynamo scheduler).
-- **`turn-scheduled` Lambda** — periodic **DescribeInstances** / optional **StopInstances** (see `lambda/src/turnScheduled.ts`, `turn.tf`).
-- Terraform leaves **`turn.<domain>`** at **`127.0.0.1`** until the HTTP path updates it — see deploy README.
+- **`turn-scheduled` Lambda** — periodic **DescribeInstances** / ASG checks / optional **StopInstances** or ASG scale-down (see `lambda/src/turnScheduled.ts`, `turn.tf`).
+- Terraform leaves **`turn.<domain>`** at **`127.0.0.1`** until the HTTP/status path updates it. In ASG mode the record can contain multiple live relay public IPv4s — see deploy README.
+- **Packer AMI flow** — `packer/relay-coturn.pkr.hcl` pre-installs coturn. PR builds use PR-scoped AMIs only; `main` builds promote the AMI id to `TF_TURN_AMI_ID`.
 
 ---
 
@@ -186,7 +190,8 @@ DynamoDB is a **single table** for room meta, WebSocket connection rows, reverse
 
 - **CI** — lint, tests, site build, lambda bundle (see `.github/workflows/ci.yml`).
 - **Deploy** — Terraform apply → build site with baked `VITE_*` → S3 sync → CloudFront invalidation (see `.github/workflows/deploy.yml`).
-- **PR previews** — same AWS stack shape with per-PR Terraform state, preview DNS (`pr-<n>`, `api-pr-<n>`, `ws-pr-<n>`, optional `turn-pr-<n>`), and automatic `terraform destroy` on PR close (see `.github/workflows/preview.yml`).
+- **PR previews** — same AWS stack shape with per-PR Terraform state, preview DNS (`pr-<n>`, `api-pr-<n>`, `ws-pr-<n>`, optional `turn-pr-<n>`), isolated PR AMIs when Packer changes, and automatic `terraform destroy` on PR close (see `.github/workflows/preview.yml`).
+- **Relay perf** — manually deploys a separate `perf-pr-<n>` stack, runs TURN allocation/throughput checks, and comments results back on the PR (see `.github/workflows/relay-perf.yml`).
 
 For **variables, secrets, custom domains, TURN secrets, and outputs**, use:
 

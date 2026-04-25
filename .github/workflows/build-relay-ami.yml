@@ -1,0 +1,126 @@
+name: Build relay AMI
+
+on:
+  workflow_call:
+    inputs:
+      promote:
+        description: Update TF_TURN_AMI_ID after a successful build.
+        required: false
+        type: boolean
+        default: false
+      force_build:
+        description: Build even when the Packer file did not change.
+        required: false
+        type: boolean
+        default: false
+      pr_number:
+        description: Pull request number for PR-scoped AMI tags.
+        required: false
+        type: string
+        default: ""
+    outputs:
+      ami_id:
+        description: AMI id produced by Packer, or empty when skipped.
+        value: ${{ jobs.build.outputs.ami_id }}
+  workflow_dispatch:
+    inputs:
+      promote:
+        description: Update TF_TURN_AMI_ID after a successful build.
+        required: true
+        type: boolean
+        default: false
+      pr_number:
+        description: Optional PR number for PR-scoped AMI tags.
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  id-token: write
+  contents: read
+  actions: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      ami_id: ${{ steps.capture.outputs.ami_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect Packer changes
+        id: changes
+        env:
+          FORCE_BUILD: ${{ inputs.force_build || github.event_name == 'workflow_dispatch' }}
+        run: |
+          set -euo pipefail
+          if [ "${FORCE_BUILD}" = "true" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          elif [ -n "${{ github.event.before || '' }}" ] && [ "${{ github.event.before || '' }}" != "0000000000000000000000000000000000000000" ]; then
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          else
+            BASE="HEAD~1"
+            HEAD="HEAD"
+          fi
+
+          if git diff --name-only "$BASE" "$HEAD" | grep -Eq '^(packer/relay-coturn\.pkr\.hcl|\.github/workflows/build-relay-ami\.yml)$'; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials (OIDC)
+        if: steps.changes.outputs.build == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - uses: hashicorp/setup-packer@v3
+        if: steps.changes.outputs.build == 'true'
+        with:
+          version: latest
+
+      - name: Build coturn AMI
+        if: steps.changes.outputs.build == 'true'
+        env:
+          PKR_VAR_aws_region: ${{ secrets.AWS_REGION }}
+          PKR_VAR_source_sha: ${{ github.sha }}
+          PKR_VAR_pr_number: ${{ inputs.pr_number || github.event.pull_request.number || '' }}
+        run: |
+          set -euo pipefail
+          packer init packer/relay-coturn.pkr.hcl
+          packer validate packer/relay-coturn.pkr.hcl
+          packer build -machine-readable packer/relay-coturn.pkr.hcl | tee packer-relay-ami.log
+
+      - name: Capture AMI id
+        id: capture
+        run: |
+          set -euo pipefail
+          if [ ! -f packer-relay-ami.log ]; then
+            echo "ami_id=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          AMI_ID="$(awk -F, '/artifact,0,id/ {print $6}' packer-relay-ami.log | tail -1 | sed 's/^.*://')"
+          if [ -z "$AMI_ID" ]; then
+            echo "::error::Could not parse AMI id from Packer output."
+            exit 1
+          fi
+          echo "ami_id=${AMI_ID}" >> "$GITHUB_OUTPUT"
+          echo "Built relay AMI: ${AMI_ID}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Promote AMI variable
+        if: inputs.promote && steps.capture.outputs.ami_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AMI_ID: ${{ steps.capture.outputs.ami_id }}
+        run: gh variable set TF_TURN_AMI_ID --body "$AMI_ID" --repo "$GITHUB_REPOSITORY"
