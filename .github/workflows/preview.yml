@@ -48,6 +48,9 @@ jobs:
     needs: build-relay-ami
     if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    environment:
+      name: preview-pr-${{ github.event.pull_request.number }}
+      url: https://pr-${{ github.event.pull_request.number }}.cardgame.michaelj43.dev
     env:
       PACKER_RELAY_AMI_ID: ${{ needs.build-relay-ami.outputs.ami_id }}
       PROMOTED_RELAY_AMI_ID: ${{ vars.TF_TURN_AMI_ID }}
