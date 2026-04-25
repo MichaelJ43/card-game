@@ -309,6 +309,7 @@ sweeper process.
 Required repository **Secrets** for deploy:
 
 - `AWS_ROLE_ARN`, `ROOM_JWT_SECRET`, `AWS_REGION`, `TF_STATE_BUCKET`, `TF_STATE_LOCK_TABLE`.
+- Packer AMI promotion: **`GH_VARIABLES_TOKEN`** — fine-grained token with repository **Variables: read/write** permission. Mainline Packer builds use it to update `TF_TURN_AMI_ID`; promotion failure is non-blocking because deploy still consumes the current job's AMI output.
 - Optional coturn: **`TURN_COTURN_STATIC_PASSWORD`** — required when **`TF_TURN_EC2_ENABLED`** is `true` (same value for Terraform `turn_coturn_static_password` and `VITE_MULTIPLAYER_TURN_CREDENTIAL` in the site build).
 
 Optional repository **Variables** (plaintext) for Vite — set these so every
