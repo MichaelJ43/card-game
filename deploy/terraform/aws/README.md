@@ -12,17 +12,17 @@ Human-facing setup and CI are documented in the repository **README**, **`AGENTS
 |------|-----------|
 | Site | `aws_s3_bucket.site`, OAC, bucket policy, `aws_cloudfront_distribution.site` |
 | APIs | `aws_apigatewayv2_api` (HTTP + WebSocket), integrations, routes, stages, Lambda invoke permissions |
-| Custom TLS | When `custom_domain` + `acm_certificate_arn` are set: CloudFront **aliases** + viewer cert; `aws_apigatewayv2_domain_name` + `aws_apigatewayv2_api_mapping` for `api.<custom_domain>` and `ws.<custom_domain>` |
-| DNS | When `custom_domain` + `acm_certificate_arn` + `route53_hosted_zone_id` are set: `aws_route53_record` apex **A/AAAA** → CloudFront; `api` / `ws` **A** aliases → API Gateway regional domain targets |
+| Custom TLS | When custom hostnames + `acm_certificate_arn` are set: CloudFront **aliases** + viewer cert; `aws_apigatewayv2_domain_name` + `aws_apigatewayv2_api_mapping` for the HTTP and WebSocket API hostnames |
+| DNS | When custom hostnames + `acm_certificate_arn` + `route53_hosted_zone_id` are set: site **A/AAAA** → CloudFront; HTTP / WebSocket **A** aliases → API Gateway regional domain targets |
 | Data | `aws_dynamodb_table.rooms` (TTL) |
 | Compute | `aws_lambda_function` **http** / **ws** (+ optional **turn-scheduled**), log groups, IAM role + inline policy (+ optional **turn** inline policy) |
-| Optional TURN | When **`turn_ec2_enabled`** and Route 53 are on: coturn **EC2** (default VPC), **`turn.<custom_domain>`** A record (placeholder `127.0.0.1`; **HTTP Lambda** overwrites with public IP after `/turn/start`), EventBridge **15m** → idle-stop Lambda. **No EIP** (avoids EIP hourly charge while instance is stopped). |
+| Optional TURN | When **`turn_ec2_enabled`** and Route 53 are on: coturn **EC2** (default VPC), the configured TURN A record (placeholder `127.0.0.1`; **HTTP Lambda** overwrites with public IP after `/turn/start`), EventBridge **15m** → idle-stop Lambda. **No EIP** (avoids EIP hourly charge while instance is stopped). |
 
-**Certificate / region:** CloudFront requires an ACM cert in **`us-east-1`**. API Gateway regional custom domains use the same **`acm_certificate_arn`** in **`var.aws_region`** — use **`aws_region = "us-east-1"`** unless you split certs (not modeled as separate inputs). The cert must cover the site host and **`api.`** / **`ws.`** subdomains if those custom names are used.
+**Certificate / region:** CloudFront requires an ACM cert in **`us-east-1`**. API Gateway regional custom domains use the same **`acm_certificate_arn`** in **`var.aws_region`** — use **`aws_region = "us-east-1"`** unless you split certs (not modeled as separate inputs). The cert must cover the configured site, HTTP API, WebSocket API, and optional TURN hostnames. PR previews use wildcard sibling names such as `pr-123.cardgame.michaelj43.dev`, `api-pr-123.cardgame.michaelj43.dev`, `ws-pr-123.cardgame.michaelj43.dev`, and `turn-pr-123.cardgame.michaelj43.dev`.
 
-**Route 53:** `route53_hosted_zone_id` must refer to a **public** hosted zone whose **zone name equals** `custom_domain` (Terraform creates relative names `""`, `api`, `ws` under that zone). Apex cannot be a plain CNAME; aliases use Route 53 **alias A/AAAA** to CloudFront and **alias A** to API Gateway `domain_name_configuration.target_domain_name` / `hosted_zone_id`.
+**Route 53:** `route53_hosted_zone_id` must refer to a **public** hosted zone containing the configured hostnames. Apex cannot be a plain CNAME; aliases use Route 53 **alias A/AAAA** to CloudFront and **alias A** to API Gateway `domain_name_configuration.target_domain_name` / `hosted_zone_id`.
 
-**Lambda env:** HTTP Lambda `ALLOWED_ORIGIN` / CORS follow `site_browser_origin` in `site.tf` (`allowed_origin` override, else `https://<custom_domain>`, else CloudFront URL). `WS_PUBLIC_URL` uses **`wss://ws.<custom_domain>`** (no path) when a custom domain is enabled—the stage is bound by API mapping; the default execute-api URL still uses **`/{stage}`** (`lambda.tf`).
+**Lambda env:** HTTP Lambda `ALLOWED_ORIGIN` / CORS follow `site_browser_origin` in `site.tf` (`allowed_origin` override, else `https://<site hostname>`, else CloudFront URL). `WS_PUBLIC_URL` uses the configured WebSocket hostname (no path) when a custom domain is enabled—the stage is bound by API mapping; the default execute-api URL still uses **`/{stage}`** (`lambda.tf`).
 
 ---
 
@@ -33,10 +33,11 @@ Defined in **`variables.tf`**. Required for any apply: **`room_jwt_secret`**; La
 Notable optional inputs:
 
 - **`custom_domain`**, **`acm_certificate_arn`** — enable CloudFront alternate name + API Gateway custom domains + vanity-oriented outputs.
+- **`site_hostname`**, **`http_api_hostname`**, **`ws_api_hostname`**, **`turn_hostname`** — optional explicit hostnames. These default to `custom_domain`, `api.<site hostname>`, `ws.<site hostname>`, and `turn.<site hostname>` for production compatibility, and let PR previews use sibling names such as `api-pr-123...`.
 - **`route53_hosted_zone_id`** — manage the DNS records above (only with custom domain + cert).
 - **`allowed_origin`** — override browser origin string for CORS / Lambda when non-empty.
-- **`aws_region`**, **`project`**, **`environment`**, **`tags`**, **`site_bucket_name`**, room / connection TTLs, zip paths, **`site_assets_dir`** (used by automation that syncs `dist/`).
-- **`turn_ec2_enabled`** (default `false`) — optional coturn stack; requires **`custom_domain`**, **`acm_certificate_arn`**, and **`route53_hosted_zone_id`**. **`turn_instance_type`**, **`scheduled_lambda_zip`**. **GitHub Deploy** exports `TF_VAR_turn_ec2_enabled` when repository **Variable** **`TF_TURN_EC2_ENABLED`** is `true`; otherwise apply only updates the existing **http** / **ws** Lambdas and APIs (no EC2 or `turn.*` record).
+- **`aws_region`**, **`project`**, **`environment`**, **`tags`**, **`site_bucket_name`**, **`site_bucket_force_destroy`** (preview teardown only), room / connection TTLs, zip paths, **`site_assets_dir`** (used by automation that syncs `dist/`).
+- **`turn_ec2_enabled`** (default `false`) — optional coturn stack; requires configured custom hostnames, **`acm_certificate_arn`**, and **`route53_hosted_zone_id`**. **`turn_instance_type`**, **`scheduled_lambda_zip`**. **GitHub Deploy** exports `TF_VAR_turn_ec2_enabled` when repository **Variable** **`TF_TURN_EC2_ENABLED`** is `true`; otherwise apply only updates the existing **http** / **ws** Lambdas and APIs (no EC2 or TURN record).
 - **`turn_coturn_static_password`** (default `""`, sensitive) — **required** when the TURN stack applies: long-term coturn password for user **`cardgame`**. You choose it once (e.g. password generator); pass the same value as GitHub Actions **Secret** **`TURN_COTURN_STATIC_PASSWORD`** so Terraform user-data and the Vite build both use it. Min **8** characters (after trim).
 
 ---
@@ -55,8 +56,11 @@ Notable optional inputs:
 | `cloudfront_distribution_id` | For `create-invalidation` |
 | `cloudfront_domain` | `*.cloudfront.net` hostname |
 | `site_url` | `https://<custom_domain>` when configured, else `https://<cloudfront_domain>` |
-| `http_api_url` | `https://api.<custom_domain>` when custom domain is on, else HTTP API `api_endpoint` |
-| `ws_api_url` | `wss://ws.<custom_domain>` (no `/stage` path) when custom domain is on; else default **execute-api** `wss://…amazonaws.com/{stage}` |
+| `http_api_url` | `https://<http_api_hostname>` when custom domain is on, else HTTP API `api_endpoint` |
+| `ws_api_url` | `wss://<ws_api_hostname>` (no `/stage` path) when custom domain is on; else default **execute-api** `wss://…amazonaws.com/{stage}` |
+| `site_hostname` | Resolved custom site hostname when custom domain is on |
+| `http_api_hostname` | Resolved custom HTTP API hostname when custom domain is on |
+| `ws_api_hostname` | Resolved custom WebSocket API hostname when custom domain is on |
 | `rooms_table` | DynamoDB table name |
 | `http_regional_domain_name` | `d-…execute-api…` target for the **HTTP** custom domain (compare to Route 53 `api` alias) |
 | `ws_regional_domain_name` | `d-…execute-api…` target for the **WebSocket** custom domain (compare to Route 53 `ws` alias) |
@@ -92,6 +96,29 @@ Then redeploy the site. The HTTP Lambda waits for **EC2 status checks OK** befor
 The site build consumes **`http_api_url`** and **`ws_api_url`** as **`VITE_MULTIPLAYER_HTTP_URL`** / **`VITE_MULTIPLAYER_WS_URL`** when those env vars are not overridden in CI.
 
 If **`wss://ws.<domain>/prod` returns 403** but **`wss://ws.<domain>` connects**, the stage is already set by **API mapping**—use **no path** in the client URL (Terraform outputs match this). If **`wss://ws.<domain>`** still fails, check the **`ws`** Route 53 alias targets **`ws_regional_domain_name`**, not the HTTP API’s regional hostname.
+
+---
+
+## PR previews
+
+`.github/workflows/preview.yml` creates a full temporary environment for each same-repository PR and destroys it when the PR closes. Each preview uses its own S3 backend key:
+
+```bash
+card-game/previews/pr-<number>/terraform.tfstate
+```
+
+Preview hostnames are:
+
+| Endpoint | Hostname |
+|----------|----------|
+| Site | `pr-<number>.cardgame.michaelj43.dev` |
+| HTTP API | `api-pr-<number>.cardgame.michaelj43.dev` |
+| WebSocket API | `ws-pr-<number>.cardgame.michaelj43.dev` |
+| Optional TURN | `turn-pr-<number>.cardgame.michaelj43.dev` |
+
+The preview workflow reuses the production AWS secrets (`AWS_ROLE_ARN`, `AWS_REGION`, `TF_STATE_BUCKET`, `TF_STATE_LOCK_TABLE`, `ROOM_JWT_SECRET`, `TF_ACM_CERTIFICATE_ARN`, `TF_ROUTE53_HOSTED_ZONE_ID`). The ACM certificate must cover `*.cardgame.michaelj43.dev`. Per-PR TURN EC2 is controlled by repository Variable `TF_PREVIEW_TURN_EC2_ENABLED`; leave it `false` to avoid preview EC2 cost.
+
+On PR close, the workflow runs `terraform destroy` with the same state key and variables, then removes the preview state object from S3. `site_bucket_force_destroy` is set for previews so the temporary S3 bucket can be deleted after assets have been uploaded.
 
 ---
 

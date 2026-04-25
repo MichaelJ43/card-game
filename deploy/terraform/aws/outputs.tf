@@ -15,17 +15,32 @@ output "cloudfront_domain" {
 
 output "site_url" {
   description = "Public site URL."
-  value       = local.use_custom_domain ? "https://${local.custom_domain_host}" : "https://${aws_cloudfront_distribution.site.domain_name}"
+  value       = local.use_custom_domain ? "https://${local.site_hostname}" : "https://${aws_cloudfront_distribution.site.domain_name}"
 }
 
 output "http_api_url" {
-  description = "HTTP API base URL for VITE_MULTIPLAYER_HTTP_URL: vanity https://api.<custom_domain> when custom domain is enabled, else execute-api URL."
-  value       = local.use_custom_domain ? "https://api.${local.custom_domain_host}" : aws_apigatewayv2_api.http.api_endpoint
+  description = "HTTP API base URL for VITE_MULTIPLAYER_HTTP_URL: vanity custom hostname when custom domain is enabled, else execute-api URL."
+  value       = local.use_api_custom_domains ? "https://${local.http_api_hostname}" : aws_apigatewayv2_api.http.api_endpoint
 }
 
 output "ws_api_url" {
-  description = "WebSocket URL for VITE_MULTIPLAYER_WS_URL: vanity wss://ws.<custom_domain> (no path) when custom domain + API mapping bind the stage; default execute-api URL still uses /{stage}."
-  value       = local.use_custom_domain ? "wss://ws.${local.custom_domain_host}" : "wss://${aws_apigatewayv2_api.ws.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}"
+  description = "WebSocket URL for VITE_MULTIPLAYER_WS_URL: vanity custom hostname (no path) when custom domain + API mapping bind the stage; default execute-api URL still uses /{stage}."
+  value       = local.use_api_custom_domains ? "wss://${local.ws_api_hostname}" : "wss://${aws_apigatewayv2_api.ws.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}"
+}
+
+output "site_hostname" {
+  description = "Resolved custom site hostname, if custom domain is enabled."
+  value       = local.use_custom_domain ? local.site_hostname : null
+}
+
+output "http_api_hostname" {
+  description = "Resolved custom HTTP API hostname, if API custom domains are enabled."
+  value       = local.use_api_custom_domains ? local.http_api_hostname : null
+}
+
+output "ws_api_hostname" {
+  description = "Resolved custom WebSocket API hostname, if API custom domains are enabled."
+  value       = local.use_api_custom_domains ? local.ws_api_hostname : null
 }
 
 output "rooms_table" {
@@ -45,7 +60,7 @@ output "ws_regional_domain_name" {
 
 output "turn_hostname" {
   description = "FQDN for coturn when turn_ec2_enabled (use as VITE_MULTIPLAYER_TURN_HOST); null otherwise."
-  value       = local.turn_stack ? "turn.${local.custom_domain_host}" : null
+  value       = local.turn_stack ? local.turn_hostname : null
 }
 
 output "turn_coturn_static_password" {

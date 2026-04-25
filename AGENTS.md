@@ -287,6 +287,11 @@ sweeper process.
 - `.github/workflows/deploy.yml` — OIDC-assumed role; applies Terraform, builds
   the site with endpoint URLs baked in, syncs to S3 and invalidates CloudFront.
   The deploy job targets GitHub **Environment** `production` (deployment history + URL in the repo UI).
+- `.github/workflows/preview.yml` — same-repository PR previews; creates a
+  per-PR Terraform stack/state key on open/update and destroys it on PR close.
+  Preview hostnames are `pr-<n>.cardgame.michaelj43.dev`,
+  `api-pr-<n>.cardgame.michaelj43.dev`, `ws-pr-<n>.cardgame.michaelj43.dev`,
+  and optional `turn-pr-<n>.cardgame.michaelj43.dev`.
 
 Required repository **Secrets** for deploy:
 
@@ -306,6 +311,11 @@ Deploy resolves URLs as: **Variables if non-empty, else Terraform outputs** for 
 Custom site hostname (e.g. `cardgame.michaelj43.dev`): set repository **Variable** `TF_CUSTOM_DOMAIN` and **Secret** `TF_ACM_CERTIFICATE_ARN` (ACM cert must be in **us-east-1**). Optional **Secret** `TF_ROUTE53_HOSTED_ZONE_ID` for Terraform-managed Route 53 aliases. See **`AWS_SETUP.md`** §7 and **`.github/workflows/deploy.yml`**; **`deploy/terraform/aws/README.md`** documents what Terraform creates.
 
 Optional **coturn on EC2** (Terraform `turn_ec2_enabled`: EC2, `turn.<domain>` A record, `turn-scheduled` Lambda): set repository **Variable** `TF_TURN_EC2_ENABLED` to **`true`** so deploy exports `TF_VAR_turn_ec2_enabled`. No effect unless **`TF_ROUTE53_HOSTED_ZONE_ID`** is also set (TURN requires managed apex/api/ws DNS). Defaults stay **off** so merges do not surprise-bill EC2.
+
+PR previews reuse the deploy secrets and require the ACM certificate to cover
+`*.cardgame.michaelj43.dev`. Repository **Variable**
+`TF_PREVIEW_TURN_EC2_ENABLED` controls whether previews create a per-PR coturn
+EC2 instance; keep it **`false`** unless testing TURN specifically.
 
 ### Future backlog (not in this PR)
 
