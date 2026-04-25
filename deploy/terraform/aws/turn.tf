@@ -14,20 +14,28 @@ data "aws_subnets" "default" {
   }
 }
 
-data "aws_ami" "al2023_x86" {
+data "aws_ami" "ubuntu_noble_x86" {
   count       = local.turn_stack ? 1 : 0
   most_recent = true
-  owners      = ["amazon"]
+  owners      = ["099720109477"]
   filter {
     name   = "name"
-    values = ["al2023-ami-202*-kernel-6.1-x86_64"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+  }
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
   }
 }
 
 locals {
   turn_instance_stack = local.turn_stack && var.turn_compute_mode == "instance"
   turn_asg_stack      = local.turn_stack && var.turn_compute_mode == "asg"
-  turn_ami_id         = local.turn_stack ? (trimspace(var.turn_ami_id) != "" ? trimspace(var.turn_ami_id) : data.aws_ami.al2023_x86[0].id) : ""
+  turn_ami_id         = local.turn_stack ? (trimspace(var.turn_ami_id) != "" ? trimspace(var.turn_ami_id) : data.aws_ami.ubuntu_noble_x86[0].id) : ""
 }
 
 resource "aws_security_group" "turn" {

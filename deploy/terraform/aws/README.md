@@ -39,7 +39,7 @@ Notable optional inputs:
 - **`aws_region`**, **`project`**, **`environment`**, **`tags`**, **`site_bucket_name`**, **`site_bucket_force_destroy`** (preview teardown only), room / connection TTLs, zip paths, **`site_assets_dir`** (used by automation that syncs `dist/`).
 - **`turn_ec2_enabled`** (default `false`) — optional coturn stack; requires configured custom hostnames, **`acm_certificate_arn`**, and **`route53_hosted_zone_id`**. **GitHub Deploy** exports `TF_VAR_turn_ec2_enabled` when repository **Variable** **`TF_TURN_EC2_ENABLED`** is `true`; otherwise apply only updates the existing **http** / **ws** Lambdas and APIs (no relay compute or TURN record).
 - **`turn_compute_mode`** (`instance` or `asg`) — `instance` preserves the original single-EC2 start/stop model; `asg` creates a launch template, Auto Scaling Group, target-tracking CPU policy, and Lambda desired-capacity control.
-- **`turn_ami_id`** — optional pre-baked coturn AMI. CI updates repository Variable **`TF_TURN_AMI_ID`** after successful mainline Packer builds; deploy/preview/perf pass it as `TF_VAR_turn_ami_id`. Empty falls back to latest AL2023 and user-data installs coturn.
+- **`turn_ami_id`** — optional pre-baked coturn AMI. CI updates repository Variable **`TF_TURN_AMI_ID`** after successful mainline Packer builds; deploy/preview/perf pass it as `TF_VAR_turn_ami_id`. Empty falls back to latest Ubuntu 24.04 LTS and user-data installs coturn.
 - **`turn_instance_type`**, **`turn_asg_min_size`**, **`turn_asg_desired_capacity`**, **`turn_asg_max_size`**, **`turn_asg_cpu_target_percent`**, **`turn_relay_min_port`**, **`turn_relay_max_port`** — relay sizing/scaling inputs. Defaults for prod/preview/perf live in root-level `terraform/*.tfvars`.
 - **`turn_coturn_static_password`** (default `""`, sensitive) — **required** when the TURN stack applies: long-term coturn password for user **`cardgame`**. You choose it once (e.g. password generator); pass the same value as GitHub Actions **Secret** **`TURN_COTURN_STATIC_PASSWORD`** so Terraform user-data and the Vite build both use it. Min **8** characters (after trim).
 
@@ -110,7 +110,7 @@ Then redeploy the site. The HTTP Lambda requests relay capacity on `/turn/start`
 
 ### Packer-built relay AMIs
 
-`packer/relay-coturn.pkr.hcl` builds an Amazon Linux 2023 coturn AMI with packages installed and the service enabled. It does **not** bake TURN credentials into the image; Terraform user-data still writes `/etc/turnserver.conf` with the environment-specific realm, user, password, and relay port range.
+`packer/relay-coturn.pkr.hcl` builds an Ubuntu 24.04 LTS coturn AMI with packages installed and the service enabled. It does **not** bake TURN credentials into the image; Terraform user-data still writes `/etc/turnserver.conf` with the environment-specific realm, user, password, and relay port range.
 
 `.github/workflows/build-relay-ami.yml` is used by deploy/preview workflows before Terraform:
 

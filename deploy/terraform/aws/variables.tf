@@ -138,7 +138,7 @@ variable "turn_instance_type" {
 }
 
 variable "turn_ami_id" {
-  description = "Optional pre-baked coturn AMI id. When empty, Terraform uses the latest AL2023 AMI and user-data installs coturn at boot."
+  description = "Optional pre-baked coturn AMI id. When empty, Terraform uses the latest Ubuntu 24.04 LTS AMI and user-data installs coturn at boot."
   type        = string
   default     = ""
 }
