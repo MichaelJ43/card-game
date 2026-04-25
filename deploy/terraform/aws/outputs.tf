@@ -63,6 +63,16 @@ output "turn_hostname" {
   value       = local.turn_stack ? local.turn_hostname : null
 }
 
+output "turn_compute_mode" {
+  description = "TURN compute mode when TURN is enabled: instance or asg."
+  value       = local.turn_stack ? var.turn_compute_mode : null
+}
+
+output "turn_asg_name" {
+  description = "Auto Scaling Group name for ASG-backed TURN; null otherwise."
+  value       = local.turn_asg_stack ? aws_autoscaling_group.turn[0].name : null
+}
+
 output "turn_coturn_static_password" {
   description = "Echo of turn_coturn_static_password when TURN stack is on (sensitive). Prefer defining the password only in CI/GitHub secret TURN_COTURN_STATIC_PASSWORD; do not log this output in pipelines."
   value       = local.turn_stack && length(trimspace(var.turn_coturn_static_password)) > 0 ? trimspace(var.turn_coturn_static_password) : null

@@ -12,7 +12,10 @@ resource "aws_cloudwatch_log_group" "ws" {
 
 locals {
   http_lambda_env_turn = local.turn_stack ? {
-    TURN_EC2_INSTANCE_ID     = aws_instance.turn[0].id
+    TURN_CONTROL_MODE        = var.turn_compute_mode
+    TURN_EC2_INSTANCE_ID     = local.turn_instance_stack ? aws_instance.turn[0].id : ""
+    TURN_ASG_NAME            = local.turn_asg_stack ? aws_autoscaling_group.turn[0].name : ""
+    TURN_ASG_MIN_SIZE        = tostring(var.turn_asg_min_size)
     TURN_ROUTE53_ZONE_ID     = local.route53_zone_id
     TURN_ROUTE53_RECORD_NAME = local.turn_hostname
     WS_MANAGEMENT_API_URL    = "https://${aws_apigatewayv2_api.ws.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}"
@@ -31,7 +34,7 @@ resource "aws_lambda_function" "http" {
   source_code_hash = filebase64sha256(var.http_lambda_zip)
 
   memory_size = 256
-  timeout     = local.turn_stack ? 180 : 10
+  timeout     = 10
 
   environment {
     variables = merge(

@@ -6,10 +6,10 @@ import {
   updateSchedulerAfterStopPoll,
 } from './turnState'
 import {
-  describeInstanceState,
-  instanceStatusChecksOk,
-  stopTurnInstance,
-  turnInstanceId,
+  describeTurnCapacity,
+  stopTurnCapacity,
+  turnRoute53Config,
+  upsertTurnARecords,
 } from './turnEc2Ops'
 
 function maxUptimeMs(): number {
@@ -29,9 +29,6 @@ function usageGraceMs(): number {
  * may stop the TURN EC2 when uptime and idle conditions match (prefer staying on).
  */
 export const handler = async (): Promise<void> => {
-  const instanceId = turnInstanceId()
-  if (!instanceId) return
-
   await ensureSchedulerRowExists()
   const sched = await getSchedulerState()
   const nextAt = sched?.nextPollAt ?? 0
@@ -46,17 +43,19 @@ export const handler = async (): Promise<void> => {
     return
   }
 
-  let state: string | undefined
-  let launchTime: Date | undefined
+  const capacity = await describeTurnCapacity()
+  if (!capacity.configured) return
+
   try {
-    const d = await describeInstanceState(instanceId)
-    state = d.state
-    launchTime = d.launchTime
+    const r53 = turnRoute53Config()
+    if (r53 && capacity.publicIps.length > 0) {
+      await upsertTurnARecords(r53.hostedZoneId, r53.recordName, capacity.publicIps)
+    }
   } catch (e) {
-    console.warn('turn scheduled: describe failed', e)
-    return
+    console.warn('turn scheduled: DNS reconcile failed', e)
   }
 
+  const state = capacity.state
   if (state === 'stopping') return
 
   if (state === 'stopped') {
@@ -66,21 +65,23 @@ export const handler = async (): Promise<void> => {
 
   if (state !== 'running') return
 
-  const checksOk = await instanceStatusChecksOk(instanceId)
-  if (!checksOk) return
-
-  const launchMs = launchTime?.getTime()
-  if (launchMs == null || !Number.isFinite(launchMs)) return
+  const launchTimes = capacity.instances
+    .filter((i) => i.state === 'running' && i.checksOk)
+    .map((i) => i.launchTime?.getTime())
+    .filter((t): t is number => typeof t === 'number' && Number.isFinite(t))
+  if (launchTimes.length === 0) return
 
   const now = Date.now()
-  if (now - launchMs < maxUptimeMs()) return
+  if (now - Math.min(...launchTimes) < maxUptimeMs()) return
 
   if (liveLast > 0 && now - liveLast < usageGraceMs()) return
 
   try {
-    await stopTurnInstance(instanceId)
+    await stopTurnCapacity()
+    const r53 = turnRoute53Config()
+    if (r53) await upsertTurnARecords(r53.hostedZoneId, r53.recordName, [])
     await updateSchedulerAfterStopPoll()
   } catch (e) {
-    console.error('turn scheduled: stop failed', e)
+    console.error('turn scheduled: scale down failed', e)
   }
 }

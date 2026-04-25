@@ -212,11 +212,13 @@ npm run bundle  # zip dist/ into http.zip + websocket.zip for Terraform
 npm run test    # vitest run
 ```
 
-Infra lives in `deploy/terraform/aws/` (see its `README.md`). The GitHub Actions
-workflow `.github/workflows/deploy.yml` runs build + bundle + terraform apply +
-S3 sync + CloudFront invalidation on pushes to `main`. One-time AWS/GitHub
-bootstrap steps are tracked in the gitignored `AWS_SETUP.md` (kept out of the
-repo on purpose).
+Infra lives in `deploy/terraform/aws/` (see its `README.md`). Root-level
+`terraform/*.tfvars` files hold non-secret environment defaults for prod,
+preview, and relay perf runs. The GitHub Actions workflow
+`.github/workflows/deploy.yml` runs build + bundle + terraform apply + S3 sync
++ CloudFront invalidation on pushes to `main`. One-time AWS/GitHub bootstrap
+steps are tracked in the gitignored `AWS_SETUP.md` (kept out of the repo on
+purpose).
 
 ---
 
@@ -284,14 +286,25 @@ sweeper process.
 ### GitHub Actions
 
 - `.github/workflows/ci.yml` — lint, test (site + lambda), build on every PR/push.
-- `.github/workflows/deploy.yml` — OIDC-assumed role; applies Terraform, builds
-  the site with endpoint URLs baked in, syncs to S3 and invalidates CloudFront.
-  The deploy job targets GitHub **Environment** `production` (deployment history + URL in the repo UI).
+- `.github/workflows/deploy.yml` — OIDC-assumed role; optionally builds a fresh
+  relay AMI when `packer/relay-coturn.pkr.hcl` changed, applies Terraform,
+  builds the site with endpoint URLs baked in, syncs to S3 and invalidates
+  CloudFront. The deploy job targets GitHub **Environment** `production`
+  (deployment history + URL in the repo UI).
 - `.github/workflows/preview.yml` — same-repository PR previews; creates a
   per-PR Terraform stack/state key on open/update and destroys it on PR close.
   Preview hostnames are `pr-<n>.cardgame.michaelj43.dev`,
   `api-pr-<n>.cardgame.michaelj43.dev`, `ws-pr-<n>.cardgame.michaelj43.dev`,
-  and optional `turn-pr-<n>.cardgame.michaelj43.dev`.
+  and optional `turn-pr-<n>.cardgame.michaelj43.dev`. If a PR changes the relay
+  Packer file, preview builds a PR-scoped AMI and passes it only to that PR
+  stack; it never updates the main `TF_TURN_AMI_ID` variable.
+- `.github/workflows/build-relay-ami.yml` — reusable/manual Packer workflow for
+  `packer/relay-coturn.pkr.hcl`. `main` builds promote the AMI id to repository
+  Variable `TF_TURN_AMI_ID`; PR builds are isolated and cleaned up with preview
+  teardown.
+- `.github/workflows/relay-perf.yml` — manual, gated relay perf workflow. It
+  creates a separate `perf-pr-<n>` stack, runs TURN allocation/throughput checks,
+  uploads raw artifacts, and updates a PR comment.
 
 Required repository **Secrets** for deploy:
 
@@ -312,10 +325,22 @@ Custom site hostname (e.g. `cardgame.michaelj43.dev`): set repository **Variable
 
 Optional **coturn on EC2** (Terraform `turn_ec2_enabled`: EC2, `turn.<domain>` A record, `turn-scheduled` Lambda): set repository **Variable** `TF_TURN_EC2_ENABLED` to **`true`** so deploy exports `TF_VAR_turn_ec2_enabled`. No effect unless **`TF_ROUTE53_HOSTED_ZONE_ID`** is also set (TURN requires managed apex/api/ws DNS). Defaults stay **off** so merges do not surprise-bill EC2.
 
+Relay compute can run in either the legacy single-instance mode or ASG mode via
+`turn_compute_mode` in `terraform/prod.tfvars` / `terraform/preview.tfvars` /
+`terraform/relay-perf.tfvars`. The current planned default is ASG-backed coturn:
+`/turn/start` sets desired capacity to at least one, `/turn/status` reconciles
+Route 53 with healthy relay IPs, and `turn-scheduled` scales back down after
+uptime/idle rules. `TF_TURN_AMI_ID` is a generated repository Variable managed
+by the Packer workflow; do not hard-code AMI ids in docs or workflows unless
+debugging a one-off run.
+
 PR previews reuse the deploy secrets and require the ACM certificate to cover
 `*.cardgame.michaelj43.dev`. Repository **Variable**
-`TF_PREVIEW_TURN_EC2_ENABLED` controls whether previews create a per-PR coturn
-EC2 instance; keep it **`false`** unless testing TURN specifically.
+`TF_PREVIEW_TURN_EC2_ENABLED` controls whether previews create per-PR coturn
+relay compute; keep it **`false`** unless testing TURN specifically.
+
+Repository **Variable** `TF_RELAY_PERF_ENABLED` gates the manual relay perf
+workflow. Keep it **`false`** unless intentionally running capacity tests.
 
 ### Future backlog (not in this PR)
 

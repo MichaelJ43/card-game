@@ -137,6 +137,59 @@ variable "turn_instance_type" {
   default     = "t3.micro"
 }
 
+variable "turn_ami_id" {
+  description = "Optional pre-baked coturn AMI id. When empty, Terraform uses the latest Ubuntu 24.04 LTS AMI and user-data installs coturn at boot."
+  type        = string
+  default     = ""
+}
+
+variable "turn_compute_mode" {
+  description = "Compute mode for the optional coturn relay: instance keeps the original single EC2 start/stop model; asg uses a launch template and Auto Scaling Group."
+  type        = string
+  default     = "instance"
+
+  validation {
+    condition     = contains(["instance", "asg"], var.turn_compute_mode)
+    error_message = "turn_compute_mode must be either \"instance\" or \"asg\"."
+  }
+}
+
+variable "turn_asg_min_size" {
+  description = "Minimum capacity for ASG-backed TURN. Use 0 for on-demand/ephemeral stacks, 1+ for always-warm production relay."
+  type        = number
+  default     = 0
+}
+
+variable "turn_asg_desired_capacity" {
+  description = "Initial desired capacity for ASG-backed TURN."
+  type        = number
+  default     = 0
+}
+
+variable "turn_asg_max_size" {
+  description = "Maximum capacity for ASG-backed TURN."
+  type        = number
+  default     = 1
+}
+
+variable "turn_asg_cpu_target_percent" {
+  description = "Target average CPU utilization for ASG-backed TURN target tracking. Set to 0 to disable the default target-tracking policy."
+  type        = number
+  default     = 60
+}
+
+variable "turn_relay_min_port" {
+  description = "Minimum UDP relay port exposed by coturn."
+  type        = number
+  default     = 49152
+}
+
+variable "turn_relay_max_port" {
+  description = "Maximum UDP relay port exposed by coturn."
+  type        = number
+  default     = 65535
+}
+
 variable "scheduled_lambda_zip" {
   description = "Path to turnScheduled.zip from lambda/scripts/bundle.mjs."
   type        = string
