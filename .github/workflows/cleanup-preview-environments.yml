@@ -1,0 +1,36 @@
+name: Cleanup Preview Environments
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview deletions without removing environments"
+        type: boolean
+        default: true
+      keep:
+        description: "Number of newest preview-pr-* environments to keep"
+        type: number
+        default: 10
+
+permissions:
+  contents: read
+  actions: write
+  deployments: read
+
+jobs:
+  cleanup:
+    name: Cleanup preview environments
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cleanup preview environments
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_ENVIRONMENTS_TOKEN || github.token }}
+          KEEP_PREVIEW_ENVIRONMENTS: ${{ inputs.keep }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: node scripts/github/cleanup-preview-environments.mjs

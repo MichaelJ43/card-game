@@ -305,11 +305,16 @@ sweeper process.
 - `.github/workflows/relay-perf.yml` — manual, gated relay perf workflow. It
   creates a separate `perf-pr-<n>` stack, runs TURN allocation/throughput checks,
   uploads raw artifacts, and updates a PR comment.
+- `.github/workflows/cleanup-preview-environments.yml` — manual cleanup for
+  stale GitHub **Environment** records named `preview-pr-*`. It keeps the newest
+  preview environments (default: 10) and only deletes older entries whose latest
+  deployment status is `inactive`; dry-run is the default.
 
 Required repository **Secrets** for deploy:
 
 - `AWS_ROLE_ARN`, `ROOM_JWT_SECRET`, `AWS_REGION`, `TF_STATE_BUCKET`, `TF_STATE_LOCK_TABLE`.
 - Packer AMI promotion: **`GH_VARIABLES_TOKEN`** — fine-grained token with repository **Variables: read/write** permission. Mainline Packer builds use it to update `TF_TURN_AMI_ID`; promotion failure is non-blocking because deploy still consumes the current job's AMI output.
+- Optional environment cleanup: **`GH_ENVIRONMENTS_TOKEN`** — repository token for deleting GitHub Environments if the default `GITHUB_TOKEN` cannot delete `preview-pr-*` environment records. A classic token with `repo` scope is sufficient for private repos per GitHub's environment API docs.
 - Optional coturn: **`TURN_COTURN_STATIC_PASSWORD`** — required when **`TF_TURN_EC2_ENABLED`** is `true` (same value for Terraform `turn_coturn_static_password` and `VITE_MULTIPLAYER_TURN_CREDENTIAL` in the site build).
 
 Optional repository **Variables** (plaintext) for Vite — set these so every
