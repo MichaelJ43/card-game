@@ -41,6 +41,10 @@ Choosing another entry in the **Game** menu updates the selection only; press **
 
 Use **Rules** (next to **End game**) to open a modal with the in-app rules for the **currently selected** game (you can read them before **Start deal**).
 
+### Analytics
+
+The browser entries load `https://static.michaelj43.dev/v1/m43-analytics.js` with app id `card-game`. It records pageview events to `https://api.michaelj43.dev/analytics/events?v=1`; add `?m43debug=1` to a page URL to see client diagnostics in the browser console.
+
 Production build and local preview of the built assets:
 
 ```bash
