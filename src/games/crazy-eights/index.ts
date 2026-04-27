@@ -1,5 +1,7 @@
+import type { AiDifficulty } from '../../core/aiContext'
+import { aiIsExpert } from '../../core/aiPlaystyle'
 import type { ApplyResult, GameModule, SelectAiContext } from '../../core/gameModule'
-import type { CardTemplate, GameAction, GameManifestYaml } from '../../core/types'
+import type { CardInstance, CardTemplate, GameAction, GameManifestYaml } from '../../core/types'
 import { registerGameModule } from '../../core/registry'
 import { recycleDiscardIntoDrawWhenEmpty, isDeckDrawAvailableAfterOptionalRecycle } from '../../core/discardRecycle'
 import { mulberry32, shuffleInPlace } from '../../core/shuffle'
@@ -48,6 +50,61 @@ function canPlay(
 }
 
 const SUITS = ['spades', 'hearts', 'diamonds', 'clubs'] as const
+
+function rankC8Strength(rank: string | undefined): number {
+  if (!rank) return 0
+  if (rank === 'A') return 14
+  if (rank === 'K') return 13
+  if (rank === 'Q') return 12
+  if (rank === 'J') return 11
+  if (rank === '8') return 0
+  const n = Number(rank)
+  return Number.isFinite(n) ? n : 0
+}
+
+function enumerateCrazy8Plays(
+  table: TableState,
+  gs: Crazy8sGameState,
+  playerIndex: number,
+): GameAction[] {
+  const top = topDiscard(table)
+  if (!top) return []
+  const hz = table.zones[handId(playerIndex)]!.cards
+  const out: GameAction[] = []
+  hz.forEach((c, i) => {
+    if (canPlay(table.templates, c.templateId, top, gs.currentSuit)) {
+      if (table.templates[c.templateId]?.rank === '8') {
+        for (const s of SUITS) {
+          out.push({ type: 'custom', payload: { cmd: 'c8Play', index: i, suit: s } })
+        }
+      } else {
+        out.push({ type: 'custom', payload: { cmd: 'c8Play', index: i } })
+      }
+    }
+  })
+  if (isDeckDrawAvailableAfterOptionalRecycle(table, gs.reshuffleDiscardWhenDrawEmpty, true)) {
+    out.push({ type: 'custom', payload: { cmd: 'c8Draw' } })
+  }
+  return out
+}
+
+function bestSuitOnEight(
+  _table: TableState,
+  hand: CardInstance[],
+  playIndex: number,
+  templates: Record<string, CardTemplate>,
+  rng: () => number,
+  d: AiDifficulty,
+): (typeof SUITS)[number] {
+  const rem = hand.filter((_, j) => j !== playIndex)
+  const countBySuit = (s: string) =>
+    rem.filter((c) => (templates[c.templateId]?.suit as string | undefined) === s).length
+  const scored = SUITS.map((s) => ({ s, n: countBySuit(s) })).sort((a, b) => b.n - a.n)
+  if (d === 'easy' || d === 'medium') return scored[Math.floor(rng() * scored.length)]!.s
+  if (d === 'hard') return scored[0]!.s
+  if (aiIsExpert(d) && rng() < 0.14 && scored.length > 1) return scored[1]!.s
+  return scored[0]!.s
+}
 
 const crazy8sModule: GameModule<Crazy8sGameState> = {
   moduleId: 'crazy-eights',
@@ -202,28 +259,74 @@ const crazy8sModule: GameModule<Crazy8sGameState> = {
     return { table: t, gameState: gs, error: 'Unknown.' }
   },
 
-  selectAiAction(table, gs, playerIndex, rng, _ctx: SelectAiContext): GameAction | null {
+  selectAiAction(table, gs, playerIndex, rng, context: SelectAiContext): GameAction | null {
     if (gs.phase !== 'play' || gs.currentPlayer !== playerIndex) return null
-    const top = topDiscard(table)
-    if (!top) return null
+    const d = context.difficulty
+    const tpl = table.templates
     const hz = table.zones[handId(playerIndex)]!.cards
-    const legalIdx: number[] = []
-    hz.forEach((c, i) => {
-      if (canPlay(table.templates, c.templateId, top, gs.currentSuit)) legalIdx.push(i)
-    })
-    if (legalIdx.length > 0) {
-      const pick = legalIdx[Math.floor(rng() * legalIdx.length)]!
-      const card = hz[pick]!
-      if (table.templates[card.templateId]?.rank === '8') {
-        const s = SUITS[Math.floor(rng() * 4)]!
-        return { type: 'custom', payload: { cmd: 'c8Play', index: pick, suit: s } }
+    const actions = enumerateCrazy8Plays(table, gs, playerIndex)
+    if (actions.length === 0) return null
+
+    type CustomA = Extract<GameAction, { type: 'custom' }>
+    const plays = actions.filter((a): a is CustomA => a.type === 'custom' && cmd(a.payload) === 'c8Play')
+    const draws = actions.filter((a): a is CustomA => a.type === 'custom' && cmd(a.payload) === 'c8Draw')
+
+    const hasPlay = plays.length > 0
+    if (d === 'easy' && hasPlay && draws.length > 0 && rng() < 0.28) {
+      return draws[0]!
+    }
+
+    if (!hasPlay) return draws[0] ?? null
+
+    if (d === 'easy' || d === 'medium') {
+      const a = plays[Math.floor(rng() * plays.length)]!
+      const p = a.payload as { index?: number; suit?: string }
+      const i = Number(p.index)
+      const c = hz[i]!
+      if (tpl[c.templateId]?.rank === '8') {
+        const s = p.suit && SUITS.includes(p.suit as (typeof SUITS)[number]) ? p.suit : bestSuitOnEight(table, hz, i, tpl, rng, d)
+        return { type: 'custom', payload: { cmd: 'c8Play', index: i, suit: s } }
       }
-      return { type: 'custom', payload: { cmd: 'c8Play', index: pick } }
+      return { type: 'custom', payload: { cmd: 'c8Play', index: i } }
     }
-    if (isDeckDrawAvailableAfterOptionalRecycle(table, gs.reshuffleDiscardWhenDrawEmpty, true)) {
-      return { type: 'custom', payload: { cmd: 'c8Draw' } }
+
+    const score = (a: CustomA): number => {
+      const c0 = cmd(a.payload as Record<string, unknown>)
+      if (c0 === 'c8Draw') return 5000
+      const p = a.payload as { index?: number }
+      const i = Number(p.index)
+      const t = hz[i]!
+      const r = tpl[t.templateId]?.rank
+      if (r === '8') return 1200
+      return 1000 - rankC8Strength(r)
     }
-    return null
+
+    if (d === 'hard' || d === 'expert') {
+      if (d === 'expert' && rng() < 0.12) {
+        const eights = plays.filter((a) => {
+          const i = Number((a.payload as { index?: number }).index)
+          return tpl[hz[i]!.templateId]?.rank === '8'
+        })
+        const non8 = plays.filter((a) => {
+          const i2 = Number((a.payload as { index?: number }).index)
+          return tpl[hz[i2]!.templateId]?.rank !== '8'
+        })
+        if (eights.length > 0 && non8.length > 0 && rng() < 0.55) {
+          const a = non8.sort((a, b) => score(a) - score(b))[0]!
+          const p = a.payload as { index?: number }
+          return { type: 'custom', payload: { cmd: 'c8Play', index: p.index } }
+        }
+      }
+      const best = plays.slice().sort((a, b) => score(a) - score(b))[0]!
+      const p = best.payload as { index?: number; suit?: string }
+      const i = Number(p.index)
+      if (tpl[hz[i]!.templateId]?.rank === '8') {
+        const s = bestSuitOnEight(table, hz, i, tpl, rng, d)
+        return { type: 'custom', payload: { cmd: 'c8Play', index: i, suit: s } }
+      }
+      return { type: 'custom', payload: { cmd: 'c8Play', index: i } }
+    }
+    return plays[0]!
   },
 
   statusText(_t, gs) {
