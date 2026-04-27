@@ -57,8 +57,20 @@ const CONFIGURABLE_AI_GAME_IDS = new Set([
   'sequence-race',
 ])
 
-/** Games where `selectAiAction` uses {@link AiDifficulty} (per-seat). */
-const AI_DIFFICULTY_GAME_IDS = new Set(['go-fish', 'skyjo'])
+/** Games where `selectAiAction` uses {@link AiDifficulty} (per-seat); toolbar shows difficulty. */
+const AI_DIFFICULTY_GAME_IDS = new Set([
+  'go-fish',
+  'skyjo',
+  'crazy-eights',
+  'switch',
+  'uno',
+  'thirty-one',
+  'euchre',
+  'durak',
+  'pinochle',
+  'canasta',
+  'sequence-race',
+])
 
 export function gameSupportsPerSeatAiDifficulty(gameId: string): boolean {
   return AI_DIFFICULTY_GAME_IDS.has(gameId)

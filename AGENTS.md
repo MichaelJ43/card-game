@@ -26,6 +26,7 @@ This document summarizes how the **card-game** repository is structured, how gam
 | `src/core/table.ts` | **`createEmptyTable`**, **`cloneTable`**, **`moveTop`**, zone helpers. |
 | `src/core/registry.ts` | **`registerGameModule`** / **`getGameModule`** — modules self-register on import. |
 | `src/core/aiContext.ts` | **`AiDifficulty`**: `easy` \| `medium` \| `hard` \| `expert`; **`SelectAiContext`** (difficulty + optional match fields for Skyjo AI). |
+| `src/core/aiPlaystyle.ts` | Small helpers: **`aiIsExpert`**, **`aiIsHardOrExpert`** for tier checks in `selectAiAction`. |
 | `docs/ai-behavior.md` | **Table AI**: what each **difficulty** does, which games use **`SelectAiContext`**, and which modules ignore it. |
 | `src/data/manifests.ts` | **`GAME_SOURCES`**, **`DECK_SOURCES`**, **`GAME_IDS`** — Vite `?raw` imports wiring ids to YAML strings. |
 | `src/data/rulesSources.ts` | **`RULES_SOURCES`**, **`rulesTextForGame`**, **`RulesGameId`** — maps each **`GAME_IDS`** entry to `src/rules/*.md` raw markdown. |
@@ -122,8 +123,8 @@ User-facing details (per-level behavior, per-game) are in **`docs/ai-behavior.md
 
 - **`SelectAiContext`** includes **`difficulty`** and (for Skyjo) optional **`matchCumulativeScores`**, **`matchTargetScore`**.
 - **`gameSupportsConfigurableAi`**: games where the user can set **AI opponent count** (capped at 1 for “heads-up only” ids — see **`HEADS_UP_GAME_IDS`** in **`playerConfig.ts`**).
-- **`gameSupportsPerSeatAiDifficulty`**: currently **`go-fish`** and **`skyjo`** — **`App`** renders per-seat difficulty selects and passes them in **`CreateSessionOptions.aiDifficulties`**. Only those modules *interpret* that field; other titles with timer-driven AI may use a fixed context or ignore **`difficulty`**.
-- Other titles may use **`selectAiAction`** with a fixed difficulty in **`useEffect`** (e.g. Crazy Eights, Uno use `{ difficulty: 'medium' }` even though they do not read it) or **`null`** if the game does not use table AI turns the same way (e.g. War).
+- **`gameSupportsPerSeatAiDifficulty`**: e.g. **`go-fish`**, **`skyjo`**, **`crazy-eights`**, **`switch`**, **`uno`**, **`thirty-one`**, **`euchre`**, **`durak`**, **`pinochle`**, **`canasta`**, **`sequence-race`** — **`App`** renders per-seat difficulty and passes them in **`CreateSessionOptions.aiDifficulties`**. (See **`docs/ai-behavior.md`** for what each level does in each game.)
+- Other timer-driven titles, if any, may still use a fixed context or ignore **`difficulty`**. Titles with **`selectAiAction`** returning **`null`** (e.g. War) are **not** under table AI.
 
 When adding AI to a game, implement **`selectAiAction`** and ensure **`getLegalActions`** matches what humans can do.
 

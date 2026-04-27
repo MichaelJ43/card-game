@@ -1,7 +1,8 @@
 import { recycleDiscardIntoDrawWhenEmpty, isDeckDrawAvailableAfterOptionalRecycle } from '../../core/discardRecycle'
+import type { AiDifficulty } from '../../core/aiContext'
 import type { ApplyResult, GameModule, SelectAiContext } from '../../core/gameModule'
 import { newInstanceId } from '../../core/deck'
-import type { CardInstance, GameAction, GameManifestYaml } from '../../core/types'
+import type { CardInstance, CardTemplate, GameAction, GameManifestYaml } from '../../core/types'
 import { registerGameModule } from '../../core/registry'
 import { mulberry32, shuffleInPlace } from '../../core/shuffle'
 import { cloneTable, createEmptyTable, moveTop } from '../../core/table'
@@ -20,6 +21,17 @@ function cmd(p: Record<string, unknown> | undefined): string {
 
 function isJokerTemplate(id: string): boolean {
   return id.startsWith('joker')
+}
+
+function canastaCardWeight(tid: string, templates: Record<string, CardTemplate>): number {
+  if (isJokerTemplate(tid)) return 30
+  const r = templates[tid]?.rank
+  if (r === 'A') return 20
+  if (r === 'K' || r === 'Q' || r === 'J' || r === '10') return 10
+  if (r === '9' || r === '8' || r === '7' || r === '6' || r === '5' || r === '4' || r === '3' || r === '2') {
+    return 5
+  }
+  return 4
 }
 
 export interface CanastaGameState {
@@ -172,8 +184,8 @@ const canastaModule: GameModule<CanastaGameState> = {
   },
 
   selectAiAction(table, gs, playerIndex, rng, context: SelectAiContext) {
-    void context
     if (gs.phase !== 'play' || playerIndex !== gs.currentPlayer) return null
+    const d: AiDifficulty = context.difficulty
     if (!gs.drewThisTurn) {
       if (isDeckDrawAvailableAfterOptionalRecycle(table, gs.reshuffleDiscardWhenDrawEmpty, true)) {
         return { type: 'custom', payload: { cmd: 'cnsDrawTwo' } }
@@ -181,8 +193,30 @@ const canastaModule: GameModule<CanastaGameState> = {
     }
     const hand = table.zones[handId(playerIndex)]!.cards
     if (!hand.length) return null
-    const i = Math.floor(rng() * hand.length)
-    return { type: 'custom', payload: { cmd: 'cnsDiscard', index: i } }
+    if (d === 'easy' && rng() < 0.35) {
+      return { type: 'custom', payload: { cmd: 'cnsDiscard', index: Math.floor(rng() * hand.length) } }
+    }
+    if (d === 'medium' && rng() < 0.2) {
+      return { type: 'custom', payload: { cmd: 'cnsDiscard', index: Math.floor(rng() * hand.length) } }
+    }
+    const tpl = table.templates
+    const byRank = (tid: string) => canastaCardWeight(tid, tpl)
+    const countBy = new Map<string, number>()
+    for (const c of hand) {
+      const k = c.templateId
+      countBy.set(k, (countBy.get(k) ?? 0) + 1)
+    }
+    const scored = hand.map((c, i) => {
+      let s = byRank(c.templateId)
+      if (d === 'expert' && (countBy.get(c.templateId) ?? 0) >= 2) s -= 18
+      return { i, s }
+    })
+    if (d === 'expert' && rng() < 0.11 && scored.length > 1) {
+      scored.sort((a, b) => b.s - a.s)
+      return { type: 'custom', payload: { cmd: 'cnsDiscard', index: scored[1]!.i } }
+    }
+    scored.sort((a, b) => b.s - a.s)
+    return { type: 'custom', payload: { cmd: 'cnsDiscard', index: scored[0]!.i } }
   },
 
   statusText(table, gs) {

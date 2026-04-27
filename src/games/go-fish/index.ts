@@ -132,6 +132,26 @@ function scoreGoFishAsk(
   return my * 20 + theirHand * 3
 }
 
+/** Expert: one-card-from-a-book, table politics, and avoid fishing empty seats. */
+function scoreGoFishAskExpert(
+  action: GameAction,
+  table: TableState,
+  templates: Record<string, CardTemplate>,
+  currentPlayer: number,
+): number {
+  if (action.type !== 'goFishAsk') return -Infinity
+  const { targetPlayer, rank } = action
+  const hz = table.zones[handId(currentPlayer)]!.cards
+  const my = countRankInHand(hz, templates, rank)
+  const theirHand = table.zones[handId(targetPlayer)]!.cards.length
+  let s = scoreGoFishAsk(action, table, templates, currentPlayer)
+  if (my === 3) s += 120
+  else if (my === 2) s += 32
+  if (theirHand <= 1) s -= 45
+  else s += theirHand * 1.2
+  return s
+}
+
 function enumerateLegalAsks(
   table: TableState,
   templates: Record<string, CardTemplate>,
@@ -460,10 +480,24 @@ const goFishModule: GameModule<GoFishGameState> = {
       s: a.type === 'goFishAsk' ? scoreGoFishAsk(a, sim, templates, playerIndex) : 0,
     }))
 
-    if (difficulty === 'hard' || difficulty === 'expert') {
+    if (difficulty === 'hard') {
       const maxS = Math.max(...scored.map((x) => x.s))
       const top = scored.filter((x) => x.s === maxS)
       return top[Math.floor(rng() * top.length)]!.a
+    }
+
+    if (difficulty === 'expert') {
+      const exp = legal.map((a) => ({
+        a,
+        s: a.type === 'goFishAsk' ? scoreGoFishAskExpert(a, sim, templates, playerIndex) : 0,
+      }))
+      const sorted = [...exp].sort((x, y) => y.s - x.s)
+      if (sorted.length > 1 && rng() < 0.12) {
+        return sorted[1]!.a
+      }
+      const maxE = Math.max(...exp.map((x) => x.s))
+      const topE = exp.filter((x) => x.s === maxE)
+      return topE[Math.floor(rng() * topE.length)]!.a
     }
 
     // easy: prefer weaker asks; mix in random mistakes

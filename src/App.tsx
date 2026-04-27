@@ -1104,7 +1104,7 @@ function App() {
           prev.gameState,
           g.currentPlayer!,
           Math.random,
-          { difficulty: 'medium' },
+          { difficulty: difficultyForAiPlayer(prev, g.currentPlayer!) },
         )
         if (!act) return prev
         const r = prev.module.applyAction(prev.table, prev.gameState, act)
@@ -1143,7 +1143,7 @@ function App() {
           prev.gameState,
           g.currentPlayer!,
           Math.random,
-          { difficulty: 'medium' },
+          { difficulty: difficultyForAiPlayer(prev, g.currentPlayer!) },
         )
         if (!act) return prev
         const r = prev.module.applyAction(prev.table, prev.gameState, act)
