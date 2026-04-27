@@ -117,6 +117,7 @@ function MatchCumulativePanel({
   caption = 'Cumulative scores',
   scoringMode = 'points',
   pendingRoundScores,
+  pendingRoundCellNotes,
   playerSeatCaption,
 }: {
   match: MatchState
@@ -124,8 +125,10 @@ function MatchCumulativePanel({
   scoreColumnLabel?: string
   caption?: string
   scoringMode?: 'points' | 'chips'
-  /** Round scored in game state but not yet merged — updates Total column only (no layout change). */
+  /** Round scored in game state but not yet merged — show as latest R# column; Total includes this round. */
   pendingRoundScores?: number[] | null
+  /** Per-seat tooltip / penalty hints for the pending R# column (see {@link GameModule.extractMatchRoundScoreCellNotes}). */
+  pendingRoundCellNotes?: (string | null)[] | null
   /** Row header for each seat (defaults to {@link playerSeatLabel}). */
   playerSeatCaption?: (playerIndex: number) => string
 }) {
@@ -134,23 +137,19 @@ function MatchCumulativePanel({
   const n = match.cumulativeScores.length
   const pending =
     pendingRoundScores && pendingRoundScores.length === n ? pendingRoundScores : null
+  const pendingNotes =
+    pending && pendingRoundCellNotes && pendingRoundCellNotes.length === n ? pendingRoundCellNotes : null
   const displayTotals = pending
     ? match.cumulativeScores.map((c, i) => c + (pending[i] ?? 0))
     : match.cumulativeScores
+  const pendingStripe: 'a' | 'b' = history.length % 2 === 0 ? 'a' : 'b'
 
   const rowCaption = playerSeatCaption ?? ((pi: number) => playerSeatLabel(pi))
 
   return (
     <div className={`matchCumulative${toolbar ? ' matchCumulative--toolbar' : ''}`}>
       <div className="matchCumulative__scroll">
-        <table
-          className="matchCumulative__table"
-          title={
-            pending
-              ? `${scoreColumnLabel} shows the result after merging this round (before you click Next round).`
-              : undefined
-          }
-        >
+        <table className="matchCumulative__table">
           <caption>{caption}</caption>
           <thead>
             <tr>
@@ -166,6 +165,14 @@ function MatchCumulativePanel({
                   R{ri + 1}
                 </th>
               ))}
+              {pending && (
+                <th
+                  scope="col"
+                  className={`matchCumulative__thRound matchCumulative__thRound--${pendingStripe}`}
+                >
+                  R{history.length + 1}
+                </th>
+              )}
               <th scope="col" className="matchCumulative__thTotal">
                 {scoreColumnLabel}
               </th>
@@ -185,6 +192,19 @@ function MatchCumulativePanel({
                     {roundVec[pi] ?? '—'}
                   </td>
                 ))}
+                {pending && (
+                  <td
+                    className={`matchCumulative__roundCell matchCumulative__roundCell--${pendingStripe}`}
+                  >
+                    {pendingNotes?.[pi] ? (
+                      <span className="matchCumulative__roundPenalty" title={pendingNotes[pi]!}>
+                        {pending[pi] ?? '—'}
+                      </span>
+                    ) : (
+                      (pending[pi] ?? '—')
+                    )}
+                  </td>
+                )}
                 <td className="matchCumulative__totalCell">
                   {displayTotals[pi] ?? '—'}
                 </td>
@@ -981,12 +1001,35 @@ function App() {
     return rs
   }, [session])
 
-  const matchPreviewTotals = useMemo(() => {
-    if (!session || !pendingMergeRoundScores) return null
+  const pendingMergeRoundCellNotes = useMemo((): (string | null)[] | null => {
+    if (!session) return null
     const m = session.match
     if (!m?.config || m.complete) return null
-    return m.cumulativeScores.map((c, i) => c + (pendingMergeRoundScores[i] ?? 0))
+    const mod = session.module
+    if (!mod.isMatchRoundFinished?.(session.gameState)) return null
+    return mod.extractMatchRoundScoreCellNotes?.(session.gameState) ?? null
+  }, [session])
+
+  const nextMatchRoundLabel = useMemo(() => {
+    if (!session?.match || !pendingMergeRoundScores) return 'Next round'
+    const m = session.match
+    if (m.complete) return 'Start a new deal'
+    const next = m.cumulativeScores.map((c, i) => c + (pendingMergeRoundScores[i] ?? 0))
+    if (m.config.endCondition === 'anyAtOrAbove' && next.some((s) => s >= m.config.targetScore)) {
+      return 'Start a new deal'
+    }
+    return 'Next Round'
   }, [session, pendingMergeRoundScores])
+
+  const mainStatusLine = useMemo(() => {
+    if (pendingMergeRoundScores) {
+      return networkSpectator ? 'Spectating until the next deal.' : null
+    }
+    if (networkSpectator) {
+      return `${status} (spectating until the next deal)`
+    }
+    return status
+  }, [pendingMergeRoundScores, networkSpectator, status])
 
   const primaryLabel = gameId === 'demo-custom' ? 'Reveal winner' : 'Play round'
 
@@ -1539,6 +1582,7 @@ function App() {
                   }
                   scoringMode={session.manifest.match?.scoringMode === 'chips' ? 'chips' : 'points'}
                   pendingRoundScores={pendingMergeRoundScores}
+                  pendingRoundCellNotes={pendingMergeRoundCellNotes}
                   playerSeatCaption={cumulativeRowCaption}
                 />
               </div>
@@ -1589,21 +1633,12 @@ function App() {
 
       {session && (
         <>
-          <p className="app__status" role="status">
-            {networkSpectator ? `${status} (spectating until the next deal)` : status}
-          </p>
-
-          {matchPreviewTotals && session.match && !session.match.complete && (
-            <p className="app__matchPreview" role="status">
-              Totals if you merge this round:{' '}
-              {matchPreviewTotals.map((s, i) => (
-                <span key={i}>
-                  {cumulativeRowCaption(i)}: {s}
-                  {i < matchPreviewTotals.length - 1 ? ' · ' : ''}
-                </span>
-              ))}
+          {mainStatusLine != null && mainStatusLine !== '' && (
+            <p className="app__status" role="status">
+              {mainStatusLine}
             </p>
           )}
+
           {canAdvanceMatch && (
             <div className="app__matchActions">
               <button
@@ -1613,7 +1648,7 @@ function App() {
                 disabled={!!session?.net}
                 title={session?.net ? 'Only the host can advance the match.' : undefined}
               >
-                Next round (apply scores)
+                {nextMatchRoundLabel}
               </button>
             </div>
           )}

@@ -55,6 +55,12 @@ export interface GameModule<TGame = unknown> {
    * points for that round. Return null if not in a finished-round state.
    */
   extractMatchRoundScores?(gameState: TGame): number[] | null
+  /**
+   * Optional per-player hover notes for the **pending** (not yet merged) round column on the
+   * cumulative board — e.g. end-of-round penalties (non-null = emphasize that cell, use string as
+   * `title` / tooltip blurb).
+   */
+  extractMatchRoundScoreCellNotes?(gameState: TGame): (string | null)[] | null
   /** True when this game state represents a completed round ready to merge into cumulative scores. */
   isMatchRoundFinished?(gameState: TGame): boolean
 }

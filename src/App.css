@@ -327,6 +327,15 @@
   font-variant-numeric: tabular-nums;
 }
 
+.matchCumulative__roundPenalty {
+  color: var(--match-cumulative-penalty, #b91c1c);
+  font-weight: 700;
+  cursor: help;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
 .matchCumulative__totalCell {
   background: var(--match-cumulative-total-bg);
   font-weight: 700;
@@ -369,13 +378,6 @@
     margin-left: 0;
     text-align: left;
   }
-}
-
-.app__matchPreview {
-  margin: 0 0 0.75rem;
-  font-size: 0.85rem;
-  opacity: 0.92;
-  text-align: center;
 }
 
 .app__matchActions {

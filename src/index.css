@@ -27,6 +27,7 @@
   --match-cumulative-total-bg: #d1fae5;
   --match-cumulative-total-fg: #065f46;
   --match-cumulative-total-border: #059669;
+  --match-cumulative-penalty: #b91c1c;
   --match-cumulative-meta: var(--text-muted);
 
   --sans: var(--m43-font-sans);
@@ -63,6 +64,7 @@
     --match-cumulative-total-bg: color-mix(in srgb, #10b981 20%, var(--bg));
     --match-cumulative-total-fg: #a7f3d0;
     --match-cumulative-total-border: #34d399;
+    --match-cumulative-penalty: #f87171;
     --match-cumulative-meta: #a1a1aa;
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
