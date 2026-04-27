@@ -297,7 +297,7 @@ const crazy8sModule: GameModule<Crazy8sGameState> = {
       const i = Number(p.index)
       const t = hz[i]!
       const r = tpl[t.templateId]?.rank
-      if (r === '8') return 300
+      if (r === '8') return 1200
       return 1000 - rankC8Strength(r)
     }
 

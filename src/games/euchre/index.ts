@@ -119,6 +119,15 @@ function selectEuchreTrickIndex(
       const p = trickPower(templates, tid, trump, leadSuit0)
       return { i, winner, p }
     })
+    const currentWinner = resolveTrick(templates, trick, trump)
+    if (d === 'expert' && currentWinner === partner) {
+      const keepsPartnerWinning = scored.filter((x) => x.winner === partner)
+      if (keepsPartnerWinning.length > 0 && rng() < 0.86) {
+        const m = Math.min(...keepsPartnerWinning.map((x) => x.p))
+        const pool = keepsPartnerWinning.filter((x) => x.p === m)
+        return pool[Math.floor(rng() * pool.length)]!.i
+      }
+    }
     const weWin = scored.filter((x) => x.winner === playerIndex)
     const pWin = scored.filter((x) => x.winner === partner)
     if (d === 'expert' && pWin.length > 0 && weWin.length === 0) {

@@ -333,6 +333,12 @@ function difficultyForAiPlayer(session: GameSession, playerIndex: number): AiDif
   return cfg && ix >= 0 && ix < cfg.length ? normalizeAiDifficulty(cfg[ix]) : 'medium'
 }
 
+function defaultAiCountForGame(gameId: (typeof GAME_IDS)[number]): number {
+  const raw = GAME_SOURCES[gameId]
+  if (!raw) return 0
+  return parseGameManifestYaml(raw).players.ai
+}
+
 function App() {
   const [gameId, setGameId] = useState<(typeof GAME_IDS)[number]>('war')
   const [aiOpponents, setAiOpponents] = useState(1)
@@ -491,13 +497,23 @@ function App() {
       difficultyList?: AiDifficulty[],
     ): CreateSessionOptions | undefined => {
       const house = createSessionOptionsHouseRules(forGameId as RulesGameId)
+      const difficultySeatCount = gameSupportsConfigurableAi(forGameId)
+        ? aiOpponents
+        : defaultAiCountForGame(forGameId)
+      const diffs = difficultyList ?? aiDifficulties
       if (!gameSupportsConfigurableAi(forGameId)) {
+        if (gameSupportsPerSeatAiDifficulty(forGameId) && difficultySeatCount > 0) {
+          return {
+            aiDifficulties: normalizeAiDifficultiesForCount(difficultySeatCount, diffs),
+            ...(skipMatch ? { skipMatch: true } : {}),
+            ...house,
+          }
+        }
         if (skipMatch) {
           return { skipMatch: true, ...house }
         }
         return Object.keys(house).length ? house : undefined
       }
-      const diffs = difficultyList ?? aiDifficulties
       return {
         aiCount: aiOpponents,
         aiDifficulties: normalizeAiDifficultiesForCount(aiOpponents, diffs),
@@ -1457,9 +1473,9 @@ function App() {
                   </div>
                 </div>
               </div>
-              {gameSupportsPerSeatAiDifficulty(gameId) && aiOpponents >= 1 && (
+              {gameSupportsPerSeatAiDifficulty(gameId) && (gameSupportsConfigurableAi(gameId) ? aiOpponents : defaultAiCountForGame(gameId)) >= 1 && (
                 <div className="app__toolbarRow app__toolbarRow--diff" role="group" aria-label="AI player difficulty">
-                  {Array.from({ length: aiOpponents }, (_, i) => (
+                  {Array.from({ length: gameSupportsConfigurableAi(gameId) ? aiOpponents : defaultAiCountForGame(gameId) }, (_, i) => (
                     <label key={i} className="app__label app__label--inline">
                       {aiPlayerMenuLabel(i)}
                       <select
