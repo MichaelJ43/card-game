@@ -120,6 +120,149 @@ function expectedUnknownCardValue(counts: Record<number, number>, total: number)
   return s / total
 }
 
+/** Second moment; used to weight face-down “fuzzy” uncertainty. */
+function varianceUnknownCard(counts: Record<number, number>, total: number): number {
+  if (total <= 0) return 0
+  const ev = expectedUnknownCardValue(counts, total)
+  let e2 = 0
+  for (const [k, n] of Object.entries(counts)) {
+    if (n <= 0) continue
+    const v = Number(k)
+    e2 += v * v * (n / total)
+  }
+  return Math.max(0, e2 - ev * ev)
+}
+
+function probUnknownIsValue(counts: Record<number, number>, total: number, v: number): number {
+  if (total <= 0) return 0
+  return (counts[v] ?? 0) / total
+}
+
+function sumVisibleFaceUpOnGrid(
+  table: TableState,
+  playerIndex: number,
+  templates: Record<string, CardTemplate>,
+): number {
+  let s = 0
+  for (const c of table.zones[gridZone(playerIndex)]!.cards) {
+    if (!c || isSlot(c.templateId) || !c.faceUp) continue
+    s += cardValue(templates, c.templateId)
+  }
+  return s
+}
+
+/**
+ * If two cards in a column are face up with the same value and the third is still hidden,
+ * placing `pv` on the hidden discards a chance at a high triple when `pv` does not match.
+ */
+function expertClogLastHiddenInPairColumn(
+  table: TableState,
+  playerIndex: number,
+  templates: Record<string, CardTemplate>,
+  placeIdx: number,
+  pv: number,
+  expert: boolean,
+): number {
+  if (!expert) return 0
+  const [a, b, d] = columnIndices(placeIdx % COLS)
+  const g = table.zones[gridZone(playerIndex)]!.cards
+  const idxs: number[] = [a, b, d]
+  let hiddenIdx: number | null = null
+  const face: { v: number; i: number }[] = []
+  for (const i of idxs) {
+    const c = g[i]
+    if (!c || isSlot(c.templateId)) continue
+    if (!c.faceUp) {
+      if (hiddenIdx === null) hiddenIdx = i
+      else return 0
+      continue
+    }
+    face.push({ v: cardValue(templates, c.templateId), i })
+  }
+  if (face.length !== 2 || hiddenIdx === null) return 0
+  if (face[0]!.v !== face[1]!.v) return 0
+  if (placeIdx !== hiddenIdx) return 0
+  const r = face[0]!.v
+  if (pv === r) return 0
+  return 4.5 + Math.max(0, r) * 0.5
+}
+
+/**
+ * Swapping off a card that is part of a face-up pair, while the third column card is still hidden,
+ * hurts odds of a future column triple—more so for higher pairs.
+ */
+function expertLoomingPairBreakPenalty(
+  table: TableState,
+  playerIndex: number,
+  templates: Record<string, CardTemplate>,
+  placeIdx: number,
+  pv: number,
+  expert: boolean,
+): number {
+  if (!expert) return 0
+  const [a, b, d] = columnIndices(placeIdx % COLS)
+  const g = table.zones[gridZone(playerIndex)]!.cards
+  const col = [a, b, d].map((i) => g[i]!)
+  if (col.some((c) => !c || isSlot(c.templateId))) return 0
+  let hiddenN = 0
+  for (const c of col) {
+    if (!c.faceUp) hiddenN++
+  }
+  if (hiddenN !== 1) return 0
+  const faceV: number[] = []
+  for (const c of col) {
+    if (c.faceUp) faceV.push(cardValue(templates, c.templateId))
+  }
+  if (faceV.length !== 2) return 0
+  if (faceV[0] !== faceV[1]) return 0
+  const r = faceV[0]!
+  const cAt = g[placeIdx]!
+  if (!cAt.faceUp || cardValue(templates, cAt.templateId) !== r) return 0
+  if (pv === r) return 0
+  return 5 + (r >= 6 ? r * 0.6 : 0)
+}
+
+/**
+ * Slight “halo” toward a column triple: weight toward matching a lone face-up
+ * (or a pair) using remaining-card P(value).
+ */
+function expertTripleCompletionHalo(
+  table: TableState,
+  playerIndex: number,
+  placeIdx: number,
+  pv: number,
+  templates: Record<string, CardTemplate>,
+  counts: Record<number, number>,
+  total: number,
+  expert: boolean,
+): number {
+  if (!expert) return 0
+  const [a, b, d] = columnIndices(placeIdx % COLS)
+  const g = table.zones[gridZone(playerIndex)]!.cards
+  const peerVals: number[] = []
+  for (const i of [a, b, d]) {
+    if (i === placeIdx) continue
+    const c = g[i]
+    if (!c || isSlot(c.templateId) || !c.faceUp) continue
+    peerVals.push(cardValue(templates, c.templateId))
+  }
+  if (peerVals.length === 2 && peerVals[0] === peerVals[1]) {
+    const v = peerVals[0]!
+    const p3 = probUnknownIsValue(counts, total, v)
+    if (pv === v) return -2.2 * p3
+    return 0
+  }
+  if (peerVals.length === 1) {
+    const v = peerVals[0]!
+    const p3 = probUnknownIsValue(counts, total, v)
+    if (pv === v) return -1.0 * p3
+    if (p3 > 0.12) {
+      return -0.4 * p3 * Math.max(0, 8 - Math.abs(pv - v))
+    }
+  }
+  return 0
+}
+
 /** Average face-up card value on a player’s grid (null if none face-up). */
 function avgFaceUpOnGrid(table: TableState, playerIndex: number, templates: Record<string, CardTemplate>): number | null {
   const g = table.zones[gridZone(playerIndex)]!.cards
@@ -456,6 +599,8 @@ function selectAiSkyjo(
   legal: GameAction[],
 ): GameAction {
   const { difficulty, matchCumulativeScores, matchTargetScore } = context
+  const isExpert = difficulty === 'expert'
+  const isHard = difficulty === 'hard' || isExpert
   const myCum = matchCumulativeScores?.[playerIndex] ?? 0
   const matchTarget = matchTargetScore ?? 100
   const templates = table.templates
@@ -467,11 +612,18 @@ function selectAiSkyjo(
   }
 
   /** Lower score is better (estimated increase to grid sum, minus bonuses). */
-  const bestPendingActionHard = (): GameAction => {
+  const bestPendingActionSmart = (expert: boolean): GameAction => {
     const pv = cardValue(templates, gameState.pendingDraw!.templateId)
     const pCount = gameState.playerCount
     const comp = remainingUnknownComposition(table, templates, pCount)
     const evUnknown = expectedUnknownCardValue(comp.counts, comp.total)
+    const stdU = Math.sqrt(varianceUnknownCard(comp.counts, comp.total))
+    const visSum = sumVisibleFaceUpOnGrid(table, playerIndex, templates)
+    const visW =
+      expert && visSum > 22
+        ? 1 + Math.min(0.2, (visSum - 22) * 0.014)
+        : 1
+    const finM = expert ? 0.88 : 0.62
     const nextP = (playerIndex + 1) % pCount
     const pending = gameState.pendingDraw!
 
@@ -490,6 +642,21 @@ function selectAiSkyjo(
       if (completesColumnTriple(table, playerIndex, templates, i, pv)) {
         score -= 24
       }
+      if (expert) {
+        if (!c.faceUp) score += 0.3 * stdU
+        score += expertClogLastHiddenInPairColumn(table, playerIndex, templates, i, pv, expert)
+        score += expertLoomingPairBreakPenalty(table, playerIndex, templates, i, pv, expert)
+        score += expertTripleCompletionHalo(
+          table,
+          playerIndex,
+          i,
+          pv,
+          templates,
+          comp.counts,
+          comp.total,
+          expert,
+        )
+      }
       const oldToDiscard = c.faceUp ? cardValue(templates, c.templateId) : evUnknown
       const helpsNext = maxDiscardPlacementMerit(table, nextP, templates, oldToDiscard)
       score += helpsNext * 0.45
@@ -505,7 +672,7 @@ function selectAiSkyjo(
         matchTarget,
         gameState.skyjoFinisher,
       )
-      score += finishPen * 0.62
+      score += finishPen * finM * visW
       if (score < bestScore) {
         bestScore = score
         best = a
@@ -521,7 +688,7 @@ function selectAiSkyjo(
       }, Infinity)
 
       /** Swap clearly lowers expected sum — keep the card on the grid. */
-      const swapIsStrong = Number.isFinite(minSwapDelta) && minSwapDelta <= -2
+      const swapIsStrong = Number.isFinite(minSwapDelta) && minSwapDelta <= (expert ? -1.5 : -2)
 
       let bestDump = dumps[0]!
       let dumpRank = -Infinity
@@ -562,7 +729,8 @@ function selectAiSkyjo(
           matchTarget,
           gameState.skyjoFinisher,
         )
-        const adjRank = rank - fpen * 0.95
+        const fMult = expert ? 0.88 : 0.95
+        const adjRank = rank - fpen * fMult
         if (adjRank > dumpRank) {
           dumpRank = adjRank
           bestDump = a
@@ -572,17 +740,25 @@ function selectAiSkyjo(
 
       if (!swapIsStrong) {
         const giftPv = maxDiscardPlacementMerit(table, nextP, templates, pv)
-        const useDump =
-          pv >= 10 ||
-          (pv >= 8 && minSwapDelta >= 0) ||
-          (pv >= 6 && minSwapDelta >= 1.5) ||
-          (pv >= 5 && minSwapDelta >= 3)
+        const useDump = expert
+          ? pv >= 11 ||
+            (pv >= 9 && minSwapDelta >= 0) ||
+            (pv >= 7 && minSwapDelta >= 1) ||
+            (pv >= 5.5 && minSwapDelta >= 2.6)
+          : pv >= 10 ||
+            (pv >= 8 && minSwapDelta >= 0) ||
+            (pv >= 6 && minSwapDelta >= 1.5) ||
+            (pv >= 5 && minSwapDelta >= 3)
         const dumpFeedsNext = pv <= 4 && giftPv > 2.25
-        const dumpTooRisky = dumpFpen * 0.62 > 14 && minSwapDelta <= 2
-        if (useDump && !dumpFeedsNext && !dumpTooRisky) {
+        const fMultRisk = expert ? 0.85 : 0.62
+        const riskTh = expert ? 11 : 14
+        const minDeltaTh = expert ? 2.4 : 2
+        const dumpTooRisky = dumpFpen * fMultRisk > riskTh && minSwapDelta <= minDeltaTh
+        const badVisibleFinish = expert && visSum > 24 && dumpFpen > 7.5
+        if (useDump && !dumpFeedsNext && !dumpTooRisky && !badVisibleFinish) {
           return bestDump
         }
-        if (useDump && dumpFeedsNext && pv >= 9 && !dumpTooRisky) {
+        if (useDump && dumpFeedsNext && pv >= 9 && !dumpTooRisky && !badVisibleFinish) {
           return bestDump
         }
       }
@@ -652,7 +828,7 @@ function selectAiSkyjo(
     return { type: 'skyjoSwapDrawn', gridIndex: bestSwap }
   }
 
-  const noPendingHard = (): GameAction => {
+  const noPendingSmart = (expert: boolean): GameAction => {
     const disc = topDiscard(table)
     const dv = disc ? cardValue(templates, disc.templateId) : 999
     const drawAvail = table.zones.draw!.cards.length > 0
@@ -669,12 +845,25 @@ function selectAiSkyjo(
     const takeActions = legal.filter((a) => a.type === 'skyjoTakeDiscard')
     if (disc && takeActions.length > 0) {
       const giftNextIfWeDraw = maxDiscardPlacementMerit(table, nextP, templates, dv)
-      takeMerit += giftNextIfWeDraw * 0.42
+      takeMerit += giftNextIfWeDraw * (expert ? 0.35 : 0.42)
       const red = rediscardPressureForValue(dv, comp.counts, comp.total, avgPrev)
-      takeMerit -= red * 2.8
-      if (dv <= 2) return takeDiscardAction()
-      if (takeMerit >= drawMerit + 0.25 && dv <= evUnknown + 1.2) return takeDiscardAction()
-      if (dv <= 4 && takeMerit >= -0.5) return takeDiscardAction()
+      takeMerit -= red * (expert ? 3.2 : 2.8)
+      if (expert) {
+        if (dv <= 1) return takeDiscardAction()
+        const needEdge = 0.55 + Math.min(0.9, red * 2.0)
+        if (takeMerit >= drawMerit + needEdge && dv <= evUnknown + 0.45) return takeDiscardAction()
+        if (dv <= 2 && takeMerit >= drawMerit - 0.08) return takeDiscardAction()
+        if (dv <= 3 && takeMerit >= drawMerit + 0.38 && dv <= evUnknown + 0.25) return takeDiscardAction()
+        if (dv < evUnknown - 0.35 && takeMerit < drawMerit + 0.35) {
+          /* low pip but poor fit — prefer stock */
+        } else if (dv <= 4 && takeMerit >= 0.15 && dv <= evUnknown + 0.9) {
+          return takeDiscardAction()
+        }
+      } else {
+        if (dv <= 2) return takeDiscardAction()
+        if (takeMerit >= drawMerit + 0.25 && dv <= evUnknown + 1.2) return takeDiscardAction()
+        if (dv <= 4 && takeMerit >= -0.5) return takeDiscardAction()
+      }
     }
     if (drawAvail) {
       return { type: 'skyjoDraw', from: 'deck' }
@@ -715,7 +904,7 @@ function selectAiSkyjo(
       const pool = [...swaps, ...dumps]
       if (pool.length > 0) return pool[Math.floor(rng() * pool.length)]!
     }
-    if (difficulty === 'hard') return bestPendingActionHard()
+    if (isHard) return bestPendingActionSmart(isExpert)
     return pendingActionMedium()
   }
 
@@ -723,8 +912,8 @@ function selectAiSkyjo(
     return { type: 'skyjoDraw', from: 'deck' }
   }
 
-  if (difficulty === 'hard') {
-    return noPendingHard()
+  if (isHard) {
+    return noPendingSmart(isExpert)
   }
 
   if (difficulty === 'easy' && rng() < 0.42) {

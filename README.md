@@ -10,6 +10,8 @@ A **browser-only** card table built with **React**, **TypeScript**, and **Vite**
 
 End-to-end flows (browser shell, **WebRTC** game channel vs **WebSocket** signaling relay, optional **TURN/coturn**, AWS **Lambdas** / **DynamoDB**, and how they connect to deploy) are described in **[`docs/architecture.md`](docs/architecture.md)**. For Terraform inputs, DNS/TLS, and CI deploy steps, that doc points at **[`deploy/terraform/aws/README.md`](deploy/terraform/aws/README.md)**.
 
+**Table AI (easy / medium / hard / expert)** and how each **supported game** uses or ignores difficulty are documented in **[`docs/ai-behavior.md`](docs/ai-behavior.md)**.
+
 ## Requirements
 
 - **Node.js** (20+ or current LTS recommended)

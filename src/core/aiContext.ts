@@ -1,9 +1,12 @@
 /** Per-AI policy; locked for the current deal (see session `aiPlayerConfig`). */
-export type AiDifficulty = 'easy' | 'medium' | 'hard'
+export type AiDifficulty = 'easy' | 'medium' | 'hard' | 'expert'
 
-export const AI_DIFFICULTY_OPTIONS: readonly AiDifficulty[] = ['easy', 'medium', 'hard']
+export const AI_DIFFICULTY_OPTIONS: readonly AiDifficulty[] = ['easy', 'medium', 'hard', 'expert']
 
-/** Passed to {@link import('./gameModule').GameModule.selectAiAction} for the current AI seat. */
+/**
+ * Passed to {@link import('./gameModule').GameModule.selectAiAction} for the current AI seat.
+ * Not every module reads all fields; see `docs/ai-behavior.md`.
+ */
 export interface SelectAiContext {
   difficulty: AiDifficulty
   /** Cumulative match totals before this round (same length as seats). Used by Skyjo for finisher double penalty. */
@@ -13,5 +16,5 @@ export interface SelectAiContext {
 }
 
 export function normalizeAiDifficulty(v: unknown): AiDifficulty {
-  return v === 'easy' || v === 'hard' || v === 'medium' ? v : 'medium'
+  return v === 'easy' || v === 'hard' || v === 'medium' || v === 'expert' ? v : 'medium'
 }
