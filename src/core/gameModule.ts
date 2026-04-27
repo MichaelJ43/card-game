@@ -18,6 +18,11 @@ export interface GameModuleContext {
    * Games without both `draw` and `discard` zones ignore this. Omitted or false = no recycle.
    */
   reshuffleDiscardWhenDrawEmpty?: boolean
+  /**
+   * Uno: when true, a player with no play draws repeatedly until a playable card (or the deck is exhausted);
+   * if a playable is drawn, they must play that card. Omitted = off.
+   */
+  unoDrawUntilPlayable?: boolean
 }
 
 export interface ApplyResult<TGame> {

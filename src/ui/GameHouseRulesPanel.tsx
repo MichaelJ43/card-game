@@ -33,6 +33,9 @@ export function GameHouseRulesPanel({ gameId, manifest, readOnly = false }: Game
   const [warTie, setWarTie] = useState<'1' | '3'>(() =>
     getHouseRulesForGame(gameId).warTieDownCards === 1 ? '1' : '3',
   )
+  const [unoDrawChain, setUnoDrawChain] = useState(
+    () => getHouseRulesForGame('uno').unoDrawUntilPlayable === true,
+  )
   const [houseRulesGen, bumpHouseRules] = useReducer((x: number) => x + 1, 0)
   const houseRules = useMemo(() => {
     void houseRulesGen
@@ -47,6 +50,7 @@ export function GameHouseRulesPanel({ gameId, manifest, readOnly = false }: Game
     setSkyjoDiscardOnly(!!h.skyjoDiscardSwapFaceUpOnly)
     setDealerSoft17(!!h.dealerHitsSoft17)
     setWarTie(h.warTieDownCards === 1 ? '1' : '3')
+    setUnoDrawChain(h.unoDrawUntilPlayable === true)
   }, [gameId, defaultTarget])
 
   const onTargetBlur = () => {
@@ -108,6 +112,24 @@ export function GameHouseRulesPanel({ gameId, manifest, readOnly = false }: Game
           <span>
             When the <strong>draw pile</strong> is empty, shuffle the <strong>discard pile</strong> into a new draw pile
             (top discard stays face-up).
+          </span>
+        </label>
+      )}
+
+      {gameId === 'uno' && (
+        <label className="app__houseRulesCheck">
+          <input
+            type="checkbox"
+            checked={unoDrawChain}
+            onChange={(e) => {
+              const on = e.target.checked
+              setUnoDrawChain(on)
+              patchHouseRulesForGame('uno', { unoDrawUntilPlayable: on ? true : null })
+            }}
+          />
+          <span>
+            When you must draw, <strong>keep drawing</strong> until a card can be played on the discard; you must then
+            play that card (cannot pass it).
           </span>
         </label>
       )}

@@ -30,6 +30,8 @@ export interface CreateSessionOptions {
    * Override “shuffle discard into draw when draw is empty” for games that support it (see house rules).
    */
   reshuffleDiscardWhenDrawEmpty?: boolean
+  /** Uno: draw until a playable card, then must play that card (house rule). */
+  unoDrawUntilPlayable?: boolean
   /**
    * Remote human opponents (networked peers). Applied only for games in {@link gameSupportsOnlineMultiplayer}.
    * Player 0 is always the local human; remote humans occupy 1..N before any AI seats.

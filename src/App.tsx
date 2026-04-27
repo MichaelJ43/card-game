@@ -37,6 +37,7 @@ import { ChatToastStack } from './ui/ChatToastStack'
 import { MultiplayerPanel } from './ui/MultiplayerPanel'
 import { openChatPopoutWindow } from './ui/openChatPopout'
 import { RulesModal } from './ui/RulesModal'
+import { UnoWildColorModal, type UnoWildColor } from './ui/UnoWildColorModal'
 import { TableView, type ActiveTurnHighlight, type TableIntent } from './ui/TableView'
 import { skyjoDumpUiStepShouldReset, type SkyjoDumpUiStep } from './ui/tableUiFlow'
 import type { GameAction } from './core/types'
@@ -377,6 +378,8 @@ function App() {
   const [gfRank, setGfRank] = useState('A')
   const [skyjoDumpStep, setSkyjoDumpStep] = useState<SkyjoDumpUiStep>('idle')
   const [rulesOpen, setRulesOpen] = useState(false)
+  /** Pending legal wild play actions (same index, different colors) when the color modal is open. */
+  const [unoWildPlayActions, setUnoWildPlayActions] = useState<GameAction[]>([])
   const [hostClientRoster, setHostClientRoster] = useState<HostedPeer[]>([])
   /** True while this browser is an active room host (not ref-driven — avoids reading refs during render). */
   const [multiplayerHostActive, setMultiplayerHostActive] = useState(false)
@@ -1305,11 +1308,45 @@ function App() {
     }
   }, [session])
 
+  useEffect(() => {
+    if (!session || !isUnoSession(session)) {
+      setUnoWildPlayActions([])
+      return
+    }
+    const g = session.gameState as { phase?: string; currentPlayer?: number }
+    if (g.phase !== 'play' || g.currentPlayer !== shellHumanSeat(session)) {
+      setUnoWildPlayActions([])
+    }
+  }, [session])
+
   const aiCountLocked = Boolean(session?.match && !session.match.complete)
 
   const tableIntentZones = useMemo((): readonly string[] | undefined => {
     if (!session || networkSpectator) return undefined
     const sh = shellHumanSeat(session)
+    if (isUnoSession(session) && (session.gameState as { phase?: string }).phase === 'play') {
+      const cp = (session.gameState as { currentPlayer: number }).currentPlayer
+      if (cp !== sh) return undefined
+      const legals = session.module.getLegalActions(session.table, session.gameState)
+      const zones: string[] = []
+      if (
+        legals.some((a) => {
+          if (a.type !== 'custom') return false
+          return (a.payload as { cmd?: unknown }).cmd === 'unoDraw'
+        })
+      ) {
+        zones.push('draw')
+      }
+      if (
+        legals.some((a) => {
+          if (a.type !== 'custom') return false
+          return (a.payload as { cmd?: unknown }).cmd === 'unoPlay'
+        })
+      ) {
+        zones.push(`hand:${sh}`)
+      }
+      return zones.length > 0 ? zones : undefined
+    }
     if (isSkyjoSession(session) && session.gameState.phase !== 'roundOver' && session.gameState.currentPlayer === sh) {
       const gs = session.gameState
       if (gs.pendingDraw) {
@@ -1334,6 +1371,42 @@ function App() {
       const sh = shellHumanSeat(session)
       const myGrid = `grid:${sh}`
       const myHand = `hand:${sh}`
+
+      if (isUnoSession(session)) {
+        const g = session.gameState as { phase?: string; currentPlayer?: number }
+        if (g.phase !== 'play' || g.currentPlayer !== sh) return
+        if (intent.kind === 'stack' && intent.zoneId === 'draw') {
+          const action: GameAction = { type: 'custom', payload: { cmd: 'unoDraw' } }
+          const preview = session.module.applyAction(session.table, session.gameState, action)
+          if (preview.error) {
+            window.alert(preview.error)
+            return
+          }
+          dispatchAction(action)
+          return
+        }
+        if (intent.kind === 'card' && intent.zoneId === myHand) {
+          const cardIndex = intent.cardIndex
+          const legals = session.module.getLegalActions(session.table, session.gameState)
+          const plays = legals.filter(
+            (a): a is Extract<GameAction, { type: 'custom' }> =>
+              a.type === 'custom' &&
+              (a.payload as { cmd?: string }).cmd === 'unoPlay' &&
+              Number((a.payload as { index?: number }).index) === cardIndex,
+          )
+          if (plays.length === 0) {
+            window.alert('That card is not a legal play right now.')
+            return
+          }
+          if (plays.length === 1) {
+            dispatchAction(plays[0]!)
+            return
+          }
+          setUnoWildPlayActions(plays)
+        }
+        return
+      }
+
       if (isSkyjoSession(session)) {
         const gs = session.gameState
         if (gs.phase === 'roundOver' || gs.currentPlayer !== sh) return
@@ -1429,6 +1502,20 @@ function App() {
       }
     },
     [session, networkSpectator, dispatchAction, skyjoDumpStep, gfAwaitingOpponent, gfRank, humanRanks],
+  )
+
+  const onUnoWildColorPick = useCallback(
+    (col: UnoWildColor) => {
+      const a = unoWildPlayActions.find(
+        (x) =>
+          x.type === 'custom' &&
+          (x.payload as { cmd?: string; color?: string }).cmd === 'unoPlay' &&
+          (x.payload as { color?: string }).color === col,
+      )
+      setUnoWildPlayActions([])
+      if (a) dispatchAction(a)
+    },
+    [unoWildPlayActions, dispatchAction],
   )
 
   return (
@@ -1714,6 +1801,16 @@ function App() {
                 </div>
               )}
 
+            {gameId === 'uno' &&
+              isUnoSession(session) &&
+              (session.gameState as { phase?: string }).phase === 'play' &&
+              (session.gameState as { currentPlayer: number }).currentPlayer === shellHumanSeat(session) && (
+                <p className="app__tableIntentHint">
+                  Click a card in your hand to play, or the draw pile to draw when you have no play. Wild cards open
+                  a color chooser.
+                </p>
+              )}
+
             {legalCustomActions.length > 0 && (
               <div className="app__customActions" role="group" aria-label="Game actions">
                 {legalCustomActions.map((a) => (
@@ -1754,6 +1851,11 @@ function App() {
       )}
       </main>
 
+      <UnoWildColorModal
+        open={unoWildPlayActions.length > 0}
+        onClose={() => setUnoWildPlayActions([])}
+        onChooseColor={onUnoWildColorPick}
+      />
       <RulesModal
         open={rulesOpen}
         onClose={() => setRulesOpen(false)}

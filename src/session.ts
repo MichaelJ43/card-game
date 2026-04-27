@@ -13,7 +13,12 @@ import {
   type CreateSessionOptions,
 } from './session/playerConfig'
 import type { SeatProfile } from './session/seatProfiles'
-import { clampMatchTargetScore, createSessionOptionsHouseRules, effectiveReshuffleDiscardWhenDrawEmpty } from './data/houseRules'
+import {
+  clampMatchTargetScore,
+  createSessionOptionsHouseRules,
+  effectiveReshuffleDiscardWhenDrawEmpty,
+  effectiveUnoDrawUntilPlayable,
+} from './data/houseRules'
 import type { RulesGameId } from './data/rulesSources'
 
 export type { MatchState } from './core/match'
@@ -93,6 +98,7 @@ export function createSession(
     manifest,
     options,
   )
+  const unoDrawUntilPlayable = effectiveUnoDrawUntilPlayable(gameId as RulesGameId, options)
 
   const { table, gameState } = mod.setup(
     {
@@ -104,6 +110,7 @@ export function createSession(
       warTieDownCards: options?.warTieDownCards,
       skyjoDiscardSwapFaceUpOnly: options?.skyjoDiscardSwapFaceUpOnly,
       reshuffleDiscardWhenDrawEmpty,
+      unoDrawUntilPlayable,
     },
     instances,
   )
@@ -163,6 +170,10 @@ export function continuationOptionsFromSession(prev: GameSession): CreateSession
   }
   if (prev.manifest.module === 'war' && (gs.tieDownCards === 1 || gs.tieDownCards === 3)) {
     base.warTieDownCards = gs.tieDownCards
+  }
+  if (prev.manifest.module === 'uno' && typeof (gs as { drawUntilPlayable?: boolean }).drawUntilPlayable === 'boolean') {
+    const u = gs as { drawUntilPlayable: boolean }
+    base.unoDrawUntilPlayable = u.drawUntilPlayable
   }
   return base
 }

@@ -19,6 +19,8 @@ export interface GameHouseRules {
    * Omitted = use manifest default or built-in per-game default.
    */
   reshuffleDiscardWhenDrawEmpty?: boolean
+  /** Uno: keep drawing from the pile until a card can be played, then you must play that card. */
+  unoDrawUntilPlayable?: boolean
 }
 
 /** Games that expose the discard→draw recycle toggle in Rules → Options. */
@@ -124,5 +126,14 @@ export function createSessionOptionsHouseRules(gameId: RulesGameId): Partial<Cre
   if (hr.warTieDownCards === 1 || hr.warTieDownCards === 3) o.warTieDownCards = hr.warTieDownCards
   if (hr.reshuffleDiscardWhenDrawEmpty === true) o.reshuffleDiscardWhenDrawEmpty = true
   if (hr.reshuffleDiscardWhenDrawEmpty === false) o.reshuffleDiscardWhenDrawEmpty = false
+  if (hr.unoDrawUntilPlayable === true) o.unoDrawUntilPlayable = true
+  if (hr.unoDrawUntilPlayable === false) o.unoDrawUntilPlayable = false
   return o
+}
+
+export function effectiveUnoDrawUntilPlayable(gameId: RulesGameId, options?: CreateSessionOptions): boolean {
+  if (gameId !== 'uno') return false
+  if (options?.unoDrawUntilPlayable === true) return true
+  if (options?.unoDrawUntilPlayable === false) return false
+  return !!getHouseRulesForGame('uno').unoDrawUntilPlayable
 }
