@@ -5,6 +5,9 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>card-game</title>
+    <link rel="stylesheet" href="https://static.michaelj43.dev/v1/m43-tokens.css" />
+    <link rel="stylesheet" href="https://static.michaelj43.dev/v1/m43-shell.css" />
+    <link rel="stylesheet" href="https://static.michaelj43.dev/v1/m43-primitives.css" />
     <script
       src="https://static.michaelj43.dev/v1/m43-analytics.js"
       defer
@@ -13,8 +16,19 @@
       data-m43-spa="true"
     ></script>
   </head>
-  <body>
-    <div id="root"></div>
+  <body class="m43 m43-page m43-page--content-wide">
+    <div data-m43-auth-header></div>
+    <div class="m43-page__body m43">
+      <div id="root"></div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
+    <script
+      src="https://static.michaelj43.dev/v1/m43-auth-header.js"
+      defer
+      data-m43-auth
+      data-m43-api="https://api.michaelj43.dev"
+      data-m43-auth-origin="https://auth.michaelj43.dev"
+      data-m43-home-url="https://michaelj43.dev/"
+    ></script>
   </body>
 </html>

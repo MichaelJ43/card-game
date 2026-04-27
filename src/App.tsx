@@ -1390,7 +1390,7 @@ function App() {
 
   return (
     <div className="app">
-      <header className="app__header">
+      <header className="m43-site-header m43-site-header--wide app__header">
         <div className="app__headerRow">
           <h1 className="app__title">Card table</h1>
           <AudioCueBar inRoom={multiplayerHostActive || joinedAsClient} />
@@ -1547,6 +1547,7 @@ function App() {
         </div>
       </header>
 
+      <main className="m43-main m43-main--wide app__main">
       {gameSupportsOnlineMultiplayer(gameId) && (
         <MultiplayerPanel
           gameId={gameId}
@@ -1709,7 +1710,7 @@ function App() {
             )}
           </div>
 
-          <footer className="app__footer">
+          <footer className="m43-site-footer m43-site-footer--wide app__footer">
             <span>
               {session.manifest.name} — deck <code>{session.manifest.deck}</code> — module{' '}
               <code>{session.manifest.module}</code>
@@ -1717,6 +1718,7 @@ function App() {
           </footer>
         </>
       )}
+      </main>
 
       <RulesModal
         open={rulesOpen}

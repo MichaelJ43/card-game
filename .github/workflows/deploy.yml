@@ -12,6 +12,7 @@ on:
     paths:
       - 'index.html'
       - 'chat-popout.html'
+      - 'vite.config.ts'
       - 'src/**'
       - 'lambda/**'
       - 'deploy/terraform/**'

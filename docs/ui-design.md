@@ -1,6 +1,8 @@
 # Shell UI design
 
-Conventions for the **app chrome** around the table: header toolbar, dialogs that reuse shell styles, and the **Online play** (`MultiplayerPanel`) block. Implementation lives primarily in [`src/App.css`](../src/App.css); the shell is [`src/App.tsx`](../src/App.tsx).
+The page uses the shared **m43** design system (tokens, shell, primitives) from `https://static.michaelj43.dev/v1/` plus a fixed **auth top bar** (`m43-auth-header.js`). Product-specific chrome (toolbar, multiplayer strip, modals) still uses the `app__*` classes in [`src/App.css`](../src/App.css) and [`src/App.tsx`](../src/App.tsx); [`src/index.css`](../src/index.css) maps legacy CSS variables (`--text`, `--bg`, …) to **`--m43-*`** so existing styles track the shared palette.
+
+Conventions for the **app chrome** around the table: header toolbar, dialogs that reuse shell styles, and the **Online play** (`MultiplayerPanel`) block.
 
 ## Toolbar buttons (header)
 
