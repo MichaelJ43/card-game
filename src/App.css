@@ -79,12 +79,34 @@
 }
 
 .app__toolbarControls {
+  --app-toolbar-control-minh: 2.5rem;
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem 1rem;
   align-items: flex-end;
   width: 100%;
   min-width: 0;
+}
+
+/* Shared height / padding so game select, AI count, and action buttons line up */
+.app__toolbarControls .app__select,
+.app__toolbarControls .app__inputNumber,
+.app__toolbarControls .app__btnToolbar {
+  min-height: var(--app-toolbar-control-minh);
+  box-sizing: border-box;
+  line-height: 1.25;
+}
+
+.app__toolbarControls .app__select,
+.app__toolbarControls .app__inputNumber {
+  padding: 0.4rem 0.6rem;
+}
+
+.app__toolbarControls .app__btnToolbar {
+  padding: 0.4rem 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .app__toolbarScores {
@@ -117,16 +139,9 @@
 
 .app__toolbarActions {
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  flex-direction: row;
+  align-items: flex-end;
   flex: 0 0 auto;
-}
-
-.app__toolbarActionsLabel {
-  font-size: 0.85rem;
-  font-weight: 600;
-  line-height: 1.2;
-  color: inherit;
 }
 
 .app__toolbarActionsBtns {
@@ -138,7 +153,7 @@
 
 .app__btnToolbar {
   padding: 0.42rem 0.85rem;
-  min-height: 2.25rem;
+  min-height: 2.5rem;
   box-sizing: border-box;
 }
 
@@ -159,6 +174,19 @@
   gap: 0.35rem;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+/* At least as wide as the "AI opponents" line; number field fills the label */
+.app__label--aiOpponents {
+  flex: 0 1 auto;
+  min-width: 14ch;
+  max-width: 100%;
+}
+
+.app__label--aiOpponents .app__inputNumber {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .app__select {

@@ -1465,7 +1465,7 @@ function App() {
                     </select>
                   </label>
                   {gameSupportsConfigurableAi(gameId) && (
-                    <label className="app__label">
+                    <label className="app__label app__label--aiOpponents">
                       AI opponents
                       <input
                         className="app__inputNumber"
@@ -1489,7 +1489,6 @@ function App() {
                     </label>
                   )}
                   <div className="app__toolbarActions">
-                    {!onlineClientShell && <span className="app__toolbarActionsLabel">Actions</span>}
                     <div className="app__toolbarActionsBtns">
                       {!onlineClientShell && (
                         <button

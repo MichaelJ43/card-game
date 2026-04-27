@@ -9,7 +9,7 @@ Conventions for the **app chrome** around the table: header toolbar, dialogs tha
 Secondary actions in the header (e.g. **Rules**, **New deal**, **End game**, AI difficulty controls) use:
 
 - `app__btnSecondary` — base secondary button (border, transparent fill, theme text color).
-- `app__btnToolbar` — toolbar sizing: `min-height: 2.25rem`, slightly tighter horizontal padding than the default `app__btnSecondary` alone.
+- `app__btnToolbar` — shared shell button sizing: `min-height: 2.5rem` (header toolbar row unifies with selects/inputs). Slightly tighter horizontal padding than the default `app__btnSecondary` alone.
 
 **Pattern:** combine both classes on `<button>` elements:
 
