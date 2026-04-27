@@ -1289,6 +1289,17 @@ const skyjoModule: GameModule<SkyjoGameState> = {
     if (gs.phase !== 'roundOver' || !gs.roundScores?.length) return null
     return gs.roundScores
   },
+
+  extractMatchRoundScoreCellNotes(gs) {
+    if (gs.phase !== 'roundOver' || !gs.roundScores?.length) return null
+    const n = gs.roundScores.length
+    if (!gs.finisherDoubled) return Array.from({ length: n }, () => null)
+    const fin = gs.skyjoFinisher
+    if (fin == null || fin < 0 || fin >= n) return Array.from({ length: n }, () => null)
+    return Array.from({ length: n }, (_, i) =>
+      i === fin ? 'This score was doubled: first to go out, but not the lowest (or tied lowest) value.' : null,
+    )
+  },
 }
 
 registerGameModule(skyjoModule)
