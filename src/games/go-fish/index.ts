@@ -460,7 +460,7 @@ const goFishModule: GameModule<GoFishGameState> = {
       s: a.type === 'goFishAsk' ? scoreGoFishAsk(a, sim, templates, playerIndex) : 0,
     }))
 
-    if (difficulty === 'hard') {
+    if (difficulty === 'hard' || difficulty === 'expert') {
       const maxS = Math.max(...scored.map((x) => x.s))
       const top = scored.filter((x) => x.s === maxS)
       return top[Math.floor(rng() * top.length)]!.a
