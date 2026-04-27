@@ -329,7 +329,6 @@
 
 .matchCumulative__roundPenalty {
   color: var(--match-cumulative-penalty, #b91c1c);
-  font-weight: 700;
   cursor: help;
   text-decoration: underline;
   text-decoration-style: dotted;
