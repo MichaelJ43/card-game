@@ -1310,6 +1310,17 @@ function App() {
   const tableIntentZones = useMemo((): readonly string[] | undefined => {
     if (!session || networkSpectator) return undefined
     const sh = shellHumanSeat(session)
+    if (isUnoSession(session) && (session.gameState as { phase?: string }).phase === 'play') {
+      const cp = (session.gameState as { currentPlayer: number }).currentPlayer
+      if (cp !== sh) return undefined
+      const legals = session.module.getLegalActions(session.table, session.gameState)
+      const canDraw = legals.some((a) => {
+        if (a.type !== 'custom') return false
+        const cmd = (a.payload as { cmd?: unknown }).cmd
+        return cmd === 'unoDraw'
+      })
+      return canDraw ? (['draw'] as const) : undefined
+    }
     if (isSkyjoSession(session) && session.gameState.phase !== 'roundOver' && session.gameState.currentPlayer === sh) {
       const gs = session.gameState
       if (gs.pendingDraw) {
@@ -1334,6 +1345,22 @@ function App() {
       const sh = shellHumanSeat(session)
       const myGrid = `grid:${sh}`
       const myHand = `hand:${sh}`
+
+      if (isUnoSession(session)) {
+        const g = session.gameState as { phase?: string; currentPlayer?: number }
+        if (g.phase !== 'play' || g.currentPlayer !== sh) return
+        if (intent.kind === 'stack' && intent.zoneId === 'draw') {
+          const action: GameAction = { type: 'custom', payload: { cmd: 'unoDraw' } }
+          const preview = session.module.applyAction(session.table, session.gameState, action)
+          if (preview.error) {
+            window.alert(preview.error)
+            return
+          }
+          dispatchAction(action)
+        }
+        return
+      }
+
       if (isSkyjoSession(session)) {
         const gs = session.gameState
         if (gs.phase === 'roundOver' || gs.currentPlayer !== sh) return

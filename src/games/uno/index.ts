@@ -134,6 +134,13 @@ export interface UnoGameState {
   currentColor: UnoColor
   drewThisTurn: boolean
   drawSlot: number | null
+  /**
+   * When true, after drawing you must play the card at `drawSlot` (cannot pass).
+   * Set when the optional “draw until playable” house rule is on and a playable card was drawn.
+   */
+  mustPlayDrawnCard: boolean
+  /** House rule: kept for UI / next round; immutable during a round. */
+  drawUntilPlayable: boolean
   message: string
   roundScores: number[] | null
   reshuffleDiscardWhenDrawEmpty: boolean
@@ -170,7 +177,11 @@ function computeLegalActions(
   const hz = table.zones[handId(playerIndex)]!.cards
   const out: GameAction[] = []
 
-  if (gs.drewThisTurn && gs.drawSlot !== null) {
+  if (gs.drewThisTurn) {
+    if (gs.drawSlot === null) {
+      out.push({ type: 'custom', payload: { cmd: 'unoPassAfterDraw' } })
+      return out
+    }
     const idx = gs.drawSlot
     const card = hz[idx]
     if (!card) {
@@ -186,8 +197,12 @@ function computeLegalActions(
       } else {
         out.push({ type: 'custom', payload: { cmd: 'unoPlay', index: idx } })
       }
+      if (!gs.mustPlayDrawnCard) {
+        out.push({ type: 'custom', payload: { cmd: 'unoPassAfterDraw' } })
+      }
+    } else {
+      out.push({ type: 'custom', payload: { cmd: 'unoPassAfterDraw' } })
     }
-    out.push({ type: 'custom', payload: { cmd: 'unoPassAfterDraw' } })
     return out
   }
 
@@ -268,6 +283,8 @@ const unoModule: GameModule<UnoGameState> = {
         currentColor: startColor,
         drewThisTurn: false,
         drawSlot: null,
+        mustPlayDrawnCard: false,
+        drawUntilPlayable: ctx.unoDrawUntilPlayable === true,
         message: 'Match color or number — Wilds are always playable.',
         roundScores: null,
         reshuffleDiscardWhenDrawEmpty: ctx.reshuffleDiscardWhenDrawEmpty ?? false,
@@ -294,6 +311,17 @@ const unoModule: GameModule<UnoGameState> = {
 
     if (c === 'unoPassAfterDraw') {
       if (!gs.drewThisTurn) return { table: t, gameState: gs, error: 'Pass only after drawing.' }
+      if (gs.mustPlayDrawnCard && gs.drawSlot !== null) {
+        const up = topDiscard(t)
+        const c0 = hz[gs.drawSlot]
+        if (c0 && up) {
+          const t0 = templates[c0.templateId]!
+          const tTop = templates[up.templateId]!
+          if (canPlay(t0, tTop, gs.currentColor)) {
+            return { table: t, gameState: gs, error: 'You must play the drawn card.' }
+          }
+        }
+      }
       const next = step(cp, gs.direction, pCount)
       return {
         table: t,
@@ -302,6 +330,7 @@ const unoModule: GameModule<UnoGameState> = {
           currentPlayer: next,
           drewThisTurn: false,
           drawSlot: null,
+          mustPlayDrawnCard: false,
           message: next === 0 ? 'Your turn.' : `Player ${next}'s turn.`,
         },
       }
@@ -329,6 +358,49 @@ const unoModule: GameModule<UnoGameState> = {
       const topTpl = templates[top.templateId]!
       const hasPlay = hz.some((card) => canPlay(templates[card.templateId]!, topTpl, gs.currentColor))
       if (hasPlay) return { table: t, gameState: gs, error: 'You have a playable card.' }
+
+      if (gs.drawUntilPlayable) {
+        let newSlot: number | null = null
+        let foundPlayable = false
+        for (;;) {
+          ensureDraw(t, rng, gs.reshuffleDiscardWhenDrawEmpty)
+          if (t.zones.draw!.cards.length === 0) break
+          moveTop(t, 'draw', hid, cp === 0)
+          newSlot = hz.length - 1
+          const drawn = hz[newSlot]!
+          const dTpl = templates[drawn.templateId]!
+          if (canPlay(dTpl, topTpl, gs.currentColor)) {
+            foundPlayable = true
+            break
+          }
+        }
+        if (foundPlayable && newSlot !== null) {
+          return {
+            table: t,
+            gameState: {
+              ...gs,
+              drewThisTurn: true,
+              drawSlot: newSlot,
+              mustPlayDrawnCard: true,
+              message: 'You must play the drawn card.',
+            },
+          }
+        }
+        if (newSlot !== null) {
+          return {
+            table: t,
+            gameState: {
+              ...gs,
+              drewThisTurn: true,
+              drawSlot: null,
+              mustPlayDrawnCard: false,
+              message: 'No playable card; end your turn.',
+            },
+          }
+        }
+        return { table: t, gameState: gs, error: 'Cannot draw.' }
+      }
+
       ensureDraw(t, rng, gs.reshuffleDiscardWhenDrawEmpty)
       if (t.zones.draw!.cards.length === 0) return { table: t, gameState: gs, error: 'Cannot draw.' }
       moveTop(t, 'draw', hid, cp === 0)
@@ -339,6 +411,7 @@ const unoModule: GameModule<UnoGameState> = {
           ...gs,
           drewThisTurn: true,
           drawSlot: newSlot,
+          mustPlayDrawnCard: false,
           message: 'Play the drawn card or end turn.',
         },
       }
@@ -358,7 +431,7 @@ const unoModule: GameModule<UnoGameState> = {
     if (!canPlay(playTpl, topTpl, gs.currentColor)) {
       return { table: t, gameState: gs, error: 'Illegal play.' }
     }
-    if (gs.drewThisTurn && gs.drawSlot !== idx) {
+    if (gs.drewThisTurn && gs.drawSlot != null && gs.drawSlot !== idx) {
       return { table: t, gameState: gs, error: 'Play the drawn card or pass.' }
     }
     const colorPick = (action.payload as { color?: string }).color
@@ -390,6 +463,8 @@ const unoModule: GameModule<UnoGameState> = {
           currentColor: newColor,
           drewThisTurn: false,
           drawSlot: null,
+          mustPlayDrawnCard: false,
+          drawUntilPlayable: gs.drawUntilPlayable,
           message: `Player ${cp} went out!`,
           roundScores: scores,
           reshuffleDiscardWhenDrawEmpty: gs.reshuffleDiscardWhenDrawEmpty,
@@ -439,6 +514,7 @@ const unoModule: GameModule<UnoGameState> = {
         currentColor: newColor,
         drewThisTurn: false,
         drawSlot: null,
+        mustPlayDrawnCard: false,
         message: next === 0 ? 'Your turn.' : `Player ${next}'s turn.`,
       },
     }

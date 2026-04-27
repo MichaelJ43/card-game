@@ -22,9 +22,13 @@ Uno-style play: get rid of your cards first by matching **color** or **symbol** 
 
 ## Drawing when stuck
 
-1. If you cannot play, **draw** one card from the pile.
+1. If you cannot play, **draw** one card from the pile. You can **click the draw pile** on the table or use the on-screen **Draw** control.
 1. If that new card **can be played**, you may play it immediately.
-1. Otherwise you typically **end your turn** without playing (this app exposes **Draw** / pass-style actions as appropriate).
+1. Otherwise you typically **end your turn** without playing (this app exposes pass-style actions as appropriate).
+
+## Optional house rule (Rules → Options)
+
+1. **Draw until you can play, then you must play that card:** when you have no play, the app can keep drawing for you until a card *can* be played on the discard, or the deck is exhausted. If a playable card is drawn, you **must** play it (no passing it). If the deck runs out first, you add any unplayable cards to your hand and end your turn.
 
 ## Special cards (typical meanings)
 
@@ -46,5 +50,5 @@ Uno-style play: get rid of your cards first by matching **color** or **symbol** 
 
 ## Playing in this app
 
-1. Use on-screen **custom actions** for draw and play; wilds prompt for **color** where needed.
+1. Use on-screen **custom actions** for play; **click the draw pile** or the **Draw** control to draw. Wilds prompt for **color** where needed.
 1. Watch the **status** line for skips and draws.
