@@ -31,7 +31,7 @@ Start the dev server (hot reload):
 npm run dev
 ```
 
-Then open the URL Vite prints (usually `http://localhost:5173`).
+Then open the **https** URL Vite prints (for example `https://localhost:5173`). The dev server uses a generated certificate (`@vitejs/plugin-basic-ssl`); your browser may ask you to trust it once. HTTPS keeps `returnUrl` flows aligned with production auth (`https` only on the API).
 
 ### Online multiplayer (local)
 
@@ -42,6 +42,12 @@ In a live room, use **Open chat** in the **Online play** strip for [ephemeral ro
 Choosing another entry in the **Game** menu updates the selection only; press **Start deal** (or **New deal** when a hand is already on the table) to shuffle and play.
 
 Use **Rules** (next to **End game**) to open a modal with the in-app rules for the **currently selected** game (you can read them before **Start deal**).
+
+### m43 shell and auth
+
+The app loads shared **m43** CSS from `https://static.michaelj43.dev/v1/` (`m43-tokens.css`, `m43-shell.css`, `m43-primitives.css`) and the **`m43-auth-header.js`** top bar (Log in / profile against `https://api.michaelj43.dev` / `https://auth.michaelj43.dev`). **Home** in the bar points at `https://michaelj43.dev/`. Add `?m43debug=1` for auth header console diagnostics.
+
+Wide layout uses **`m43-page--content-wide`** and **`m43-*--wide`** classes; that needs **`--m43-content-max-xl`** in the published token/shell CSS ([static-assets](https://github.com/MichaelJ43/static-assets) wide-layout release).
 
 ### Analytics
 

@@ -1,19 +1,19 @@
+/* App variables track m43 tokens (m43-*.css loaded from index.html before this bundle). */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
+  --text: var(--m43-muted);
+  --text-h: var(--m43-text);
+  --text-muted: var(--m43-muted);
+  --bg: var(--m43-bg);
+  --border: var(--m43-border);
+  --code-bg: var(--m43-surface-inset);
+  --accent: var(--m43-accent);
+  --accent-bg: color-mix(in srgb, var(--m43-accent) 14%, transparent);
+  --accent-border: color-mix(in srgb, var(--m43-accent) 50%, var(--m43-border));
+  --social-bg: color-mix(in srgb, var(--m43-muted) 14%, var(--m43-bg));
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
-  --text-muted: #5c566a;
-
-  /* Cumulative score panel (toolbar + table; light mode = high contrast on white) */
+  /* Cumulative score panel */
   --match-cumulative-surface: color-mix(in srgb, var(--text-h) 4.5%, var(--bg));
   --match-cumulative-border: color-mix(in srgb, var(--text-h) 14%, var(--border));
   --match-cumulative-inset: color-mix(in srgb, var(--bg) 70%, var(--text-h) 30%);
@@ -29,9 +29,9 @@
   --match-cumulative-total-border: #059669;
   --match-cumulative-meta: var(--text-muted);
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --sans: var(--m43-font-sans);
+  --heading: var(--m43-font-sans);
+  --mono: var(--m43-font-mono);
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
@@ -50,12 +50,6 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --text-muted: #9ca3af;
-
     --match-cumulative-surface: color-mix(in srgb, var(--text-h) 7%, var(--bg));
     --match-cumulative-border: color-mix(in srgb, var(--text-h) 22%, var(--border));
     --match-cumulative-inset: color-mix(in srgb, var(--text-h) 8%, transparent);
@@ -70,11 +64,6 @@
     --match-cumulative-total-fg: #a7f3d0;
     --match-cumulative-total-border: #34d399;
     --match-cumulative-meta: #a1a1aa;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
   }
