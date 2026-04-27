@@ -25,7 +25,8 @@ This document summarizes how the **card-game** repository is structured, how gam
 | `src/core/match.ts` | **`MatchState`**, **`applyFinishedRound`**, **`createInitialMatchState`**, end condition **`anyAtOrAbove`**, **`winnerIs`**: `lowest` \| `highest`. |
 | `src/core/table.ts` | **`createEmptyTable`**, **`cloneTable`**, **`moveTop`**, zone helpers. |
 | `src/core/registry.ts` | **`registerGameModule`** / **`getGameModule`** — modules self-register on import. |
-| `src/core/aiContext.ts` | **`AiDifficulty`**: `easy` \| `medium` \| `hard`; **`SelectAiContext`** (difficulty + optional match fields for Skyjo AI). |
+| `src/core/aiContext.ts` | **`AiDifficulty`**: `easy` \| `medium` \| `hard` \| `expert`; **`SelectAiContext`** (difficulty + optional match fields for Skyjo AI). |
+| `docs/ai-behavior.md` | **Table AI**: what each **difficulty** does, which games use **`SelectAiContext`**, and which modules ignore it. |
 | `src/data/manifests.ts` | **`GAME_SOURCES`**, **`DECK_SOURCES`**, **`GAME_IDS`** — Vite `?raw` imports wiring ids to YAML strings. |
 | `src/data/rulesSources.ts` | **`RULES_SOURCES`**, **`rulesTextForGame`**, **`RulesGameId`** — maps each **`GAME_IDS`** entry to `src/rules/*.md` raw markdown. |
 | `src/data/houseRules.ts` | **`localStorage`** persistence for per-game **house rules**; **`createSessionOptionsHouseRules`** merges into **`CreateSessionOptions`**; **`GAMES_WITH_DISCARD_RECYCLE_OPTION`** controls which games show the “reshuffle discard when draw empty” toggle; **`effectiveReshuffleDiscardWhenDrawEmpty`** resolves manifest default + stored preference + session options. |
@@ -117,10 +118,12 @@ Central definition in **`src/core/types.ts`**. Examples: **`skyjoDraw`**, **`sky
 
 ## AI
 
+User-facing details (per-level behavior, per-game) are in **`docs/ai-behavior.md`**.
+
 - **`SelectAiContext`** includes **`difficulty`** and (for Skyjo) optional **`matchCumulativeScores`**, **`matchTargetScore`**.
 - **`gameSupportsConfigurableAi`**: games where the user can set **AI opponent count** (capped at 1 for “heads-up only” ids — see **`HEADS_UP_GAME_IDS`** in **`playerConfig.ts`**).
-- **`gameSupportsPerSeatAiDifficulty`**: currently **`go-fish`** and **`skyjo`** — **`App`** renders per-seat difficulty selects and passes them in **`CreateSessionOptions.aiDifficulties`**.
-- Other titles may use **`selectAiAction`** with a fixed difficulty in **`useEffect`** (e.g. Crazy Eights, Uno) or **`null`** if the game does not use table AI turns the same way.
+- **`gameSupportsPerSeatAiDifficulty`**: currently **`go-fish`** and **`skyjo`** — **`App`** renders per-seat difficulty selects and passes them in **`CreateSessionOptions.aiDifficulties`**. Only those modules *interpret* that field; other titles with timer-driven AI may use a fixed context or ignore **`difficulty`**.
+- Other titles may use **`selectAiAction`** with a fixed difficulty in **`useEffect`** (e.g. Crazy Eights, Uno use `{ difficulty: 'medium' }` even though they do not read it) or **`null`** if the game does not use table AI turns the same way (e.g. War).
 
 When adding AI to a game, implement **`selectAiAction`** and ensure **`getLegalActions`** matches what humans can do.
 
