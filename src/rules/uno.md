@@ -50,5 +50,5 @@ Uno-style play: get rid of your cards first by matching **color** or **symbol** 
 
 ## Playing in this app
 
-1. Use on-screen **custom actions** for play; **click the draw pile** or the **Draw** control to draw. Wilds prompt for **color** where needed.
+1. **Click a card in your hand** to play, **click the draw pile** (or **Draw**) to draw when you have no play, and use on-screen **custom actions** as an alternative. **Wilds** open a color chooser; you can still use the labeled wild buttons in the action row if you prefer.
 1. Watch the **status** line for skips and draws.

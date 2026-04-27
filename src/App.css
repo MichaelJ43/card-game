@@ -502,6 +502,61 @@
   max-height: min(90vh, 42rem);
 }
 
+.app__modal--unoWild {
+  width: min(22rem, 100%);
+  max-height: min(90vh, 24rem);
+}
+
+.app__modalBody--unoWild {
+  padding-top: 0.5rem;
+}
+
+.app__unoColorGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.app__unoColorBtn {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-radius: 0.4rem;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.app__unoColorSwatch--r {
+  background: #c41e1e;
+}
+.app__unoColorSwatch--r:hover {
+  filter: brightness(1.1);
+}
+.app__unoColorSwatch--y {
+  background: #c9a000;
+}
+.app__unoColorSwatch--y:hover {
+  filter: brightness(1.1);
+}
+.app__unoColorSwatch--g {
+  background: #16803c;
+}
+.app__unoColorSwatch--g:hover {
+  filter: brightness(1.1);
+}
+.app__unoColorSwatch--b {
+  background: #1a56b8;
+}
+.app__unoColorSwatch--b:hover {
+  filter: brightness(1.1);
+}
+
 .app__modalHeader {
   display: flex;
   flex-wrap: wrap;
