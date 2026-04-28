@@ -51,7 +51,7 @@ Wide layout uses **`m43-page--content-wide`** and **`m43-*--wide`** classes; tha
 
 ### Analytics
 
-The browser entries load `https://static.michaelj43.dev/v1/m43-analytics.js` with app id `card-game`. It records pageview events to `https://api.michaelj43.dev/analytics/events?v=1`; add `?m43debug=1` to a page URL to see client diagnostics in the browser console.
+The browser entries load `https://static.michaelj43.dev/v1/m43-analytics.js` with app id `card-game`. It records pageview events to `https://api.michaelj43.dev/analytics/events?v=1`; add `?m43debug=1` to a page URL to see client diagnostics in the browser console. The app also sends **`game_start`** when a deal begins (and **`match_round_start`** when continuing a multi-round match); event metadata is in **`context`** (stored server-side under **`properties`**), including game id, AI count, human/remote seat counts, spectator flag, and whether the browser is hosting or a joined client—see [`src/analytics/m43GameAnalytics.ts`](src/analytics/m43GameAnalytics.ts).
 
 Production build and local preview of the built assets:
 

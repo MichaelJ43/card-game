@@ -49,6 +49,7 @@ import { playAudioCue } from './audio/playCue'
 import { tableCardFingerprint } from './audio/tableFingerprint'
 import { turnSignalFromSession } from './audio/turnSignal'
 import { AudioCueBar } from './ui/AudioCueBar'
+import { trackGameStart, trackMatchRoundStart } from './analytics/m43GameAnalytics'
 
 function attachHostSeatProfilesIfNeeded(
   sess: GameSession,
@@ -393,6 +394,8 @@ function App() {
   const prevTurnSigRef = useRef<string | null>(null)
   const prevTableFpRef = useRef<string | null>(null)
   const flipSoundTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
+  /** Joining client: emit at most one game_start snapshot per tab for the first received table state. Resets when leaving multiplayer. */
+  const clientDealAnalyticsEmittedRef = useRef(false)
   const { toasts: mainChatToasts, pushToast: pushMainChatToast, clearToasts: clearMainChatToasts } =
     useChatToasts(5, 3000)
 
@@ -562,6 +565,11 @@ function App() {
         id,
         hosting,
       )
+      const role = hosting ? 'host' : 'solo'
+      trackGameStart(sess, role, {
+        hosting,
+        remotePeersOpen: openRemotes,
+      })
       setSession(sess)
       setGfAwaitingOpponent(false)
       setGfRank('A')
@@ -627,6 +635,12 @@ function App() {
     clientRemoteSeatRef.current = snap.seat
     const parsed = parseSessionSnapshot(snap.state, snap.seat)
     if (!parsed) return
+    if (joinedAsClient && !clientDealAnalyticsEmittedRef.current) {
+      clientDealAnalyticsEmittedRef.current = true
+      trackGameStart(parsed, parsed.net?.spectator ? 'spectator' : 'client', {
+        joinedClient: true,
+      })
+    }
     setSession(parsed)
     setGameId(parsed.manifest.id as (typeof GAME_IDS)[number])
     if (gameSupportsConfigurableAi(parsed.manifest.id)) {
@@ -638,7 +652,7 @@ function App() {
     setGfAwaitingOpponent(false)
     setGfRank('A')
     setSkyjoDumpStep('idle')
-  }, [])
+  }, [joinedAsClient])
 
   const onRemoteSetDisplayName = useCallback((msg: PeerClientSetDisplayName, fromPeerId: string) => {
     const host = roomHostRef.current
@@ -864,6 +878,7 @@ function App() {
     }
     chatPopoutRef.current = null
     clientRemoteSeatRef.current = null
+    clientDealAnalyticsEmittedRef.current = false
   }, [clearMainChatToasts])
 
   const onHostingRosterChange = useCallback((peers?: HostedPeer[]) => {
@@ -874,11 +889,9 @@ function App() {
   const onNextMatchRound = useCallback(() => {
     if (!session || session.net) return
     try {
-      const next = attachHostSeatProfilesIfNeeded(
-        startNextMatchRound(session, gameId),
-        gameId,
-        !!roomHostRef.current,
-      )
+      const hosting = !!roomHostRef.current
+      const next = attachHostSeatProfilesIfNeeded(startNextMatchRound(session, gameId), gameId, hosting)
+      trackMatchRoundStart(next, hosting ? 'host' : 'solo', { hosting })
       setSession(next)
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
@@ -1633,16 +1646,7 @@ function App() {
                           while (next.length < aiOpponents) next.push('medium')
                           setAiDifficulties(next)
                           if (session) {
-                            const hosting = !!roomHostRef.current
-                            const s = attachHostSeatProfilesIfNeeded(
-                              createSession(gameId, Math.random, undefined, makeDealOptions(undefined, gameId, next)),
-                              gameId,
-                              hosting,
-                            )
-                            setSession(s)
-                            setSkyjoDumpStep('idle')
-                            setGfAwaitingOpponent(false)
-                            setGfRank('A')
+                            applyFreshDeal(gameId, makeDealOptions(undefined, gameId, next))
                           }
                         }}
                       >
