@@ -9,6 +9,7 @@ import {
   AutoScalingClient,
   DescribeAutoScalingGroupsCommand,
   SetDesiredCapacityCommand,
+  type Instance as AsgInstance,
 } from '@aws-sdk/client-auto-scaling'
 import { ChangeResourceRecordSetsCommand, Route53Client } from '@aws-sdk/client-route-53'
 
@@ -142,7 +143,8 @@ async function describeTurnAsg(asgName: string): Promise<TurnCapacityState> {
     }
   }
   const active = (group.Instances ?? []).filter(
-    (i) => i.InstanceId && i.LifecycleState !== 'Terminating' && i.LifecycleState !== 'Terminating:Wait',
+    (i: AsgInstance) =>
+      i.InstanceId && i.LifecycleState !== 'Terminating' && i.LifecycleState !== 'Terminating:Wait',
   )
   const instances = await describeInstances(active.map((i) => i.InstanceId!).filter(Boolean))
   const publicIps = instances
