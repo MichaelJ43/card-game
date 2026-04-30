@@ -362,7 +362,7 @@ function defaultAiCountForGame(gameId: (typeof GAME_IDS)[number]): number {
 }
 
 function App() {
-  const [gameId, setGameId] = useState<(typeof GAME_IDS)[number]>('war')
+  const [gameId, setGameId] = useState<(typeof GAME_IDS)[number]>('blackjack')
   const [aiOpponents, setAiOpponents] = useState(1)
   const [aiDifficulties, setAiDifficulties] = useState<AiDifficulty[]>(['medium'])
   const [session, setSession] = useState<GameSession | null>(null)
