@@ -69,4 +69,6 @@ export const GAME_SOURCES: Record<string, string> = {
   'sequence-race': sequenceRaceYaml,
 }
 
-export const GAME_IDS = Object.keys(GAME_SOURCES) as (keyof typeof GAME_SOURCES)[]
+export const GAME_IDS = (Object.keys(GAME_SOURCES) as (keyof typeof GAME_SOURCES)[]).sort((a, b) =>
+  a.localeCompare(b),
+)
