@@ -12,9 +12,9 @@ Skyjo is a card game for several players. Everyone has their own **grid** of twe
 ## Setup (typical)
 
 1. Each player gets twelve cards on a grid, all face-down at first.
-1. Two starting cards per player are turned face-up (which two varies by group; this app follows the module’s deal).
+1. Two starting cards per player are turned face-up (which two varies by group). **In this app**, each player **chooses** two face-down cards on their own grid to flip, one at a time, in seat order, before the round proper begins.
 1. One starter card may start the discard pile; the rest form a draw pile.
-1. The first player is often whoever has the highest sum on their two visible starters (this app uses that rule).
+1. The first player is whoever has the **highest sum** on their two visible starters (ties go to the earlier seat in table order).
 
 ## Your turn (summary)
 
@@ -56,4 +56,5 @@ Skyjo is a card game for several players. Everyone has their own **grid** of twe
 
 1. Use **Start deal** / **New deal** after changing options so the next deal uses them.
 1. Per-seat **AI difficulty** applies to computer players.
-1. Follow the on-screen hints for draw, discard, swap, and dump-and-flip.
+1. When a new round begins, **flip two cards** on your grid when it is your turn in the opening step; then follow the on-screen hints for draw, discard, swap, and dump-and-flip.
+1. Legal grid targets for the current action are slightly **emphasized on hover** (and keyboard focus) so the card you are about to use is easier to see.

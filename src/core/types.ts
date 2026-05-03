@@ -129,4 +129,6 @@ export type GameAction =
   | { type: 'skyjoDumpDraw'; flipIndex: number }
   /** Replace grid cell with top discard (no pending draw). */
   | { type: 'skyjoTakeDiscard'; gridIndex: number }
+  /** Skyjo opening: flip one face-down grid card (each player reveals two before play). */
+  | { type: 'skyjoOpeningFlip'; gridIndex: number }
   | { type: 'custom'; payload: Record<string, unknown> }
