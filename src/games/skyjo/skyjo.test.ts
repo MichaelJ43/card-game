@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import '../../bootstrap'
 import { createSession } from '../../session'
-import type { GameAction } from '../../core/types'
-import type { TableState } from '../../core/types'
+import type { CardTemplate, GameAction, TableState } from '../../core/types'
 import type { SkyjoGameState } from './index'
 
 function visibleOpeningSum(table: TableState, templates: Record<string, CardTemplate>, p: number): number {
@@ -52,14 +51,14 @@ describe('Skyjo opening phase', () => {
   it('rejects flipping a face-up cell', () => {
     const session = createSession('skyjo', () => 0.42, undefined, { skipMatch: true, aiCount: 0 })
     const mod = session.module
-    let { table, gameState } = session
-    const gs0 = gameState as SkyjoGameState
-    expect(gs0.phase).toBe('opening')
+    let { table } = session
+    let gameState = session.gameState as SkyjoGameState
+    expect(gameState.phase).toBe('opening')
 
     const r1 = mod.applyAction(table, gameState, { type: 'skyjoOpeningFlip', gridIndex: 0 } as GameAction)
     expect(r1.error).toBeUndefined()
     table = r1.table
-    gameState = r1.gameState
+    gameState = r1.gameState as SkyjoGameState
 
     const rBad = mod.applyAction(table, gameState, { type: 'skyjoOpeningFlip', gridIndex: 0 } as GameAction)
     expect(rBad.error).toBeDefined()
@@ -68,7 +67,8 @@ describe('Skyjo opening phase', () => {
   it('after two flips for one player, advances to play with correct starter', () => {
     const session = createSession('skyjo', () => 0.42, undefined, { skipMatch: true, aiCount: 0 })
     const mod = session.module
-    let { table, gameState } = session
+    let { table } = session
+    let gameState = session.gameState as SkyjoGameState
     const templates = table.templates
 
     const r1 = mod.applyAction(table, gameState, { type: 'skyjoOpeningFlip', gridIndex: 2 } as GameAction)
@@ -89,13 +89,13 @@ describe('Skyjo opening phase', () => {
   it('two-player opening completes and starter has max visible sum', () => {
     const session = createSession('skyjo', () => 0.77, undefined, { skipMatch: true, aiCount: 1 })
     const mod = session.module
-    let { table, gameState } = session
+    let { table } = session
+    let gameState = session.gameState as SkyjoGameState
     const templates = table.templates
-    const pCount = (gameState as SkyjoGameState).playerCount
+    const pCount = gameState.playerCount
     expect(pCount).toBe(2)
 
-    while ((gameState as SkyjoGameState).phase === 'opening') {
-      const gs = gameState as SkyjoGameState
+    while (gameState.phase === 'opening') {
       const legals = mod.getLegalActions(table, gameState)
       const flips = legals.filter((a): a is Extract<GameAction, { type: 'skyjoOpeningFlip' }> => a.type === 'skyjoOpeningFlip')
       expect(flips.length).toBeGreaterThan(0)
@@ -103,10 +103,10 @@ describe('Skyjo opening phase', () => {
       const r = mod.applyAction(table, gameState, pick)
       expect(r.error).toBeUndefined()
       table = r.table
-      gameState = r.gameState
+      gameState = r.gameState as SkyjoGameState
     }
 
-    const final = gameState as SkyjoGameState
+    const final = gameState
     expect(final.phase).toBe('play')
     expect(countFaceUpNonSlot(table, 0)).toBe(2)
     expect(countFaceUpNonSlot(table, 1)).toBe(2)
