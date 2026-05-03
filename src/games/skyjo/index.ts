@@ -497,21 +497,46 @@ function pendingActionFinisherPenalty(
   return expectedFinisherDoublePain(myRaw, minOther, cumulative, target)
 }
 
+function countFaceUpNonSlotOnGrid(table: TableState, playerIndex: number): number {
+  let n = 0
+  for (const c of table.zones[gridZone(playerIndex)]!.cards) {
+    if (c && !isSlot(c.templateId) && c.faceUp) n++
+  }
+  return n
+}
+
+function sumOpeningVisibleOnGrid(
+  table: TableState,
+  templates: Record<string, CardTemplate>,
+  playerIndex: number,
+): number {
+  let sum = 0
+  for (const c of table.zones[gridZone(playerIndex)]!.cards) {
+    if (!c || isSlot(c.templateId) || !c.faceUp) continue
+    sum += cardValue(templates, c.templateId)
+  }
+  return sum
+}
+
+/** First player: highest sum of face-up starters (ties → lowest seat index wins). */
 function starterFromOpening(table: TableState, templates: Record<string, CardTemplate>, pCount: number): number {
   let best = -Infinity
   let leader = 0
   for (let p = 0; p < pCount; p++) {
-    let sum = 0
-    for (const i of [0, 1]) {
-      const c = table.zones[gridZone(p)]!.cards[i]
-      if (c) sum += cardValue(templates, c.templateId)
-    }
+    const sum = sumOpeningVisibleOnGrid(table, templates, p)
     if (sum > best) {
       best = sum
       leader = p
     }
   }
   return leader
+}
+
+function allPlayersOpeningReady(table: TableState, pCount: number): boolean {
+  for (let p = 0; p < pCount; p++) {
+    if (countFaceUpNonSlotOnGrid(table, p) !== 2) return false
+  }
+  return true
 }
 
 function othersAfterSkyjo(finisher: number, pCount: number): number[] {
@@ -527,7 +552,7 @@ function ensureSlotTemplate(templates: Record<string, CardTemplate>): void {
 }
 
 export interface SkyjoGameState {
-  phase: 'play' | 'final' | 'roundOver'
+  phase: 'opening' | 'play' | 'final' | 'roundOver'
   playerCount: number
   currentPlayer: number
   message: string
@@ -551,6 +576,19 @@ function buildLegalActions(table: TableState, gs: SkyjoGameState): GameAction[] 
   if (gs.phase === 'roundOver') return []
   const p = gs.currentPlayer
   if (gs.phase === 'final' && gs.finalQueue.length > 0 && gs.finalQueue[0] !== p) return []
+
+  if (gs.phase === 'opening') {
+    const actions: GameAction[] = []
+    const g = table.zones[gridZone(p)]!.cards
+    if (countFaceUpNonSlotOnGrid(table, p) >= 2) return []
+    for (let i = 0; i < GRID; i++) {
+      const c = g[i]
+      if (c && !isSlot(c.templateId) && !c.faceUp) {
+        actions.push({ type: 'skyjoOpeningFlip', gridIndex: i })
+      }
+    }
+    return actions
+  }
 
   if (gs.pendingDraw) {
     const actions: GameAction[] = []
@@ -897,6 +935,12 @@ function selectAiSkyjo(
     return legal[Math.floor(rng() * legal.length)]!
   }
 
+  if (gameState.phase === 'opening') {
+    const flips = legal.filter((a): a is Extract<GameAction, { type: 'skyjoOpeningFlip' }> => a.type === 'skyjoOpeningFlip')
+    if (flips.length === 0) return legal[0]!
+    return flips[Math.floor(rng() * flips.length)]!
+  }
+
   if (gameState.pendingDraw) {
     if (difficulty === 'easy' && rng() < 0.4) {
       const swaps = legal.filter((a) => a.type === 'skyjoSwapDrawn')
@@ -1013,23 +1057,13 @@ const skyjoModule: GameModule<SkyjoGameState> = {
       pushDiscard(table, starterCard)
     }
 
-    for (let p = 0; p < pCount; p++) {
-      const g = table.zones[gridZone(p)]!.cards
-      for (const idx of [0, 1]) {
-        const c = g[idx]
-        if (c) c.faceUp = true
-      }
-    }
-
-    const first = starterFromOpening(table, merged, pCount)
-
     return {
       table,
       gameState: {
-        phase: 'play',
+        phase: 'opening',
         playerCount: pCount,
-        currentPlayer: first,
-        message: `${first === 0 ? 'You start' : `${playerSeatLabel(first)} starts`} (highest sum of two opening cards). Draw or take discard.`,
+        currentPlayer: 0,
+        message: `${playerSeatLabel(0)} — flip two face-down cards on your grid (then each other player, in turn).`,
         pendingDraw: null,
         pendingFromDiscard: false,
         skyjoFinisher: null,
@@ -1065,6 +1099,68 @@ const skyjoModule: GameModule<SkyjoGameState> = {
     recycleDiscardIfDrawEmpty(t, rngFn, gameState.reshuffleDiscardWhenDrawEmpty)
 
     const gs = gameState
+
+    if (gs.phase === 'opening') {
+      if (action.type !== 'skyjoOpeningFlip') {
+        return { table, gameState, error: 'Flip a face-down card on your grid.' }
+      }
+      const i = action.gridIndex
+      if (i < 0 || i >= GRID) return { table, gameState, error: 'Bad grid index.' }
+      const gOpen = t.zones[gridZone(current)]!.cards
+      const target = gOpen[i]
+      if (!target || isSlot(target.templateId) || target.faceUp) {
+        return { table, gameState, error: 'Choose a face-down card on your grid.' }
+      }
+      if (countFaceUpNonSlotOnGrid(t, current) >= 2) {
+        return { table, gameState, error: 'You have already flipped two cards.' }
+      }
+      target.faceUp = true
+      for (let k = 0; k < 8; k++) {
+        if (!clearMatchingColumns(t, current, templates)) break
+      }
+
+      if (allPlayersOpeningReady(t, pCount)) {
+        const first = starterFromOpening(t, templates, pCount)
+        return {
+          table: t,
+          gameState: {
+            ...gs,
+            phase: 'play',
+            currentPlayer: first,
+            pendingDraw: null,
+            pendingFromDiscard: false,
+            message: `${first === 0 ? 'You start' : `${playerSeatLabel(first)} starts`} (highest sum of two opening cards). Draw or take discard.`,
+          },
+        }
+      }
+
+      const nowUp = countFaceUpNonSlotOnGrid(t, current)
+      if (nowUp >= 2) {
+        const nx = (current + 1) % pCount
+        return {
+          table: t,
+          gameState: {
+            ...gs,
+            phase: 'opening',
+            currentPlayer: nx,
+            pendingDraw: null,
+            pendingFromDiscard: false,
+            message:
+              nx === 0
+                ? 'Your turn — flip two face-down cards on your grid.'
+                : `${playerSeatLabel(nx)} — flip two face-down cards on your grid.`,
+          },
+        }
+      }
+
+      return {
+        table: t,
+        gameState: {
+          ...gs,
+          message: 'Flip one more face-down card on your grid.',
+        },
+      }
+    }
 
     const endTurn = (next: Partial<SkyjoGameState>, finished: number): ApplyResult<SkyjoGameState> => {
       recycleDiscardIfDrawEmpty(t, rngFn, gs.reshuffleDiscardWhenDrawEmpty)

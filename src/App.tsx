@@ -699,6 +699,13 @@ function App() {
       return
     }
     const action = msg.action as GameAction
+    if (isSkyjoSession(prev)) {
+      const skyjoGs = prev.gameState
+      if (skyjoGs.phase !== 'roundOver' && msg.seat !== skyjoGs.currentPlayer) {
+        host.ack(fromPeerId, msg.nonce, false, 'Not your turn.')
+        return
+      }
+    }
     const result = prev.module.applyAction(prev.table, prev.gameState, action)
     if (result.error) {
       host.ack(fromPeerId, msg.nonce, false, result.error)
@@ -1362,6 +1369,9 @@ function App() {
     }
     if (isSkyjoSession(session) && session.gameState.phase !== 'roundOver' && session.gameState.currentPlayer === sh) {
       const gs = session.gameState
+      if (gs.phase === 'opening') {
+        return [`grid:${sh}`]
+      }
       if (gs.pendingDraw) {
         if (gs.pendingFromDiscard) return [`grid:${sh}`]
         return [`grid:${sh}`, 'discard']
@@ -1377,6 +1387,40 @@ function App() {
     }
     return undefined
   }, [session, gfAwaitingOpponent, networkSpectator])
+
+  const skyjoPrepTarget = useMemo((): { zoneId: string; indices: ReadonlySet<number> } | undefined => {
+    if (!session || networkSpectator || !isSkyjoSession(session)) return undefined
+    const gs = session.gameState
+    if (gs.phase === 'roundOver') return undefined
+    const sh = shellHumanSeat(session)
+    if (gs.currentPlayer !== sh) return undefined
+    const legals = session.module.getLegalActions(session.table, session.gameState)
+    const zoneId = `grid:${sh}`
+    const out = new Set<number>()
+    if (gs.phase === 'opening') {
+      for (const a of legals) {
+        if (a.type === 'skyjoOpeningFlip') out.add(a.gridIndex)
+      }
+      return out.size ? { zoneId, indices: out } : undefined
+    }
+    if (gs.pendingDraw) {
+      if (skyjoDumpStep === 'selectFlip') {
+        for (const a of legals) {
+          if (a.type === 'skyjoDumpDraw') out.add(a.flipIndex)
+        }
+      } else {
+        for (const a of legals) {
+          if (a.type === 'skyjoSwapDrawn') out.add(a.gridIndex)
+          if (a.type === 'skyjoDumpDraw') out.add(a.flipIndex)
+        }
+      }
+      return out.size ? { zoneId, indices: out } : undefined
+    }
+    for (const a of legals) {
+      if (a.type === 'skyjoTakeDiscard') out.add(a.gridIndex)
+    }
+    return out.size ? { zoneId, indices: out } : undefined
+  }, [session, networkSpectator, skyjoDumpStep])
 
   const handleTableIntent = useCallback(
     (intent: TableIntent) => {
@@ -1423,6 +1467,13 @@ function App() {
       if (isSkyjoSession(session)) {
         const gs = session.gameState
         if (gs.phase === 'roundOver' || gs.currentPlayer !== sh) return
+
+        if (gs.phase === 'opening') {
+          if (intent.kind === 'card' && intent.zoneId === myGrid) {
+            dispatchAction({ type: 'skyjoOpeningFlip', gridIndex: intent.cardIndex })
+          }
+          return
+        }
 
         if (intent.kind === 'stack' && intent.zoneId === 'draw') {
           dispatchAction({ type: 'skyjoDraw', from: 'deck' })
@@ -1759,6 +1810,7 @@ function App() {
                 : undefined
             }
             activeTurnHighlight={activeTurnHighlight}
+            prepTarget={skyjoPrepTarget}
           />
 
           <div className="app__actions">
@@ -1790,12 +1842,19 @@ function App() {
               session.gameState.phase !== 'roundOver' &&
               session.gameState.currentPlayer === shellHumanSeat(session) && (
                 <div className="app__skyjo">
-                  <p className="app__tableIntentHint">
-                    Draw from the deck (left). With a pending card from the deck, click the discard pile to start dump
-                    &amp; flip, then a face-down grid card — or Shift+click a face-down card to do it in one step. Click
-                    the grid to swap, or (no pending) click the grid to take the visible discard. Pending from the
-                    discard pile must be placed (no dump).
-                  </p>
+                  {session.gameState.phase === 'opening' ? (
+                    <p className="app__tableIntentHint">
+                      Flip two face-down cards on your grid, one at a time. After everyone reveals two starters, the
+                      player with the highest sum goes first.
+                    </p>
+                  ) : (
+                    <p className="app__tableIntentHint">
+                      Draw from the deck (left). With a pending card from the deck, click the discard pile to start
+                      dump &amp; flip, then a face-down grid card — or Shift+click a face-down card to do it in one step.
+                      Click the grid to swap, or (no pending) click the grid to take the visible discard. Pending from
+                      the discard pile must be placed (no dump).
+                    </p>
+                  )}
                   {session.gameState.discardSwapFaceUpOnly && (
                     <p className="app__tableIntentHint app__tableIntentHint--sub">
                       House rule: you may only take the discard by choosing a <strong>face-up</strong> card to replace;

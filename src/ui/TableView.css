@@ -337,6 +337,28 @@
   align-items: center;
 }
 
+/* Legal prep targets (e.g. Skyjo): subtle lift on hover/focus so the actionable card reads clearly */
+.tableView__cardSlot--prepTarget .tableView__cardSlotPose {
+  transition: transform 0.15s ease;
+}
+
+.tableView__cardSlot--prepTarget:hover .tableView__cardSlotPose,
+.tableView__cardSlot--prepTarget:focus-within .tableView__cardSlotPose {
+  transform: scale(1.1);
+  z-index: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tableView__cardSlot--prepTarget .tableView__cardSlotPose {
+    transition: none;
+  }
+
+  .tableView__cardSlot--prepTarget:hover .tableView__cardSlotPose,
+  .tableView__cardSlot--prepTarget:focus-within .tableView__cardSlotPose {
+    transform: none;
+  }
+}
+
 .tableView__cards--stack .tableView__cardSlot {
   position: absolute;
   left: 0;

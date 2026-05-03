@@ -49,6 +49,11 @@ export interface TableViewProps {
    * (e.g. Skyjo `grid`, Go Fish `hand`). Omit when the game has no per-player turn UI.
    */
   activeTurnHighlight?: ActiveTurnHighlight | null
+  /**
+   * Optional: mark grid/spread card slots that are legal prep targets (hover/focus scale).
+   * Shell derives indices from legal actions (e.g. Skyjo swap / dump / opening flip).
+   */
+  prepTarget?: { zoneId: string; indices: ReadonlySet<number> } | null
 }
 
 function zoneAllowsIntent(zoneId: string, allowlist: readonly string[] | undefined): boolean {
@@ -138,6 +143,7 @@ export function TableView({
   intentZoneAllowlist,
   pendingStacksColumn,
   activeTurnHighlight,
+  prepTarget,
 }: TableViewProps) {
   const order = table.zoneOrder.length ? table.zoneOrder : Object.keys(table.zones)
   const layoutGroups = useMemo(() => buildLayoutGroups(order, table.zones), [order, table.zones])
@@ -261,6 +267,8 @@ export function TableView({
               const showFace = shouldShowFaceForViewer(zone, card, idx, humanPlayerIndex)
               const tmpl = table.templates[card.templateId]
               const cardInteractive = zoneInteractive && zone.kind !== 'stack'
+              const isPrepTarget =
+                !!prepTarget && prepTarget.zoneId === zid && prepTarget.indices.has(idx) && cardInteractive
               const inner = (
                 <CardView card={card} template={tmpl} showFace={showFace} presentationOnly={cardInteractive} />
               )
@@ -269,7 +277,10 @@ export function TableView({
                   ? undefined
                   : { transform: `rotate(${-12 + idx * 8}deg) translateY(${idx * 2}px)` }
               return (
-                <div key={card.instanceId} className="tableView__cardSlot tableView__cardSlot--enter">
+                <div
+                  key={card.instanceId}
+                  className={`tableView__cardSlot tableView__cardSlot--enter${isPrepTarget ? ' tableView__cardSlot--prepTarget' : ''}`}
+                >
                   <div className="tableView__cardSlotPose" style={poseStyle}>
                     {cardInteractive ? (
                       <button

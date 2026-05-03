@@ -6,7 +6,7 @@ Skyjo-style round play: grid of face-down/face-up cards, draw pile, discard, and
 
 **Players:** human vs one or more AIs; per-seat **AI difficulty** is supported.
 
-**UI:** follow the on-screen hints for dump & flip, swap, and discard flows.
+**UI:** each round starts with an **opening** step (every grid card is face-down; each player flips two of their own cards in seat order). Then follow the on-screen hints for dump & flip, swap, and discard flows. Legal grid targets for your current action are slightly enlarged on hover/focus so the intended card is easier to spot.
 
 See [`src/games/skyjo/skyjo.yaml`](../../src/games/skyjo/skyjo.yaml) for bundled match parameters.
 
