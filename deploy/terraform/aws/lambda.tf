@@ -12,10 +12,10 @@ resource "aws_cloudwatch_log_group" "ws" {
 
 locals {
   http_llm_env = {
-    GEMINI_SECRET_ARN            = aws_secretsmanager_secret.gemini_api_key.arn
-    LLM_MONTHLY_BUDGET_USD       = tostring(var.llm_monthly_budget_usd)
-    GOOGLE_OAUTH_WEB_CLIENT_IDS  = var.google_oauth_web_client_ids
-    GEMINI_MODEL_ID              = trimspace(var.gemini_model_id)
+    GEMINI_SECRET_ARN          = aws_secretsmanager_secret.gemini_api_key.arn
+    LLM_MONTHLY_BUDGET_USD     = tostring(var.llm_monthly_budget_usd)
+    AUTH_PLATFORM_API_BASE     = trimspace(var.auth_platform_api_base)
+    GEMINI_MODEL_ID            = trimspace(var.gemini_model_id)
   }
 
   http_lambda_env_turn = local.turn_stack ? {

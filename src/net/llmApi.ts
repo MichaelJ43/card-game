@@ -2,8 +2,11 @@ import { getMultiplayerConfig } from '../net/config'
 
 export interface AiCapabilitiesResponse {
   llmEnabled?: boolean
+  /** True when `sap_session` is valid against shared-api-platform `GET /v1/auth/me`. */
+  authSessionValid?: boolean
+  /** Budget allows LLM and Gemini key is available (independent of sign-in). */
+  llmBackendReady?: boolean
   budgetMode?: string
-  googleSignInConfigured?: boolean
   geminiConfigured?: boolean
   monthlySpendEstimatedUsd?: number
   monthlyBudgetUsd?: number | null
@@ -15,22 +18,27 @@ function httpApiBase(): string | undefined {
   return getMultiplayerConfig().httpUrl?.replace(/\/$/, '')
 }
 
+function credentialedFetchInit(): RequestInit {
+  return { credentials: 'include' as RequestCredentials }
+}
+
 export async function fetchAiCapabilities(): Promise<AiCapabilitiesResponse | null> {
   const base = httpApiBase()
   if (!base) return null
-  const res = await fetch(`${base}/ai/capabilities`, { method: 'GET', credentials: 'omit' })
+  const res = await fetch(`${base}/ai/capabilities`, { method: 'GET', ...credentialedFetchInit() })
   if (!res.ok) return null
   return (await res.json()) as AiCapabilitiesResponse
 }
 
-export async function exchangeGoogleCredential(credential: string): Promise<{ token: string }> {
+/** Exchange shared `sap_session` cookie for a short-lived LLM Bearer JWT (card-game API). */
+export async function exchangeLlmSession(): Promise<{ token: string }> {
   const base = httpApiBase()
   if (!base) throw new Error('Multiplayer HTTP URL is not configured.')
   const res = await fetch(`${base}/ai/session`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    credentials: 'omit',
-    body: JSON.stringify({ credential }),
+    ...credentialedFetchInit(),
+    body: JSON.stringify({}),
   })
   const data = (await res.json().catch(() => ({}))) as { token?: unknown; message?: unknown }
   if (!res.ok) {
@@ -66,7 +74,7 @@ export async function requestLlmMove(
       'content-type': 'application/json',
       authorization: `Bearer ${bearerToken}`,
     },
-    credentials: 'omit',
+    ...credentialedFetchInit(),
     body: JSON.stringify(payload),
   })
   const data = (await res.json().catch(() => ({}))) as {

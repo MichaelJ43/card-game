@@ -18,12 +18,16 @@ const JSON_HEADERS = {
 function cors(origin?: string) {
   const allowed = process.env.ALLOWED_ORIGIN ?? '*'
   const match = allowed === '*' || !origin ? allowed : allowed.split(',').map((o) => o.trim()).includes(origin) ? origin : allowed
-  return {
+  const headers: Record<string, string> = {
     'access-control-allow-origin': match,
     'access-control-allow-methods': 'GET,POST,OPTIONS',
-    'access-control-allow-headers': 'content-type, authorization',
+    'access-control-allow-headers': 'content-type, authorization, cookie',
     vary: 'Origin',
   }
+  if (match !== '*' && origin) {
+    headers['access-control-allow-credentials'] = 'true'
+  }
+  return headers
 }
 
 function bad(status: number, message: string, origin?: string): APIGatewayProxyResultV2 {
@@ -88,7 +92,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     }
 
     if (method === 'GET' && path.endsWith('/ai/capabilities')) {
-      return await handleGetAiCapabilities(origin)
+      return await handleGetAiCapabilities(event, origin)
     }
 
     if (method !== 'POST') return bad(405, 'Method not allowed', origin)
@@ -107,7 +111,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     if (path.endsWith('/rooms')) return await handleCreateRoom(body as CreateRoomRequest, origin)
     if (path.endsWith('/turn/start')) return await handlePostTurnStart(origin)
     if (path.endsWith('/turn/heartbeat')) return await handlePostTurnHeartbeat(body as { token?: string }, origin)
-    if (path.endsWith('/ai/session')) return await handlePostAiSession(body, origin)
+    if (path.endsWith('/ai/session')) return await handlePostAiSession(event, body, origin)
     if (path.endsWith('/ai/move')) return await handlePostAiMove(event, body, origin)
 
     return bad(404, 'Not found', origin)

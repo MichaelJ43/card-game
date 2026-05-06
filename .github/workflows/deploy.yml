@@ -122,7 +122,7 @@ jobs:
             export TF_VAR_turn_coturn_static_password="${TURN_COTURN_STATIC_PASSWORD}"
           fi
           if [ -n "${{ vars.TF_LLM_MONTHLY_BUDGET_USD }}" ]; then export TF_VAR_llm_monthly_budget_usd="${{ vars.TF_LLM_MONTHLY_BUDGET_USD }}"; fi
-          if [ -n "${{ vars.TF_GOOGLE_OAUTH_WEB_CLIENT_IDS }}" ]; then export TF_VAR_google_oauth_web_client_ids="${{ vars.TF_GOOGLE_OAUTH_WEB_CLIENT_IDS }}"; fi
+          if [ -n "${{ vars.TF_AUTH_PLATFORM_API_BASE }}" ]; then export TF_VAR_auth_platform_api_base="${{ vars.TF_AUTH_PLATFORM_API_BASE }}"; fi
           terraform apply -auto-approve -var-file=../../../terraform/prod.tfvars
 
       - name: Capture Terraform outputs
@@ -180,7 +180,6 @@ jobs:
           VITE_MULTIPLAYER_TURN_HOST: ${{ vars.VITE_MULTIPLAYER_TURN_HOST }}
           VITE_MULTIPLAYER_TURN_USER: ${{ vars.VITE_MULTIPLAYER_TURN_USER }}
           VITE_MULTIPLAYER_TURN_CREDENTIAL: ${{ secrets.TURN_COTURN_STATIC_PASSWORD }}
-          VITE_GOOGLE_OAUTH_WEB_CLIENT_ID: ${{ vars.VITE_GOOGLE_OAUTH_WEB_CLIENT_ID }}
         run: npm run build
 
       # 4. Sync static assets to S3 + invalidate CloudFront.

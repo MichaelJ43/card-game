@@ -3,8 +3,8 @@ import { signLlmAccessToken, verifyLlmAccessToken } from './authLlm'
 import { createGeminiProvider } from './geminiInference'
 import { roughEstimateMicroUsdForPrompt, estimateUsdFromUsage } from './geminiCost'
 import { getGeminiApiKey } from './geminiKey'
-import { verifyGoogleCredential } from './googleIdToken'
 import { emitLlmMetric } from './metrics'
+import { cookieHeaderFromApiEvent, fetchSapAuthMe } from './sapAuth'
 import { buildTableAiUserPrompt, type LegalChoiceBrief } from './prompt'
 import { parseChoiceIndexFromModelText } from './parseChoice'
 import {
@@ -30,12 +30,16 @@ function corsForOrigin(origin: string | undefined) {
               .includes(origin)
         ? origin
         : allowed
-  return {
+  const headers: Record<string, string> = {
     'access-control-allow-origin': match,
     'access-control-allow-methods': 'GET,POST,OPTIONS',
-    'access-control-allow-headers': 'content-type, authorization',
+    'access-control-allow-headers': 'content-type, authorization, cookie',
     vary: 'Origin',
   }
+  if (match !== '*' && origin) {
+    headers['access-control-allow-credentials'] = 'true'
+  }
+  return headers
 }
 
 function bad(
@@ -79,34 +83,34 @@ function bearerFromEvent(event: APIGatewayProxyEventV2): string | null {
   return raw.slice(7).trim() || null
 }
 
-function googleClientIds(): string {
-  return process.env.GOOGLE_OAUTH_WEB_CLIENT_IDS?.trim() ?? ''
-}
-
 function geminiModel(): string {
   const m = process.env.GEMINI_MODEL_ID?.trim()
   return m && m.length > 0 ? m : 'gemini-2.5-flash-lite'
 }
 
 export async function handleGetAiCapabilities(
+  event: APIGatewayProxyEventV2,
   origin: string | undefined,
 ): Promise<APIGatewayProxyResultV2> {
   try {
     const mode = llmBudgetMode()
     const keyConfigured = !!(await getGeminiApiKey())
-    const googleOk = googleClientIds().length > 0
     const spend = await getMonthlySpendUsd()
     const spentUsd = spend.estimatedMicroUsd / 1e6
     const cap = monthlyBudgetUsd()
+    const llmBackendReady = mode !== 'off' && keyConfigured
 
-    const llmEnabled =
-      mode !== 'off' && keyConfigured && googleOk
+    const cookies = cookieHeaderFromApiEvent(event)
+    const sap = await fetchSapAuthMe(cookies)
+    const authSessionValid = !!sap
+    const llmEnabled = llmBackendReady && authSessionValid
 
     return ok(
       {
         llmEnabled,
+        authSessionValid,
+        llmBackendReady,
         budgetMode: mode,
-        googleSignInConfigured: googleOk,
         geminiConfigured: keyConfigured,
         monthlySpendEstimatedUsd: spentUsd,
         monthlyBudgetUsd: cap,
@@ -120,8 +124,9 @@ export async function handleGetAiCapabilities(
     return ok(
       {
         llmEnabled: false,
+        authSessionValid: false,
+        llmBackendReady: false,
         budgetMode: llmBudgetMode(),
-        googleSignInConfigured: googleClientIds().length > 0,
         geminiConfigured: false,
         monthlySpendEstimatedUsd: 0,
         monthlyBudgetUsd: monthlyBudgetUsd(),
@@ -134,9 +139,11 @@ export async function handleGetAiCapabilities(
 }
 
 export async function handlePostAiSession(
-  body: unknown,
+  event: APIGatewayProxyEventV2,
+  _body: unknown,
   origin: string | undefined,
 ): Promise<APIGatewayProxyResultV2> {
+  void _body
   try {
     if (llmBudgetMode() === 'off') {
       return bad(
@@ -145,40 +152,25 @@ export async function handlePostAiSession(
         origin,
       )
     }
-    const gid = googleClientIds()
-    if (!gid) {
-      return bad(
-        503,
-        { message: 'Google Sign-In is not configured for LLM.', code: 'MISSING_GOOGLE_AUDIENCES' },
-        origin,
-      )
-    }
 
-    const b = body as { credential?: unknown }
-    const credential =
-      typeof b.credential === 'string' && b.credential.trim().length > 0 ? b.credential.trim() : null
-    if (!credential) {
-      return bad(400, { message: 'credential (Google JWT) required', code: 'BAD_REQUEST' }, origin)
-    }
-
-    let sub: string
-    try {
-      const v = await verifyGoogleCredential(credential, gid)
-      sub = v.sub
-    } catch (e) {
+    const sap = await fetchSapAuthMe(cookieHeaderFromApiEvent(event))
+    if (!sap) {
       await emitLlmMetric({
         eventType: 'AuthDenied',
         provider: 'gemini',
       })
       return bad(
         401,
-        { message: e instanceof Error ? e.message : 'Invalid Google credential.', code: 'AUTH' },
+        {
+          message: 'Valid shared auth session required (`sap_session` cookie). Sign in via auth.michaelj43.dev.',
+          code: 'AUTH',
+        },
         origin,
       )
     }
 
     const ttl = 60 * 60 * 12
-    const token = signLlmAccessToken(sub, getJwtSecret(), ttl)
+    const token = signLlmAccessToken(sap.id, getJwtSecret(), ttl)
     return ok({ token, expiresInSeconds: ttl, tokenType: 'Bearer' }, origin)
   } catch (e) {
     console.error('ai session error', e)
@@ -239,13 +231,28 @@ export async function handlePostAiMove(
     )
   }
 
+  let claims: ReturnType<typeof verifyLlmAccessToken>
   try {
-    verifyLlmAccessToken(token, getJwtSecret())
+    claims = verifyLlmAccessToken(token, getJwtSecret())
   } catch {
     await emitLlmMetric({ eventType: 'AuthDenied', provider: 'gemini' })
     return bad(
       401,
       { message: 'Invalid or expired session token.', code: 'AUTH', llmUnavailable: true },
+      origin,
+    )
+  }
+
+  const sap = await fetchSapAuthMe(cookieHeaderFromApiEvent(event))
+  if (!sap || sap.id !== claims.sub) {
+    await emitLlmMetric({ eventType: 'AuthDenied', provider: 'gemini' })
+    return bad(
+      401,
+      {
+        message: 'Shared auth session expired or mismatched token. Sign in again.',
+        code: 'AUTH_SESSION',
+        llmUnavailable: true,
+      },
       origin,
     )
   }

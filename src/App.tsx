@@ -1794,6 +1794,7 @@ function App() {
               {!onlineClientShell &&
                 !session?.net &&
                 gameSupportsLlmTableAi(gameId) &&
+                llmCaps?.authSessionValid &&
                 (gameSupportsConfigurableAi(gameId) ? aiOpponents : defaultAiCountForGame(gameId)) >= 1 && (
                   <div className="app__toolbarRow app__toolbarRow--llm">
                     <LlmTableAiBar

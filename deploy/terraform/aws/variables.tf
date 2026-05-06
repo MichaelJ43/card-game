@@ -205,10 +205,10 @@ variable "llm_monthly_budget_usd" {
   default     = 0
 }
 
-variable "google_oauth_web_client_ids" {
-  description = "Comma-separated Google OAuth Web client IDs accepted for LLM session tokens (verifyIdToken audience)."
+variable "auth_platform_api_base" {
+  description = "Base URL for shared-api-platform HTTP API (GET /v1/auth/me with forwarded sap_session cookie). Default production API host."
   type        = string
-  default     = ""
+  default     = "https://api.michaelj43.dev"
 }
 
 variable "gemini_model_id" {

@@ -4,10 +4,11 @@ resource "aws_apigatewayv2_api" "http" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_origins = [local.site_browser_origin]
-    allow_methods = ["GET", "POST", "OPTIONS"]
-    allow_headers = ["content-type", "authorization"]
-    max_age       = 600
+    allow_origins     = [local.site_browser_origin]
+    allow_methods     = ["GET", "POST", "OPTIONS"]
+    allow_headers     = ["content-type", "authorization", "cookie"]
+    allow_credentials = true
+    max_age           = 600
   }
 
   tags = local.common_tags
