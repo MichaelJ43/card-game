@@ -8,6 +8,7 @@ import {
   handlePostTurnHeartbeat,
   handlePostTurnStart,
 } from './turnHttpHandlers'
+import { handleGetAiCapabilities, handlePostAiMove, handlePostAiSession } from './llm/handlers'
 import { getRoom, putRoom, ttlSecondsFromNow, type RoomMeta } from './storage'
 
 const JSON_HEADERS = {
@@ -20,7 +21,7 @@ function cors(origin?: string) {
   return {
     'access-control-allow-origin': match,
     'access-control-allow-methods': 'GET,POST,OPTIONS',
-    'access-control-allow-headers': 'content-type',
+    'access-control-allow-headers': 'content-type, authorization',
     vary: 'Origin',
   }
 }
@@ -86,6 +87,10 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       return await handleGetTurnStatus(origin)
     }
 
+    if (method === 'GET' && path.endsWith('/ai/capabilities')) {
+      return await handleGetAiCapabilities(origin)
+    }
+
     if (method !== 'POST') return bad(405, 'Method not allowed', origin)
 
     let body: unknown = {}
@@ -102,6 +107,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     if (path.endsWith('/rooms')) return await handleCreateRoom(body as CreateRoomRequest, origin)
     if (path.endsWith('/turn/start')) return await handlePostTurnStart(origin)
     if (path.endsWith('/turn/heartbeat')) return await handlePostTurnHeartbeat(body as { token?: string }, origin)
+    if (path.endsWith('/ai/session')) return await handlePostAiSession(body, origin)
+    if (path.endsWith('/ai/move')) return await handlePostAiMove(event, body, origin)
 
     return bad(404, 'Not found', origin)
   } catch (err) {

@@ -48,6 +48,11 @@ output "rooms_table" {
   value       = aws_dynamodb_table.rooms.name
 }
 
+output "gemini_secret_arn" {
+  description = "Secrets Manager ARN for the Gemini API key (CI runs put-secret-value; no value in Terraform state)."
+  value       = aws_secretsmanager_secret.gemini_api_key.arn
+}
+
 output "http_regional_domain_name" {
   description = "Regional API Gateway hostname for the HTTP custom domain (Route 53 `api` alias target must match exactly)."
   value       = local.use_custom_domain ? aws_apigatewayv2_domain_name.http[0].domain_name_configuration[0].target_domain_name : null

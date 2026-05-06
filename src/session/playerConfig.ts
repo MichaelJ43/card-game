@@ -74,6 +74,11 @@ const AI_DIFFICULTY_GAME_IDS = new Set([
   'sequence-race',
 ])
 
+/** Games where optional cloud LLM table AI is offered (solo / local only). */
+export function gameSupportsLlmTableAi(gameId: string): boolean {
+  return AI_DIFFICULTY_GAME_IDS.has(gameId)
+}
+
 export function gameSupportsPerSeatAiDifficulty(gameId: string): boolean {
   return AI_DIFFICULTY_GAME_IDS.has(gameId)
 }

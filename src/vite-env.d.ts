@@ -8,6 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_MULTIPLAYER_TURN_HOST?: string
   readonly VITE_MULTIPLAYER_TURN_USER?: string
   readonly VITE_MULTIPLAYER_TURN_CREDENTIAL?: string
+  /** Google OAuth Web client ID (public) for Gemini table-AI sign-in (@react-oauth/google). */
+  readonly VITE_GOOGLE_OAUTH_WEB_CLIENT_ID?: string
 }
 
 declare module '*.yaml?raw' {

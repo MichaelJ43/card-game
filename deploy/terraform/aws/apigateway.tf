@@ -6,7 +6,7 @@ resource "aws_apigatewayv2_api" "http" {
   cors_configuration {
     allow_origins = [local.site_browser_origin]
     allow_methods = ["GET", "POST", "OPTIONS"]
-    allow_headers = ["content-type"]
+    allow_headers = ["content-type", "authorization"]
     max_age       = 600
   }
 
@@ -54,6 +54,24 @@ resource "aws_apigatewayv2_route" "http_turn_heartbeat" {
 resource "aws_apigatewayv2_route" "http_abandon_idle" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "POST /rooms/abandon-idle"
+  target    = "integrations/${aws_apigatewayv2_integration.http.id}"
+}
+
+resource "aws_apigatewayv2_route" "http_ai_capabilities" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "GET /ai/capabilities"
+  target    = "integrations/${aws_apigatewayv2_integration.http.id}"
+}
+
+resource "aws_apigatewayv2_route" "http_ai_session" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "POST /ai/session"
+  target    = "integrations/${aws_apigatewayv2_integration.http.id}"
+}
+
+resource "aws_apigatewayv2_route" "http_ai_move" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "POST /ai/move"
   target    = "integrations/${aws_apigatewayv2_integration.http.id}"
 }
 

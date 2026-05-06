@@ -195,3 +195,24 @@ variable "scheduled_lambda_zip" {
   type        = string
   default     = "../../../lambda/dist/turnScheduled.zip"
 }
+
+variable "llm_monthly_budget_usd" {
+  description = <<-EOT
+    Soft monthly cap for estimated LLM spend (UTC month, tracked in DynamoDB).
+    Use -1 for unlimited (still records usage). Use 0 to disable LLM endpoints.
+  EOT
+  type        = number
+  default     = 0
+}
+
+variable "google_oauth_web_client_ids" {
+  description = "Comma-separated Google OAuth Web client IDs accepted for LLM session tokens (verifyIdToken audience)."
+  type        = string
+  default     = ""
+}
+
+variable "gemini_model_id" {
+  description = "Gemini model id for table AI (passed to Lambda)."
+  type        = string
+  default     = "gemini-2.5-flash-lite"
+}

@@ -11,6 +11,13 @@ resource "aws_cloudwatch_log_group" "ws" {
 }
 
 locals {
+  http_llm_env = {
+    GEMINI_SECRET_ARN            = aws_secretsmanager_secret.gemini_api_key.arn
+    LLM_MONTHLY_BUDGET_USD       = tostring(var.llm_monthly_budget_usd)
+    GOOGLE_OAUTH_WEB_CLIENT_IDS  = var.google_oauth_web_client_ids
+    GEMINI_MODEL_ID              = trimspace(var.gemini_model_id)
+  }
+
   http_lambda_env_turn = local.turn_stack ? {
     TURN_CONTROL_MODE        = var.turn_compute_mode
     TURN_EC2_INSTANCE_ID     = local.turn_instance_stack ? aws_instance.turn[0].id : ""
@@ -33,8 +40,8 @@ resource "aws_lambda_function" "http" {
   filename         = var.http_lambda_zip
   source_code_hash = filebase64sha256(var.http_lambda_zip)
 
-  memory_size = 256
-  timeout     = 10
+  memory_size = 512
+  timeout     = 28
 
   environment {
     variables = merge(
@@ -45,6 +52,7 @@ resource "aws_lambda_function" "http" {
         ALLOWED_ORIGIN   = local.site_browser_origin
         ROOM_TTL_SECONDS = tostring(var.room_ttl_seconds)
       },
+      local.http_llm_env,
       local.http_lambda_env_turn,
     )
   }

@@ -39,6 +39,21 @@ data "aws_iam_policy_document" "lambda_inline" {
       "${aws_apigatewayv2_api.ws.execution_arn}/*/*",
     ]
   }
+
+  statement {
+    sid = "SecretsGemini"
+    actions = [
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:DescribeSecret",
+    ]
+    resources = [aws_secretsmanager_secret.gemini_api_key.arn]
+  }
+
+  statement {
+    sid       = "CloudWatchLlmMetrics"
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "lambda_inline" {
