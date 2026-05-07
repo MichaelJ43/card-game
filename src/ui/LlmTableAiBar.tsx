@@ -46,7 +46,14 @@ export function LlmTableAiBar({
   }, [onAccessTokenChange])
 
   useEffect(() => {
-    if (!caps?.authSessionValid || !caps?.llmEnabled || accessToken) return
+    if (!caps?.authSessionValid || !caps?.llmEnabled) {
+      setConnecting(false)
+      return
+    }
+    if (accessToken) {
+      setConnecting(false)
+      return
+    }
 
     let cancelled = false
     setConnecting(true)
@@ -71,6 +78,7 @@ export function LlmTableAiBar({
 
     return () => {
       cancelled = true
+      setConnecting(false)
     }
   }, [caps?.authSessionValid, caps?.llmEnabled, accessToken, onAccessTokenChange])
 
@@ -81,6 +89,8 @@ export function LlmTableAiBar({
     } catch {
       /* ignore */
     }
+    setConnecting(false)
+    setSessionError(null)
     onAccessTokenChange(t)
   }
 
@@ -156,6 +166,18 @@ export function LlmTableAiBar({
           }}
         >
           Clear LLM session
+        </button>
+      )}
+      {caps?.authSessionValid && caps.llmEnabled && connecting && !accessToken && (
+        <button
+          type="button"
+          className="app__btnSecondary app__btnToolbar"
+          onClick={() => {
+            persistToken(null)
+            onEnabledChange(false)
+          }}
+        >
+          Cancel connecting
         </button>
       )}
       <label className="app__label app__label--inline app__label--llmCheck">
