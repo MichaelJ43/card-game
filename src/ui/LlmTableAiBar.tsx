@@ -3,9 +3,17 @@ import { exchangeLlmSession, type AiCapabilitiesResponse } from '../net/llmApi'
 
 const LS_KEY = 'card-game:llm-access-token:v1'
 
+function authSpaOrigin(): string {
+  const v = import.meta.env.VITE_AUTH_ORIGIN
+  return typeof v === 'string' && v.trim() ? v.trim().replace(/\/$/, '') : 'https://auth.michaelj43.dev'
+}
+
 export interface LlmTableAiBarProps {
   caps: AiCapabilitiesResponse | null
-  configuredHttpApi: boolean
+  /** Build has `VITE_MULTIPLAYER_HTTP_URL` so `/ai/*` can be called. */
+  llmHttpConfigured: boolean
+  /** Re-fetch `GET /ai/capabilities` (e.g. after signing in in another tab). */
+  onRefreshCaps?: () => void
   enabled: boolean
   gameSupportsLlm: boolean
   onEnabledChange: (v: boolean) => void
@@ -17,7 +25,8 @@ export interface LlmTableAiBarProps {
 /** Solo-table cloud LLM: requires shared-platform `sap_session` (see shared-api-platform `docs/auth-and-dashboard.md`). */
 export function LlmTableAiBar({
   caps,
-  configuredHttpApi,
+  llmHttpConfigured,
+  onRefreshCaps,
   enabled,
   gameSupportsLlm,
   onEnabledChange,
@@ -75,7 +84,7 @@ export function LlmTableAiBar({
     onAccessTokenChange(t)
   }
 
-  if (!configuredHttpApi || !gameSupportsLlm) return null
+  if (!llmHttpConfigured || !gameSupportsLlm) return null
 
   const canToggle = !!(caps?.llmEnabled && accessToken && !connecting)
 
@@ -91,9 +100,42 @@ export function LlmTableAiBar({
         ? `Cap · $${caps.monthlyBudgetUsd}`
         : ''
 
+  const signInHref =
+    typeof window !== 'undefined'
+      ? `${authSpaOrigin()}/?returnUrl=${encodeURIComponent(window.location.href)}`
+      : `${authSpaOrigin()}/`
+
   return (
     <div className="app__llmBar" role="group" aria-label="Cloud LLM table AI">
       <span className="app__llmBarTitle">Smarter AI</span>
+      {caps === null && (
+        <span className="app__llmBarHint">
+          Checking cloud AI…
+          {onRefreshCaps && (
+            <>
+              {' '}
+              <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => onRefreshCaps()}>
+                Refresh
+              </button>
+            </>
+          )}
+        </span>
+      )}
+      {caps && caps.authSessionValid === false && (
+        <span className="app__llmBarHint">
+          Sign in for cloud moves — the game must send your <code>sap_session</code> cookie to the card-game API (same
+          site as{' '}
+          <a href={signInHref} target="_blank" rel="noreferrer">
+            account sign-in
+          </a>
+          , then use <strong>Refresh</strong> here).
+        </span>
+      )}
+      {caps && caps.authSessionValid === false && onRefreshCaps && (
+        <button type="button" className="app__btnSecondary app__btnToolbar" onClick={() => onRefreshCaps()}>
+          Refresh
+        </button>
+      )}
       {caps && !caps.llmEnabled && caps.budgetMode === 'off' && (
         <span className="app__llmBarHint">LLM is disabled on this deployment (budget 0).</span>
       )}

@@ -53,7 +53,7 @@ import { AudioCueBar } from './ui/AudioCueBar'
 import { trackGameStart, trackMatchRoundStart } from './analytics/m43GameAnalytics'
 import { pickTableAiAction } from './ai/tableAiMove'
 import { fetchAiCapabilities, type AiCapabilitiesResponse } from './net/llmApi'
-import { isMultiplayerConfigured } from './net/config'
+import { getMultiplayerConfig } from './net/config'
 import { LlmTableAiBar } from './ui/LlmTableAiBar'
 
 function attachHostSeatProfilesIfNeeded(
@@ -405,7 +405,22 @@ function App() {
   }, [llmAccessToken])
 
   useEffect(() => {
-    if (!isMultiplayerConfigured()) {
+    const base = getMultiplayerConfig().httpUrl
+    if (!base) {
+      setLlmCaps(null)
+      return
+    }
+    const load = () => void fetchAiCapabilities().then(setLlmCaps)
+    load()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') load()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [])
+
+  const refreshLlmCaps = useCallback(() => {
+    if (!getMultiplayerConfig().httpUrl) {
       setLlmCaps(null)
       return
     }
@@ -1794,12 +1809,13 @@ function App() {
               {!onlineClientShell &&
                 !session?.net &&
                 gameSupportsLlmTableAi(gameId) &&
-                llmCaps?.authSessionValid &&
+                !!getMultiplayerConfig().httpUrl &&
                 (gameSupportsConfigurableAi(gameId) ? aiOpponents : defaultAiCountForGame(gameId)) >= 1 && (
                   <div className="app__toolbarRow app__toolbarRow--llm">
                     <LlmTableAiBar
                       caps={llmCaps}
-                      configuredHttpApi={isMultiplayerConfigured()}
+                      llmHttpConfigured={!!getMultiplayerConfig().httpUrl}
+                      onRefreshCaps={refreshLlmCaps}
                       enabled={llmTableAiEnabled}
                       onEnabledChange={setLlmTableAiEnabled}
                       accessToken={llmAccessToken}

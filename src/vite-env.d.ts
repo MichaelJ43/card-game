@@ -8,6 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_MULTIPLAYER_TURN_HOST?: string
   readonly VITE_MULTIPLAYER_TURN_USER?: string
   readonly VITE_MULTIPLAYER_TURN_CREDENTIAL?: string
+  /** Auth SPA origin for “Smarter AI” sign-in links (default https://auth.michaelj43.dev). */
+  readonly VITE_AUTH_ORIGIN?: string
 }
 
 declare module '*.yaml?raw' {
