@@ -1,6 +1,7 @@
 // Produces deployable zip bundles for each Lambda handler.
 // Run after `npm run build` (creates dist/).
 // Output: dist/http.zip, dist/websocket.zip, dist/turnScheduled.zip
+// http.zip must include dist/llm/ (LLM routes under ./llm/handlers).
 
 import { execSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -36,13 +37,20 @@ writeFileSync(
 
 execSync('npm install --omit=dev --silent --no-audit --no-fund', { cwd: dist, stdio: 'inherit' })
 
-async function zipPackage(files, zipName) {
+async function zipPackage(files, zipName, options = {}) {
+  const { extraDirs = [] } = options
   const out = resolve(dist, zipName)
   const output = createWriteStream(out)
   const archive = archiver('zip', { zlib: { level: 9 } })
   archive.pipe(output)
   for (const f of files) {
     archive.file(resolve(dist, f), { name: f })
+  }
+  for (const { from, to } of extraDirs) {
+    const abs = resolve(dist, from)
+    if (existsSync(abs)) {
+      archive.directory(abs, to)
+    }
   }
   archive.directory(resolve(dist, 'node_modules'), 'node_modules')
   await new Promise((res, rej) => {
@@ -71,6 +79,7 @@ await zipPackage(
     ...common,
   ],
   'http.zip',
+  { extraDirs: [{ from: 'llm', to: 'llm' }] },
 )
 
 await zipPackage(['websocket.js', 'auth.js', 'storage.js', 'roomCode.js', ...common], 'websocket.zip')
