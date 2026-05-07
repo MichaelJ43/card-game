@@ -47,8 +47,15 @@ export async function getMonthlySpendUsd(): Promise<SpendSnapshot> {
   const res = await ddb.send(
     new GetCommand({ TableName: tableName(), Key: { pk: PK, sk: sk() }, ConsistentRead: true }),
   )
-  const item = res.Item as { estimatedMicroUsd?: number } | undefined
-  const micro = typeof item?.estimatedMicroUsd === 'number' ? item.estimatedMicroUsd : 0
+  const item = res.Item as { estimatedMicroUsd?: number | string } | undefined
+  const raw = item?.estimatedMicroUsd
+  let micro = 0
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    micro = raw
+  } else if (typeof raw === 'string' && raw.trim()) {
+    const n = Number(raw)
+    if (Number.isFinite(n)) micro = n
+  }
   return {
     monthKey: sk().replace(SK_PREFIX, ''),
     estimatedMicroUsd: micro,

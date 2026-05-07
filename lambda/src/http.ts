@@ -15,26 +15,43 @@ const JSON_HEADERS = {
   'content-type': 'application/json',
 }
 
+function singleLineHeader(s: string): string {
+  return s.replace(/\r?\n/g, '').trim()
+}
+
 function cors(origin?: string) {
-  const allowed = process.env.ALLOWED_ORIGIN ?? '*'
-  const match = allowed === '*' || !origin ? allowed : allowed.split(',').map((o) => o.trim()).includes(origin) ? origin : allowed
+  const allowedRaw = singleLineHeader(process.env.ALLOWED_ORIGIN ?? '*')
+  const allowedList = allowedRaw === '*' ? [] : allowedRaw.split(',').map((o) => o.trim()).filter(Boolean)
+  const o = origin ? singleLineHeader(origin) : undefined
+  const fallbackAcao = allowedList[0] ?? allowedRaw
+  const match =
+    allowedRaw === '*' || !o ? allowedRaw : allowedList.includes(o) ? o : fallbackAcao
   const headers: Record<string, string> = {
-    'access-control-allow-origin': match,
+    'access-control-allow-origin': singleLineHeader(match),
     'access-control-allow-methods': 'GET,POST,OPTIONS',
     'access-control-allow-headers': 'content-type, authorization, cookie',
     vary: 'Origin',
   }
-  if (match !== '*' && origin) {
+  if (match !== '*' && o) {
     headers['access-control-allow-credentials'] = 'true'
   }
   return headers
+}
+
+function safeStringify(body: unknown): string {
+  try {
+    return JSON.stringify(body, (_k, v) => (typeof v === 'bigint' ? Number(v) : v))
+  } catch (e) {
+    console.error('JSON stringify failed', e)
+    return '{"message":"Serialization error"}'
+  }
 }
 
 function bad(status: number, message: string, origin?: string): APIGatewayProxyResultV2 {
   return {
     statusCode: status,
     headers: { ...JSON_HEADERS, ...cors(origin) },
-    body: JSON.stringify({ message }),
+    body: safeStringify({ message }),
   }
 }
 
@@ -42,7 +59,7 @@ function ok(body: unknown, origin?: string): APIGatewayProxyResultV2 {
   return {
     statusCode: 200,
     headers: { ...JSON_HEADERS, ...cors(origin) },
-    body: JSON.stringify(body),
+    body: safeStringify(body),
   }
 }
 
