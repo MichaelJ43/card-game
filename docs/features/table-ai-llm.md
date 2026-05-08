@@ -36,6 +36,7 @@ The Lambda assembles the user prompt in [`buildTableAiUserPrompt`](../../lambda/
 - **Multiplayer clients** never receive `moveLedger` on viewer snapshots—we trust the host only; history exists for host-side LLM context and solo `localStorage` resume (full snapshot serialization).
 - This lets the solo/host LLM notice patterns when `moveHistory` is populated.
 - Optional module hook **`summarizeLedgerAction`** shortens the stored line; otherwise a type + payload snippet is used.
+- **Multiplayer:** [`serializeSessionSnapshotForViewer`](../../src/net/sessionSnapshot.ts) does **not** include `moveLedger` on wire snapshots to peers (host-only). Full [`serializeSessionSnapshot`](../../src/net/sessionSnapshot.ts) still carries it when present for host-local persistence paths.
 
 ## Per-game overrides
 
