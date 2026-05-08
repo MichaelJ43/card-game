@@ -830,17 +830,20 @@ function App() {
         return
       }
     }
-    const result = prev.module.applyAction(prev.table, prev.gameState, action)
-    if (result.error) {
-      host.ack(fromPeerId, msg.nonce, false, result.error)
+    const el = tableViewRef.current
+    if (el && !prefersReducedMotion()) {
+      flipBeforeRef.current = captureCardRects(el)
+    }
+    const applied = tryApplySoloSessionAction(prev, action, {
+      actorSeat: msg.seat,
+      policy: 'human',
+    })
+    if (!applied.ok) {
+      host.ack(fromPeerId, msg.nonce, false, applied.error)
       return
     }
     host.ack(fromPeerId, msg.nonce, true)
-    setSession({
-      ...prev,
-      table: result.table,
-      gameState: result.gameState,
-    })
+    setSession(applied.session)
   }, [])
 
   const deliverChatLineToUi = useCallback(
