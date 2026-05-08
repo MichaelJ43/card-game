@@ -98,18 +98,6 @@ export function LlmTableAiBar({
 
   const canToggle = !!(caps?.llmEnabled && accessToken && !connecting)
 
-  const spendHint =
-    typeof caps?.monthlySpendEstimatedUsd === 'number' && Number.isFinite(caps.monthlySpendEstimatedUsd)
-      ? `Estimated month spend · $${caps.monthlySpendEstimatedUsd.toFixed(4)}`
-      : ''
-
-  const capHint =
-    caps?.unlimitedBudget
-      ? 'Budget · unlimited tracking'
-      : typeof caps?.monthlyBudgetUsd === 'number' && caps.monthlyBudgetUsd != null && caps.monthlyBudgetUsd > 0
-        ? `Cap · $${caps.monthlyBudgetUsd}`
-        : ''
-
   const signInHref =
     typeof window !== 'undefined'
       ? `${authSpaOrigin()}/?returnUrl=${encodeURIComponent(window.location.href)}`
@@ -133,12 +121,10 @@ export function LlmTableAiBar({
       )}
       {caps && caps.authSessionValid === false && (
         <span className="app__llmBarHint">
-          Sign in for cloud moves — the game must send your <code>sap_session</code> cookie to the card-game API (same
-          site as{' '}
           <a href={signInHref} target="_blank" rel="noreferrer">
-            account sign-in
-          </a>
-          , then use <strong>Refresh</strong> here).
+            Sign in
+          </a>{' '}
+          for cloud moves.
         </span>
       )}
       {caps && caps.authSessionValid === false && onRefreshCaps && (
@@ -189,13 +175,6 @@ export function LlmTableAiBar({
         />
         Use cloud model
       </label>
-      {(spendHint || capHint) && (
-        <span className="app__llmBarMeta">
-          {capHint}
-          {capHint && spendHint ? ' · ' : ''}
-          {spendHint}
-        </span>
-      )}
       {sessionError && <span className="app__llmBarError">{sessionError}</span>}
     </div>
   )
