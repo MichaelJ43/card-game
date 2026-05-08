@@ -50,4 +50,4 @@ Optional on **`GameModule`**:
 npm run gen:ai-catalog
 ```
 
-`npm run build` runs this automatically. Commit updates to [`src/llm/generated/heuristic-catalog.json`](../../src/llm/generated/heuristic-catalog.json) when you change **`selectAiAction`** JSDoc on `index.ts` or **`\*SelectAiAction`** exported functions (e.g. `unoSelectAiAction`) on `opponent.ts`.
+`npm run build` runs this automatically. Commit updates to [`src/llm/generated/heuristic-catalog.json`](../../src/llm/generated/heuristic-catalog.json) when you change **`selectAiAction`** JSDoc on `index.ts`, or JSDoc on an exported `*SelectAiAction` function (e.g. `unoSelectAiAction`) in `opponent.ts`.
