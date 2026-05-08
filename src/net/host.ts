@@ -10,6 +10,7 @@ import {
   type SignalingRelay,
 } from './protocol'
 import { SignalingClient, type SignalingState } from './signaling'
+import { pickClientSeat } from './hostSeats'
 
 export interface HostedPeer {
   peerId: string
@@ -22,6 +23,9 @@ export interface RoomHostOptions {
   roomCode: string
   hostPeerId: string
   token: string
+  /** Persisted peerId → seat map so reconnecting clients reclaim the same seat. */
+  initialSeatBindings?: Record<string, number>
+  onSeatBindingsChange?: (bindings: Record<string, number>) => void
   onRosterChange?: (peers: HostedPeer[]) => void
   onSignalingState?: (state: SignalingState) => void
   /** Server closed the room (idle policy); tear down multiplayer UI. */
@@ -47,11 +51,13 @@ interface HostPeerRecord {
 export class RoomHost {
   private signaling: SignalingClient
   private peers = new Map<string, HostPeerRecord>()
+  private seatBindings: Record<string, number>
   private revision = 0
   private readonly opts: RoomHostOptions
 
   constructor(opts: RoomHostOptions) {
     this.opts = opts
+    this.seatBindings = { ...(opts.initialSeatBindings ?? {}) }
     this.signaling = new SignalingClient({
       wsUrl: opts.wsUrl,
       role: 'host',
@@ -83,17 +89,15 @@ export class RoomHost {
     this.opts.onRosterChange?.(roster)
   }
 
-  private nextFreeSeat(): number {
-    const used = new Set<number>([0])
-    for (const r of this.peers.values()) used.add(r.seat)
-    let seat = 1
-    while (used.has(seat)) seat++
-    return seat
-  }
-
   private addClient(peerId: string) {
     if (this.peers.has(peerId)) return
-    const seat = this.nextFreeSeat()
+    const used = new Set<number>([0])
+    for (const r of this.peers.values()) used.add(r.seat)
+    const seat = pickClientSeat({ peerId, seatBindings: this.seatBindings, usedSeats: used })
+    if (this.seatBindings[peerId] !== seat) {
+      this.seatBindings[peerId] = seat
+      this.opts.onSeatBindingsChange?.({ ...this.seatBindings })
+    }
     const link = new PeerLink({
       remotePeerId: peerId,
       initiator: false,
@@ -175,6 +179,10 @@ export class RoomHost {
 
   getProtocolVersion(): number {
     return PROTOCOL_VERSION
+  }
+
+  getSeatBindings(): Record<string, number> {
+    return { ...this.seatBindings }
   }
 
   getRoster(): HostedPeer[] {

@@ -197,7 +197,7 @@ export function serializeSessionSnapshotForViewer(
   }
 }
 
-export function parseSessionSnapshot(value: unknown, peerSeatFallback?: number): GameSession | null {
+function parseSessionSnapshotCore(value: unknown): Omit<GameSession, 'net'> | null {
   if (!isSessionSnapshotWire(value)) return null
   const w = value as SessionSnapshotWire
   const gameId = w.gameId as keyof typeof GAME_SOURCES
@@ -209,9 +209,6 @@ export function parseSessionSnapshot(value: unknown, peerSeatFallback?: number):
   manifest = reconcileManifestPlayersForTable(manifest, w.table)
   const mod = getGameModule(manifest.module)
   if (!mod) return null
-  const remoteHumans = Math.max(0, manifest.players.human - 1)
-  const seat = typeof w.viewerSeat === 'number' ? w.viewerSeat : peerSeatFallback ?? 1
-  const spectator = typeof w.spectator === 'boolean' ? w.spectator : seat > remoteHumans
   const seatProfiles = parseWireSeatProfiles(w.seatProfiles)
   return {
     manifest,
@@ -220,7 +217,25 @@ export function parseSessionSnapshot(value: unknown, peerSeatFallback?: number):
     gameState: w.gameState,
     match: w.match,
     aiPlayerConfig: w.aiPlayerConfig,
-    net: { seat, spectator },
     seatProfiles,
+  }
+}
+
+/** Restore a locally persisted solo/host snapshot (full visibility; no `net` metadata). */
+export function parseLocalSessionSnapshot(value: unknown): GameSession | null {
+  const core = parseSessionSnapshotCore(value)
+  return core ?? null
+}
+
+export function parseSessionSnapshot(value: unknown, peerSeatFallback?: number): GameSession | null {
+  const core = parseSessionSnapshotCore(value)
+  if (!core) return null
+  const w = value as SessionSnapshotWire
+  const remoteHumans = Math.max(0, core.manifest.players.human - 1)
+  const seat = typeof w.viewerSeat === 'number' ? w.viewerSeat : peerSeatFallback ?? 1
+  const spectator = typeof w.spectator === 'boolean' ? w.spectator : seat > remoteHumans
+  return {
+    ...core,
+    net: { seat, spectator },
   }
 }

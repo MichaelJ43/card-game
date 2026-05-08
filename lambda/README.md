@@ -16,5 +16,6 @@ Expected environment variables (set by Terraform):
 - `WS_ENDPOINT` — the API Gateway WebSocket Management API endpoint (`https://<id>.execute-api.<region>.amazonaws.com/<stage>`).
 - `ROOM_TTL_SECONDS` — default 86400 (24h) idle TTL on rooms (set as DynamoDB TTL).
 - `ALLOWED_ORIGIN` — CORS allow-list origin for HTTP endpoints (e.g. the CloudFront distribution).
+- `HOST_DISCONNECT_GRACE_MS` (optional) — milliseconds advertised to clients when the host signaling socket drops; default **60000**, clamped **5000–120000**. Used with signaling types **`host-disconnected`** / **`host-rejoined`** (see `src/net/protocol.ts`).
 
 Build: `npm run build && npm run bundle`. Bundling produces zip files under `dist/` for upload by Terraform.

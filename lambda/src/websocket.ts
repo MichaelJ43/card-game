@@ -58,6 +58,13 @@ function getWsTtlSeconds(): number {
   return Number.isFinite(n) && n > 0 ? n : 60 * 60 * 2
 }
 
+/** Broadcast to clients when host signaling disconnects; clients keep WS open for this long waiting for host `hello`. */
+export function getHostDisconnectGraceMs(): number {
+  const raw = process.env.HOST_DISCONNECT_GRACE_MS
+  const n = raw ? Number(raw) : 60_000
+  return Number.isFinite(n) && n >= 5000 && n <= 120_000 ? n : 60_000
+}
+
 async function postTo(client: ApiGatewayManagementApiClient, connectionId: string, data: unknown): Promise<void> {
   try {
     await client.send(
@@ -194,6 +201,15 @@ async function onHello(
       await postTo(client, host.connectionId, { type: 'peer-joined', peerId: claims.peerId })
     }
   }
+
+  if (claims.role === 'host') {
+    const peersAfterHello = await listConnections(roomCode)
+    for (const p of peersAfterHello) {
+      if (p.role === 'client') {
+        await postTo(client, p.connectionId, { type: 'host-rejoined', hostPeerId })
+      }
+    }
+  }
 }
 
 async function onRelay(
@@ -234,11 +250,11 @@ async function onDisconnect(
   const peers = await listConnections(binding.roomCode)
 
   if (binding.role === 'host') {
-    // Host WebSocket gone: notify every remaining client so UIs can tear down.
     const hostPeerId = binding.peerId
+    const gracePeriodMs = getHostDisconnectGraceMs()
     for (const p of peers) {
       if (p.role === 'client') {
-        await postTo(client, p.connectionId, { type: 'peer-left', peerId: hostPeerId })
+        await postTo(client, p.connectionId, { type: 'host-disconnected', hostPeerId, gracePeriodMs })
       }
     }
     return

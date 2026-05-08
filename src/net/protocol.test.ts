@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  PROTOCOL_VERSION,
   ROOM_CODE_LENGTH,
   ROOM_CODE_ALPHABET,
   generateRoomCode,
@@ -60,10 +61,16 @@ describe('sanitizeDisplayName', () => {
 })
 
 describe('message type guards', () => {
+  it('PROTOCOL_VERSION is current', () => {
+    expect(PROTOCOL_VERSION).toBe(4)
+  })
+
   it('isSignalingMessage', () => {
     expect(isSignalingMessage({ type: 'hello' })).toBe(true)
     expect(isSignalingMessage({ type: 'relay' })).toBe(true)
     expect(isSignalingMessage({ type: 'room-closing', reason: 'idle' })).toBe(true)
+    expect(isSignalingMessage({ type: 'host-disconnected', hostPeerId: 'h-1', gracePeriodMs: 60000 })).toBe(true)
+    expect(isSignalingMessage({ type: 'host-rejoined', hostPeerId: 'h-1' })).toBe(true)
     expect(isSignalingMessage({ type: 'nope' })).toBe(false)
     expect(isSignalingMessage(null)).toBe(false)
   })

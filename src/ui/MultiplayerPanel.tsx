@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { abandonIdleRoom, createRoom, getTurnStatus, joinRoom, startTurnServer, turnHeartbeat } from '../net/api'
+import {
+  clearMultiplayerSession,
+  writeMultiplayerSession,
+  type MultiplayerClientStored,
+  type MultiplayerHostStored,
+  type MultiplayerStored,
+} from '../data/sessionPersistence'
 import { isMultiplayerConfigured } from '../net/config'
 import { RoomClient } from '../net/client'
 import { RoomHost, type HostedPeer } from '../net/host'
@@ -11,6 +18,7 @@ import {
   type PeerHostChatLine,
   type PeerHostSnapshot,
 } from '../net/protocol'
+import type { SessionSnapshotWire } from '../net/sessionSnapshot'
 import type { PeerState } from '../net/peer'
 import type { SignalingState } from '../net/signaling'
 import { MultiplayerIdleModal } from './MultiplayerIdleModal'
@@ -60,6 +68,16 @@ export interface MultiplayerPanelProps {
   onPeerAck?: (nonce: string, ok: boolean, error: string | undefined) => void
   /** Local viewer’s seat label editor (when the table has a seat roster). */
   nameplate?: MultiplayerNameplateProps
+  /** When set on first mount, reconnect host or client from a prior tab (same JWT). */
+  autoResume?: MultiplayerStored | null
+  /** After host auto-resume, parent restores table from persisted wire (may be null before first deal). */
+  onAutoResumeHostApplied?: (wire: SessionSnapshotWire | null) => void
+  /** After client auto-resume, parent restores last snapshot if any. */
+  onAutoResumeClientApplied?: (lastWire: SessionSnapshotWire | null) => void
+  /** Persist host peerId→seat map when it changes (tab refresh / client reconnect). */
+  onSeatBindingsPersist?: (bindings: Record<string, number>) => void
+  /** Host signaling dropped or returned (client only). */
+  onClientHostReconnectPhase?: (phase: 'disconnected' | 'rejoined') => void
 }
 
 type Mode = 'idle' | 'hosting' | 'client'
@@ -87,6 +105,11 @@ export function MultiplayerPanel({
   onClosed,
   onPeerAck,
   nameplate,
+  autoResume,
+  onAutoResumeHostApplied,
+  onAutoResumeClientApplied,
+  onSeatBindingsPersist,
+  onClientHostReconnectPhase,
 }: MultiplayerPanelProps) {
   const [mode, setMode] = useState<Mode>('idle')
   const [roomCode, setRoomCode] = useState<string>('')
@@ -106,6 +129,7 @@ export function MultiplayerPanel({
   const hostJwtRef = useRef<string | null>(null)
   const clientJwtRef = useRef<string | null>(null)
   const lastShellActivityRef = useRef(0)
+  const multiplayerResumeAttemptedRef = useRef(false)
 
   const configured = isMultiplayerConfigured()
 
@@ -117,6 +141,7 @@ export function MultiplayerPanel({
   }, [])
 
   const teardown = useCallback((opts?: { clientKickedByHost?: boolean; idleTimeout?: boolean }) => {
+    multiplayerResumeAttemptedRef.current = false
     const wasHost = hostRef.current !== null
     hostRef.current?.close()
     hostRef.current = null
@@ -140,9 +165,83 @@ export function MultiplayerPanel({
     )
     setError('')
     lastShellActivityRef.current = 0
+    clearMultiplayerSession()
     onTeardown?.(wasHost)
     onClosed?.()
   }, [onClosed, onTeardown])
+
+  /** One-shot reconnect after tab refresh (persisted JWT + room). */
+  useEffect(() => {
+    if (!configured) return
+    const rec = autoResume
+    if (!rec || multiplayerResumeAttemptedRef.current) return
+    if (hostRef.current || clientRef.current) return
+    multiplayerResumeAttemptedRef.current = true
+
+    if (rec.role === 'host') {
+      hostJwtRef.current = rec.token
+      lastShellActivityRef.current = Date.now()
+      const host = new RoomHost({
+        wsUrl: rec.wsUrl,
+        roomCode: rec.roomCode,
+        hostPeerId: rec.hostPeerId,
+        token: rec.token,
+        initialSeatBindings: { ...rec.seatBindings },
+        onSeatBindingsChange: (m) => onSeatBindingsPersist?.(m),
+        onSignalingState: setSignalingState,
+        onRoomClosing: () => teardown({ idleTimeout: true }),
+        onRosterChange: (peers) => {
+          setRoster(peers)
+          onHostingRosterChange?.(peers)
+        },
+        onIntent: (msg, from) => {
+          if (msg.type === 'intent') onRemoteIntent?.(msg, from)
+          else if (msg.type === 'setDisplayName') onRemoteSetDisplayName?.(msg, from)
+          else if (msg.type === 'chatSend') onRemoteChatSend?.(msg, from)
+        },
+      })
+      hostRef.current = host
+      setRoomCode(rec.roomCode)
+      setMode('hosting')
+      setStatus('Resumed hosting.')
+      onHostStarted?.(host)
+      onAutoResumeHostApplied?.(rec.wire)
+      return
+    }
+
+    const c = rec as MultiplayerClientStored
+    clientJwtRef.current = c.token
+    lastShellActivityRef.current = Date.now()
+    const client = new RoomClient({
+      wsUrl: c.wsUrl,
+      roomCode: c.roomCode,
+      hostPeerId: c.hostPeerId,
+      clientPeerId: c.clientPeerId,
+      token: c.token,
+      onSignalingState: setSignalingState,
+      onPeerState: updatePeerStatus,
+      onSnapshot: (snap) => onSessionSnapshot?.(snap),
+      onStatus: (m) => setStatus(m),
+      onAck: (nonce, ok, err) => onPeerAck?.(nonce, ok, err),
+      onChatLine: (line) => onRoomChatLine?.(line),
+      onHostDisconnected: () => {
+        setStatus('Host reconnecting—waiting for host…')
+        onClientHostReconnectPhase?.('disconnected')
+      },
+      onHostRejoined: () => {
+        onClientHostReconnectPhase?.('rejoined')
+        setStatus('Host is back—reconnecting…')
+      },
+      onHostEnded: () => teardown({ clientKickedByHost: true }),
+      onRoomClosing: () => teardown({ idleTimeout: true }),
+    })
+    clientRef.current = client
+    setRoomCode(c.roomCode)
+    setMode('client')
+    onClientStarted?.(client)
+    onAutoResumeClientApplied?.(c.lastWire)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot resume; callbacks read from latest closure when effect runs
+  }, [configured, autoResume])
 
   useEffect(() => () => teardown(), [teardown])
 
@@ -273,6 +372,8 @@ export function MultiplayerPanel({
         roomCode: code,
         hostPeerId,
         token,
+        initialSeatBindings: {},
+        onSeatBindingsChange: (m) => onSeatBindingsPersist?.(m),
         onSignalingState: setSignalingState,
         onRoomClosing: () => {
           teardown({ idleTimeout: true })
@@ -291,6 +392,20 @@ export function MultiplayerPanel({
       setRoomCode(code)
       setMode('hosting')
       setStatus('Share the room code with your friends.')
+      const hostRow: MultiplayerHostStored = {
+        v: 1,
+        ts: Date.now(),
+        role: 'host',
+        gameId,
+        maxClients,
+        roomCode: code,
+        wsUrl,
+        hostPeerId,
+        token,
+        seatBindings: host.getSeatBindings(),
+        wire: null,
+      }
+      writeMultiplayerSession(hostRow)
       onHostStarted?.(host)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -305,6 +420,7 @@ export function MultiplayerPanel({
     onRemoteSetDisplayName,
     onRemoteChatSend,
     teardown,
+    onSeatBindingsPersist,
   ])
 
   const startClient = useCallback(async () => {
@@ -333,6 +449,14 @@ export function MultiplayerPanel({
         onStatus: (m) => setStatus(m),
         onAck: (nonce, ok, err) => onPeerAck?.(nonce, ok, err),
         onChatLine: (line) => onRoomChatLine?.(line),
+        onHostDisconnected: () => {
+          setStatus('Host reconnecting—waiting for host…')
+          onClientHostReconnectPhase?.('disconnected')
+        },
+        onHostRejoined: () => {
+          onClientHostReconnectPhase?.('rejoined')
+          setStatus('Host is back—reconnecting…')
+        },
         onHostEnded: () => {
           teardown({ clientKickedByHost: true })
         },
@@ -343,12 +467,25 @@ export function MultiplayerPanel({
       clientRef.current = client
       setRoomCode(rc)
       setMode('client')
+      const clientRow: MultiplayerClientStored = {
+        v: 1,
+        ts: Date.now(),
+        role: 'client',
+        gameId,
+        roomCode: rc,
+        wsUrl,
+        hostPeerId,
+        clientPeerId,
+        token,
+        lastWire: null,
+      }
+      writeMultiplayerSession(clientRow)
       onClientStarted?.(client)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setStatus('')
     }
-  }, [joinCodeInput, onClientStarted, onPeerAck, onRoomChatLine, onSessionSnapshot, teardown, updatePeerStatus])
+  }, [gameId, joinCodeInput, onClientStarted, onClientHostReconnectPhase, onPeerAck, onRoomChatLine, onSessionSnapshot, teardown, updatePeerStatus])
 
   if (!configured) {
     return (
