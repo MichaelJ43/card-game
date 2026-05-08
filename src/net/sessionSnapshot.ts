@@ -60,7 +60,11 @@ export interface SessionSnapshotWire {
   gameState: unknown
   match?: MatchState
   aiPlayerConfig?: AiPlayerConfig
-  /** Optional move history for LLM / UI (solo resume). */
+  /**
+   * Host-local move history (LLM / solo resume). Present only on **full** snapshots from
+   * {@link serializeSessionSnapshot}; **omitted** from {@link serializeSessionSnapshotForViewer}
+   * so peers never depend on replicated ledger state.
+   */
   moveLedger?: MoveLedgerEntry[]
   /** Host fills per client: network seat index (matches {@link PeerHostSnapshot.seat}). */
   viewerSeat?: number
@@ -194,8 +198,10 @@ export function serializeSessionSnapshotForViewer(
 ): SessionSnapshotWire | null {
   const wire = serializeSessionSnapshot(session)
   if (!wire) return null
+  const peerFields = { ...wire }
+  delete peerFields.moveLedger
   return {
-    ...wire,
+    ...peerFields,
     table: projectTableForViewer(session.table, viewerSeat, spectator),
     gameState: projectGameStateForViewer(session.gameState, viewerSeat, spectator),
     viewerSeat,

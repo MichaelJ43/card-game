@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import '../games/blackjack'
 import { createSession } from '../session'
-import { parseLocalSessionSnapshot, parseSessionSnapshot, serializeSessionSnapshot } from './sessionSnapshot'
+import {
+  parseLocalSessionSnapshot,
+  parseSessionSnapshot,
+  serializeSessionSnapshot,
+  serializeSessionSnapshotForViewer,
+} from './sessionSnapshot'
+
+describe('serializeSessionSnapshotForViewer', () => {
+  it('omits moveLedger so peers trust host table state only', () => {
+    const sess = createSession('blackjack', () => 0.5)
+    sess.moveLedger = [{ seq: 0, seat: 0, policy: 'human', summary: 'bj:hit' }]
+    const full = serializeSessionSnapshot(sess)
+    expect(full?.moveLedger).toHaveLength(1)
+    const peer = serializeSessionSnapshotForViewer(sess, 0, false)
+    expect(peer?.moveLedger).toBeUndefined()
+  })
+})
 
 describe('parseLocalSessionSnapshot', () => {
   it('restores session without net metadata', () => {
