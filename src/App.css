@@ -985,3 +985,42 @@ fieldset.app__houseRules {
   border-color: #f87171;
   color: #f87171;
 }
+
+.app__toolbarRow--llm {
+  width: 100%;
+}
+
+.app__llmBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.85rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border, #2e303a);
+  border-radius: 0.45rem;
+  background: var(--bg-soft, rgba(255, 255, 255, 0.02));
+  font-size: 0.85rem;
+}
+
+.app__llmBarTitle {
+  font-weight: 600;
+  opacity: 0.95;
+}
+
+.app__llmBarHint,
+.app__llmBarMeta {
+  opacity: 0.75;
+}
+
+.app__llmBarError {
+  color: #f87171;
+  flex: 1 1 100%;
+}
+
+.app__label--llmCheck {
+  gap: 0.35rem;
+}
+
+.app__label--llmCheck input {
+  margin-right: 0.15rem;
+}

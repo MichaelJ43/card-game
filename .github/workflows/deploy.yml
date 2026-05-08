@@ -121,6 +121,8 @@ jobs:
             export TF_VAR_turn_ec2_enabled=true
             export TF_VAR_turn_coturn_static_password="${TURN_COTURN_STATIC_PASSWORD}"
           fi
+          if [ -n "${{ vars.TF_LLM_MONTHLY_BUDGET_USD }}" ]; then export TF_VAR_llm_monthly_budget_usd="${{ vars.TF_LLM_MONTHLY_BUDGET_USD }}"; fi
+          if [ -n "${{ vars.TF_AUTH_PLATFORM_API_BASE }}" ]; then export TF_VAR_auth_platform_api_base="${{ vars.TF_AUTH_PLATFORM_API_BASE }}"; fi
           terraform apply -auto-approve -var-file=../../../terraform/prod.tfvars
 
       - name: Capture Terraform outputs
@@ -133,6 +135,20 @@ jobs:
           echo "site_url=$(terraform output -raw site_url)" >> "$GITHUB_OUTPUT"
           echo "http_api_url=$(terraform output -raw http_api_url)" >> "$GITHUB_OUTPUT"
           echo "ws_api_url=$(terraform output -raw ws_api_url)" >> "$GITHUB_OUTPUT"
+          GEMINI="$(terraform output -raw gemini_secret_arn 2>/dev/null || true)"
+          echo "gemini_secret_arn=${GEMINI}" >> "$GITHUB_OUTPUT"
+
+      - name: Put Gemini secret value (optional)
+        working-directory: deploy/terraform/aws
+        env:
+          GEMINI_SECRET_ARN: ${{ steps.tf.outputs.gemini_secret_arn }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -n "${GEMINI_API_KEY:-}" ] && [ -n "${GEMINI_SECRET_ARN:-}" ]; then
+            aws secretsmanager put-secret-value --secret-id "$GEMINI_SECRET_ARN" --secret-string "$GEMINI_API_KEY"
+          else
+            echo "::notice::Skipping Gemini Secrets Manager payload (set secret GEMINI_API_KEY to enable)."
+          fi
 
       # Prefer repository Variables when set (stable URLs, no Terraform needed to
       # change them). Otherwise use Terraform outputs from this apply.
