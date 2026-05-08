@@ -20,8 +20,10 @@ import {
   effectiveUnoDrawUntilPlayable,
 } from './data/houseRules'
 import type { RulesGameId } from './data/rulesSources'
+import type { MoveLedgerEntry } from './session/moveLedger'
 
 export type { MatchState } from './core/match'
+export type { MoveLedgerEntry } from './session/moveLedger'
 export type { CreateSessionOptions } from './session/playerConfig'
 export type { SeatProfile } from './session/seatProfiles'
 
@@ -47,6 +49,11 @@ export interface GameSession<T = unknown> {
   match?: MatchState
   /** Per-AI-seat difficulty for this deal; undefined if no AI players. */
   aiPlayerConfig?: AiPlayerConfig
+  /**
+   * Solo / local: recent moves for LLM context (cleared on new deal).
+   * Omitted in snapshots until hosts broadcast it.
+   */
+  moveLedger?: MoveLedgerEntry[]
   /** Set for browsers consuming a host snapshot over the network. */
   net?: GameSessionNetMeta
   /** Per-seat display ids/names for online play (optional for local-only tables). */

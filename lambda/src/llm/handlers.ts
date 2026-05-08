@@ -195,6 +195,12 @@ interface MoveBody {
   playerIndex?: unknown
   difficulty?: unknown
   tableDigest?: unknown
+  observation?: unknown
+  rulesDigest?: unknown
+  houseRules?: unknown
+  match?: unknown
+  moveHistory?: unknown
+  heuristicCatalog?: unknown
   choices?: unknown
 }
 
@@ -206,7 +212,7 @@ function normalizeChoices(raw: unknown): LegalChoiceBrief[] | null {
     const index = (row as { index?: unknown }).index
     const label = (row as { label?: unknown }).label
     if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) return null
-    if (typeof label !== 'string' || label.length < 1 || label.length > 512) return null
+    if (typeof label !== 'string' || label.length < 1 || label.length > 640) return null
     out.push({ index, label })
   }
   out.sort((a, b) => a.index - b.index)
@@ -295,6 +301,27 @@ export async function handlePostAiMove(
       : 'medium'
   const tableDigest =
     typeof b.tableDigest === 'string' && b.tableDigest.length > 0 ? b.tableDigest : '(empty)'
+  const observation =
+    typeof b.observation === 'string' && b.observation.length > 0 ? b.observation.slice(0, 12000) : ''
+  const rulesDigest =
+    typeof b.rulesDigest === 'string' && b.rulesDigest.length > 0 ? b.rulesDigest.slice(0, 12000) : ''
+  const houseRulesJson =
+    b.houseRules && typeof b.houseRules === 'object'
+      ? JSON.stringify(b.houseRules).slice(0, 6000)
+      : '{}'
+  const matchJson =
+    b.match === null || b.match === undefined
+      ? 'null'
+      : typeof b.match === 'object'
+        ? JSON.stringify(b.match).slice(0, 4000)
+        : 'null'
+  const moveHistoryJson = Array.isArray(b.moveHistory)
+    ? JSON.stringify(b.moveHistory).slice(0, 8000)
+    : '[]'
+  const heuristicCatalog =
+    typeof b.heuristicCatalog === 'string' && b.heuristicCatalog.length > 0
+      ? b.heuristicCatalog.slice(0, 6000)
+      : ''
   const choices = normalizeChoices(b.choices)
   if (!choices || choices.length > 80) {
     return bad(400, { message: 'choices invalid', code: 'BAD_REQUEST' }, origin)
@@ -306,6 +333,12 @@ export async function handlePostAiMove(
     playerIndex: b.playerIndex,
     difficulty,
     tableDigest,
+    observation,
+    rulesDigest,
+    houseRulesJson,
+    matchJson,
+    moveHistoryJson,
+    heuristicCatalog,
     choices,
   })
 

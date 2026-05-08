@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { AI_DIFFICULTY_OPTIONS, normalizeAiDifficulty, type AiDifficulty } from './core/aiContext'
 import { type MatchState } from './core/match'
@@ -60,6 +60,7 @@ import { MultiplayerPanel } from './ui/MultiplayerPanel'
 import { openChatPopoutWindow } from './ui/openChatPopout'
 import { RulesModal } from './ui/RulesModal'
 import { UnoWildColorModal, type UnoWildColor } from './ui/UnoWildColorModal'
+import { captureCardRects, playCardLayoutFlip, prefersReducedMotion } from './ui/cardMotionFlip'
 import { TableView, type ActiveTurnHighlight, type TableIntent } from './ui/TableView'
 import { skyjoDumpUiStepShouldReset, type SkyjoDumpUiStep } from './ui/tableUiFlow'
 import type { GameAction } from './core/types'
@@ -72,7 +73,9 @@ import { tableCardFingerprint } from './audio/tableFingerprint'
 import { turnSignalFromSession } from './audio/turnSignal'
 import { AudioCueBar } from './ui/AudioCueBar'
 import { trackGameStart, trackMatchRoundStart } from './analytics/m43GameAnalytics'
-import { pickTableAiAction } from './ai/tableAiMove'
+import { tryApplySoloSessionAction } from './ai/applySoloSessionAction'
+import { computeSoloAiTick, TABLE_AI_MEDIUM_MODULES } from './ai/soloTableAiSchedule'
+import { pickTableAiAction, selectAiContextForSession } from './ai/tableAiMove'
 import { fetchAiCapabilities, type AiCapabilitiesResponse } from './net/llmApi'
 import { getMultiplayerConfig } from './net/config'
 import { LlmTableAiBar } from './ui/LlmTableAiBar'
@@ -97,12 +100,6 @@ function tableViewHumanIndex(session: GameSession | null): number {
   if (!session?.net) return 0
   if (session.net.spectator) return -1
   return session.net.seat
-}
-
-/** First player index that is an AI seat (manifest humans occupy 0..human-1). */
-function firstAiSeatIndex(session: GameSession | null): number {
-  if (!session) return 1
-  return session.manifest.players.human
 }
 
 /** Server seat for “You” in score tables; null when spectating (no local seat). */
@@ -286,16 +283,6 @@ function isUnoSession(s: GameSession): boolean {
   return s.manifest.module === 'uno'
 }
 
-/** Games where the shell runs medium-difficulty table AI on non-human turns. */
-const TABLE_AI_MEDIUM_MODULES = new Set([
-  'thirty-one',
-  'euchre',
-  'durak',
-  'pinochle',
-  'canasta',
-  'sequence-race',
-])
-
 /** Hand-zone active turn highlight for trick / shedding modules. */
 const HAND_TURN_HIGHLIGHT_MODULES = TABLE_AI_MEDIUM_MODULES
 
@@ -373,14 +360,6 @@ function labelCustomAction(a: GameAction): string {
   }
 }
 
-function difficultyForAiPlayer(session: GameSession, playerIndex: number): AiDifficulty {
-  const firstAi = session.manifest.players.human
-  if (playerIndex < firstAi) return 'medium'
-  const cfg = session.aiPlayerConfig?.difficulties
-  const ix = playerIndex - firstAi
-  return cfg && ix >= 0 && ix < cfg.length ? normalizeAiDifficulty(cfg[ix]) : 'medium'
-}
-
 function defaultAiCountForGame(gameId: (typeof GAME_IDS)[number]): number {
   const raw = GAME_SOURCES[gameId]
   if (!raw) return 0
@@ -424,6 +403,8 @@ function App() {
   /** Host snapshot seat for this browser (joined client); set before parse so chat send works before first full session. */
   const clientRemoteSeatRef = useRef<number | null>(null)
   const sessionRef = useRef<GameSession | null>(null)
+  const tableViewRef = useRef<HTMLDivElement | null>(null)
+  const flipBeforeRef = useRef<Map<string, DOMRect> | null>(null)
   const pushSnapshotRef = useRef<() => void>(() => {})
 
   const [gfAwaitingOpponent, setGfAwaitingOpponent] = useState(false)
@@ -616,6 +597,14 @@ function App() {
 
   useEffect(() => {
     sessionRef.current = session
+  }, [session])
+
+  useLayoutEffect(() => {
+    const root = tableViewRef.current
+    const before = flipBeforeRef.current
+    flipBeforeRef.current = null
+    if (!root || !before || before.size === 0) return
+    playCardLayoutFlip(root, before)
   }, [session])
 
   useEffect(() => {
@@ -1145,18 +1134,19 @@ function App() {
       })
       return
     }
+    const el = tableViewRef.current
+    if (el && !prefersReducedMotion()) {
+      flipBeforeRef.current = captureCardRects(el)
+    }
     setSession((p) => {
       if (!p) return p
-      const result = p.module.applyAction(p.table, p.gameState, action)
-      if (result.error) {
+      const actor = shellHumanSeat(p)
+      const result = tryApplySoloSessionAction(p, action, { actorSeat: actor, policy: 'human' })
+      if (!result.ok) {
         window.alert(result.error)
         return p
       }
-      return {
-        ...p,
-        table: result.table,
-        gameState: result.gameState,
-      }
+      return result.session
     })
   }, [])
 
@@ -1299,222 +1289,44 @@ function App() {
 
   useEffect(() => {
     if (session?.net) return
-    if (!session) return
-    if (!isGoFishSession(session)) return
-    const gs = session.gameState
-    if (gs.phase !== 'playing' || gs.currentPlayer < firstAiSeatIndex(session)) return
+    const tick = computeSoloAiTick(session)
+    if (!tick) return
 
-    const cp = gs.currentPlayer
-    const ph: GoFishGameState['phase'] = gs.phase
     const handle = window.setTimeout(() => {
+      const live = sessionRef.current
+      if (!live || live.net) return
+      const nowTick = computeSoloAiTick(live)
+      if (!nowTick || nowTick.staleKey !== tick.staleKey) return
+
       void (async () => {
         const prev = sessionRef.current
-        if (!prev || !isGoFishSession(prev)) return
-        const g = prev.gameState
-        if (g.phase !== ph || g.currentPlayer !== cp || cp < firstAiSeatIndex(prev)) return
-        const act = await pickTableAiAction(prev, cp, {
+        if (!prev || prev.net) return
+        const again = computeSoloAiTick(prev)
+        if (!again || again.staleKey !== tick.staleKey) return
+
+        const cp = tick.playerIndex
+        const { action: act, policy } = await pickTableAiAction(prev, cp, {
           useLlm:
             llmTableAiEnabledRef.current && gameSupportsLlmTableAi(String(prev.manifest.id)),
           llmBearerToken: llmAccessTokenRef.current,
-          selectAiContext: { difficulty: difficultyForAiPlayer(prev, cp) },
+          selectAiContext: selectAiContextForSession(prev, cp),
         })
         if (!act) return
+
+        const el = tableViewRef.current
+        if (el && !prefersReducedMotion()) {
+          flipBeforeRef.current = captureCardRects(el)
+        }
         setSession((p) => {
-          if (!p || !isGoFishSession(p)) return p
-          const gx = p.gameState
-          if (gx.phase !== ph || gx.currentPlayer !== cp) return p
-          const r = p.module.applyAction(p.table, p.gameState, act)
-          if (r.error) return p
-          return { ...p, table: r.table, gameState: r.gameState }
+          if (!p || p.net) return p
+          const cur = computeSoloAiTick(p)
+          if (!cur || cur.staleKey !== tick.staleKey) return p
+          const r = tryApplySoloSessionAction(p, act, { actorSeat: cp, policy })
+          if (!r.ok) return p
+          return r.session
         })
       })()
-    }, 550)
-
-    return () => window.clearTimeout(handle)
-  }, [session, llmTableAiEnabled, llmAccessToken])
-
-  useEffect(() => {
-    if (session?.net) return
-    if (!session) return
-    if (!isCrazyEightsSession(session)) return
-    const gs = session.gameState as { phase?: string; currentPlayer?: number }
-    if (
-      gs.phase !== 'play' ||
-      typeof gs.currentPlayer !== 'number' ||
-      gs.currentPlayer < firstAiSeatIndex(session)
-    )
-      return
-
-    const cp = gs.currentPlayer
-    const ph = gs.phase
-    const handle = window.setTimeout(() => {
-      void (async () => {
-        const prev = sessionRef.current
-        if (!prev || !isCrazyEightsSession(prev)) return
-        const g = prev.gameState as { phase?: string; currentPlayer?: number }
-        if (g.phase !== ph || typeof g.currentPlayer !== 'number' || g.currentPlayer !== cp || cp < firstAiSeatIndex(prev))
-          return
-        const act = await pickTableAiAction(prev, cp, {
-          useLlm:
-            llmTableAiEnabledRef.current && gameSupportsLlmTableAi(String(prev.manifest.id)),
-          llmBearerToken: llmAccessTokenRef.current,
-          selectAiContext: { difficulty: difficultyForAiPlayer(prev, cp) },
-        })
-        if (!act) return
-        setSession((p) => {
-          if (!p || !isCrazyEightsSession(p)) return p
-          const gx = p.gameState as { phase?: string; currentPlayer?: number }
-          if (
-            gx.phase !== ph ||
-            typeof gx.currentPlayer !== 'number' ||
-            gx.currentPlayer !== cp
-          )
-            return p
-          const r = p.module.applyAction(p.table, p.gameState, act)
-          if (r.error) return p
-          return { ...p, table: r.table, gameState: r.gameState }
-        })
-      })()
-    }, 500)
-
-    return () => window.clearTimeout(handle)
-  }, [session, llmTableAiEnabled, llmAccessToken])
-
-  useEffect(() => {
-    if (session?.net) return
-    if (!session) return
-    if (!isUnoSession(session)) return
-    const gs = session.gameState as { phase?: string; currentPlayer?: number }
-    if (
-      gs.phase !== 'play' ||
-      typeof gs.currentPlayer !== 'number' ||
-      gs.currentPlayer < firstAiSeatIndex(session)
-    )
-      return
-
-    const cp = gs.currentPlayer
-    const ph = gs.phase
-    const handle = window.setTimeout(() => {
-      void (async () => {
-        const prev = sessionRef.current
-        if (!prev || !isUnoSession(prev)) return
-        const g = prev.gameState as { phase?: string; currentPlayer?: number }
-        if (g.phase !== ph || typeof g.currentPlayer !== 'number' || g.currentPlayer !== cp || cp < firstAiSeatIndex(prev))
-          return
-        const act = await pickTableAiAction(prev, cp, {
-          useLlm:
-            llmTableAiEnabledRef.current && gameSupportsLlmTableAi(String(prev.manifest.id)),
-          llmBearerToken: llmAccessTokenRef.current,
-          selectAiContext: { difficulty: difficultyForAiPlayer(prev, cp) },
-        })
-        if (!act) return
-        setSession((p) => {
-          if (!p || !isUnoSession(p)) return p
-          const gx = p.gameState as { phase?: string; currentPlayer?: number }
-          if (
-            gx.phase !== ph ||
-            typeof gx.currentPlayer !== 'number' ||
-            gx.currentPlayer !== cp
-          )
-            return p
-          const r = p.module.applyAction(p.table, p.gameState, act)
-          if (r.error) return p
-          return { ...p, table: r.table, gameState: r.gameState }
-        })
-      })()
-    }, 500)
-
-    return () => window.clearTimeout(handle)
-  }, [session, llmTableAiEnabled, llmAccessToken])
-
-  useEffect(() => {
-    if (session?.net) return
-    if (!session) return
-    if (!TABLE_AI_MEDIUM_MODULES.has(session.manifest.module)) return
-    const gs = session.gameState as { phase?: string; currentPlayer?: number }
-    if (
-      gs.phase !== 'play' ||
-      typeof gs.currentPlayer !== 'number' ||
-      gs.currentPlayer < firstAiSeatIndex(session)
-    )
-      return
-
-    const cp = gs.currentPlayer
-    const ph = gs.phase
-    const handle = window.setTimeout(() => {
-      void (async () => {
-        const prev = sessionRef.current
-        if (!prev || !TABLE_AI_MEDIUM_MODULES.has(prev.manifest.module)) return
-        const g = prev.gameState as { phase?: string; currentPlayer?: number }
-        if (g.phase !== ph || typeof g.currentPlayer !== 'number' || g.currentPlayer !== cp || cp < firstAiSeatIndex(prev))
-          return
-        const act = await pickTableAiAction(prev, cp, {
-          useLlm:
-            llmTableAiEnabledRef.current && gameSupportsLlmTableAi(String(prev.manifest.id)),
-          llmBearerToken: llmAccessTokenRef.current,
-          selectAiContext: { difficulty: difficultyForAiPlayer(prev, cp) },
-        })
-        if (!act) return
-        setSession((p) => {
-          if (!p || !TABLE_AI_MEDIUM_MODULES.has(p.manifest.module)) return p
-          const gx = p.gameState as { phase?: string; currentPlayer?: number }
-          if (
-            gx.phase !== ph ||
-            typeof gx.currentPlayer !== 'number' ||
-            gx.currentPlayer !== cp
-          )
-            return p
-          const r = p.module.applyAction(p.table, p.gameState, act)
-          if (r.error) return p
-          return { ...p, table: r.table, gameState: r.gameState }
-        })
-      })()
-    }, 500)
-
-    return () => window.clearTimeout(handle)
-  }, [session, llmTableAiEnabled, llmAccessToken])
-
-  useEffect(() => {
-    if (session?.net) return
-    if (!session) return
-    if (!isSkyjoSession(session)) return
-    const gs = session.gameState
-    if (gs.phase === 'roundOver' || gs.currentPlayer < firstAiSeatIndex(session)) return
-
-    const cp = gs.currentPlayer
-    const phSky = gs.phase
-    const handle = window.setTimeout(() => {
-      void (async () => {
-        const prev = sessionRef.current
-        if (!prev || !isSkyjoSession(prev)) return
-        const g = prev.gameState
-        if (g.phase === 'roundOver' || g.currentPlayer !== cp || cp < firstAiSeatIndex(prev) || g.phase !== phSky) return
-        const act = await pickTableAiAction(prev, cp, {
-          useLlm:
-            llmTableAiEnabledRef.current && gameSupportsLlmTableAi(String(prev.manifest.id)),
-          llmBearerToken: llmAccessTokenRef.current,
-          selectAiContext: {
-            difficulty: difficultyForAiPlayer(prev, cp),
-            matchCumulativeScores: prev.match?.cumulativeScores,
-            matchTargetScore: prev.match?.config.targetScore,
-          },
-        })
-        if (!act) return
-        setSession((p) => {
-          if (!p || !isSkyjoSession(p)) return p
-          const gx = p.gameState
-          if (
-            gx.phase === 'roundOver' ||
-            gx.currentPlayer !== cp ||
-            gx.phase !== phSky
-          )
-            return p
-          const r = p.module.applyAction(p.table, p.gameState, act)
-          if (r.error) return p
-          return { ...p, table: r.table, gameState: r.gameState }
-        })
-      })()
-    }, 650)
+    }, tick.delayMs)
 
     return () => window.clearTimeout(handle)
   }, [session, llmTableAiEnabled, llmAccessToken])
@@ -2070,24 +1882,26 @@ function App() {
             </div>
           )}
 
-          <TableView
-            table={session.table}
-            humanPlayerIndex={tableViewHumanIndex(session)}
-            getSeatDisplayName={seatDisplayName}
-            onTableIntent={tableIntentZones ? handleTableIntent : undefined}
-            intentZoneAllowlist={tableIntentZones}
-            pendingStacksColumn={
-              isSkyjoSession(session)
-                ? {
-                    card: session.gameState.pendingDraw,
-                    skyjoDumpStep:
-                      session.gameState.currentPlayer === shellHumanSeat(session) ? skyjoDumpStep : 'idle',
-                  }
-                : undefined
-            }
-            activeTurnHighlight={activeTurnHighlight}
-            prepTarget={skyjoPrepTarget}
-          />
+          <div className="app__tableMotionRoot" ref={tableViewRef}>
+            <TableView
+              table={session.table}
+              humanPlayerIndex={tableViewHumanIndex(session)}
+              getSeatDisplayName={seatDisplayName}
+              onTableIntent={tableIntentZones ? handleTableIntent : undefined}
+              intentZoneAllowlist={tableIntentZones}
+              pendingStacksColumn={
+                isSkyjoSession(session)
+                  ? {
+                      card: session.gameState.pendingDraw,
+                      skyjoDumpStep:
+                        session.gameState.currentPlayer === shellHumanSeat(session) ? skyjoDumpStep : 'idle',
+                    }
+                  : undefined
+              }
+              activeTurnHighlight={activeTurnHighlight}
+              prepTarget={skyjoPrepTarget}
+            />
+          </div>
 
           <div className="app__actions">
             {gameId === 'go-fish' &&

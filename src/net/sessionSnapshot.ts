@@ -5,6 +5,7 @@ import type { MatchState } from '../core/match'
 import type { CardInstance, CardTemplate, GameManifestYaml, TableState, Zone } from '../core/types'
 import { GAME_SOURCES } from '../data/manifests'
 import type { AiPlayerConfig, GameSession } from '../session'
+import type { MoveLedgerEntry } from '../session/moveLedger'
 import type { SeatProfile } from '../session/seatProfiles'
 
 export const HIDDEN_CARD_TEMPLATE_ID = '__hidden__'
@@ -59,6 +60,8 @@ export interface SessionSnapshotWire {
   gameState: unknown
   match?: MatchState
   aiPlayerConfig?: AiPlayerConfig
+  /** Optional move history for LLM / UI (solo resume). */
+  moveLedger?: MoveLedgerEntry[]
   /** Host fills per client: network seat index (matches {@link PeerHostSnapshot.seat}). */
   viewerSeat?: number
   /** True when this seat is not in the current deal’s human slots (mid-join spectator). */
@@ -171,6 +174,9 @@ export function serializeSessionSnapshot(session: GameSession): SessionSnapshotW
       aiPlayerConfig: session.aiPlayerConfig
         ? (JSON.parse(JSON.stringify(session.aiPlayerConfig)) as AiPlayerConfig)
         : undefined,
+      moveLedger: session.moveLedger
+        ? (JSON.parse(JSON.stringify(session.moveLedger)) as MoveLedgerEntry[])
+        : undefined,
       seatProfiles: session.seatProfiles
         ? (JSON.parse(JSON.stringify(session.seatProfiles)) as SeatProfile[])
         : undefined,
@@ -217,8 +223,33 @@ function parseSessionSnapshotCore(value: unknown): Omit<GameSession, 'net'> | nu
     gameState: w.gameState,
     match: w.match,
     aiPlayerConfig: w.aiPlayerConfig,
+    moveLedger: parseWireMoveLedger((w as SessionSnapshotWire).moveLedger),
     seatProfiles,
   }
+}
+
+function parseWireMoveLedger(raw: unknown): MoveLedgerEntry[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const out: MoveLedgerEntry[] = []
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue
+    const o = row as { seq?: unknown; seat?: unknown; policy?: unknown; summary?: unknown }
+    const seq = Number(o.seq)
+    const seat = Number(o.seat)
+    const policy = o.policy
+    const summary = typeof o.summary === 'string' ? o.summary : ''
+    if (
+      !Number.isInteger(seq) ||
+      seq < 0 ||
+      !Number.isInteger(seat) ||
+      seat < 0 ||
+      (policy !== 'human' && policy !== 'heuristic' && policy !== 'llm') ||
+      summary.length > 500
+    )
+      continue
+    out.push({ seq, seat, policy, summary: summary.slice(0, 500) })
+  }
+  return out.length ? out : undefined
 }
 
 /** Restore a locally persisted solo/host snapshot (full visibility; no `net` metadata). */

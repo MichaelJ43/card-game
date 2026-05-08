@@ -2,12 +2,33 @@ import type { AiDifficulty, SelectAiContext } from '../core/aiContext'
 import type { GameAction } from '../core/types'
 import type { GameSession } from '../session'
 import { trackLlmTableInference } from '../analytics/llmTableAnalytics'
-import { buildTableDigest } from '../llm/tableDigest'
+import { buildRoleAwareTableObservation } from '../llm/roleAwareObservation'
+import {
+  heuristicCatalogExcerpt,
+  houseRulesPayload,
+  matchContextPayload,
+  moveHistoryPayload,
+  rulesDigestForGame,
+} from '../llm/llmContextPayload'
 import { requestLlmMove } from '../net/llmApi'
+import type { MoveActorPolicy } from '../session/moveLedger'
 
 function difficultyForAiPlayer(session: GameSession, playerIndex: number): AiDifficulty {
   const i = playerIndex - session.manifest.players.human
   return session.aiPlayerConfig?.difficulties?.[i] ?? 'medium'
+}
+
+export function selectAiContextForSession(session: GameSession, playerIndex: number): SelectAiContext {
+  const difficulty = difficultyForAiPlayer(session, playerIndex)
+  const m = session.match
+  if (m?.cumulativeScores?.length) {
+    return {
+      difficulty,
+      matchCumulativeScores: m.cumulativeScores,
+      matchTargetScore: m.config.targetScore,
+    }
+  }
+  return { difficulty }
 }
 
 export interface PickTableAiOpts {
@@ -17,6 +38,12 @@ export interface PickTableAiOpts {
   selectAiContext: SelectAiContext
 }
 
+export interface PickTableAiResult {
+  action: GameAction | null
+  /** Policy used for the returned action (LLM only when the cloud call succeeded). */
+  policy: MoveActorPolicy
+}
+
 /**
  * Uses the cloud LLM when enabled & signed in & solo table; falls back to heuristics module.selectAiAction.
  */
@@ -24,7 +51,7 @@ export async function pickTableAiAction(
   session: GameSession,
   playerIndex: number,
   opts: PickTableAiOpts,
-): Promise<GameAction | null> {
+): Promise<PickTableAiResult> {
   const rng = Math.random
   const heuristics = (): GameAction | null =>
     session.module.selectAiAction(session.table, session.gameState, playerIndex, rng, opts.selectAiContext)
@@ -42,19 +69,36 @@ export async function pickTableAiAction(
     typeof opts.llmBearerToken !== 'string' ||
     opts.llmBearerToken.length < 8
   ) {
-    return heuristics()
+    return { action: heuristics(), policy: 'heuristic' }
   }
 
   try {
     const legal = session.module.getLegalActions(session.table, session.gameState)
-    if (!legal.length) return null
+    if (!legal.length) return { action: null, policy: 'heuristic' }
 
-    const choices = legal.slice(0, 80).map((action: GameAction, index: number) => ({
-      index,
-      label: JSON.stringify(action).slice(0, 400),
-    }))
+    const observation =
+      session.module.buildLlmObservation?.(session.table, session.gameState, playerIndex) ??
+      buildRoleAwareTableObservation(session.table, playerIndex)
 
-    const tableDigest = buildTableDigest(session.table)
+    const choices = legal.slice(0, 80).map((action: GameAction, index: number) => {
+      const described = session.module.describeLegalChoice?.(
+        session.table,
+        session.gameState,
+        action,
+        playerIndex,
+      )
+      const label =
+        (described && described.trim().length > 0 ? described : JSON.stringify(action)).slice(0, 480)
+      return { index, label }
+    })
+
+    const tableDigest = observation.slice(0, 7000)
+    const rulesDigest = rulesDigestForGame(gameId)
+    const houseRules = houseRulesPayload(gameId)
+    const match = matchContextPayload(session)
+    const moveHistory = moveHistoryPayload(session.moveLedger)
+    const heuristicCatalog = heuristicCatalogExcerpt(gameId)
+
     const res = await requestLlmMove(opts.llmBearerToken, {
       provider: 'gemini',
       gameId,
@@ -62,6 +106,12 @@ export async function pickTableAiAction(
       playerIndex,
       difficulty: difficultyForAiPlayer(session, playerIndex),
       tableDigest,
+      observation,
+      rulesDigest,
+      houseRules,
+      match,
+      moveHistory,
+      heuristicCatalog,
       choices,
     })
     const act = legal[res.choiceIndex]
@@ -72,7 +122,7 @@ export async function pickTableAiAction(
         gameId,
         reason: 'index_oob',
       })
-      return heuristics()
+      return { action: heuristics(), policy: 'heuristic' }
     }
     const elapsed =
       (typeof performance !== 'undefined' && typeof performance.now === 'function'
@@ -88,7 +138,7 @@ export async function pickTableAiAction(
       estimatedUsd: res.usage?.estimatedUsd,
       monthlySpendEstimatedUsd: res.monthlySpendEstimatedUsd,
     })
-    return act
+    return { action: act, policy: 'llm' }
   } catch (e) {
     const extras: Record<string, unknown> = { ok: false, provider: 'gemini', gameId }
     if (e instanceof Error) {
@@ -99,6 +149,6 @@ export async function pickTableAiAction(
       if (typeof llmU === 'boolean') extras.llmUnavailable = llmU
     }
     trackLlmTableInference(extras)
-    return heuristics()
+    return { action: heuristics(), policy: 'heuristic' }
   }
 }
