@@ -7,7 +7,7 @@ This document summarizes how the **card-game** repository is structured, how gam
 - **Browser-only** card table: **React 19**, **TypeScript**, **Vite**.
 - **Games** are defined by **YAML manifests** + **YAML decks**, implemented in **TypeScript game modules**.
 - The **shell** (`src/App.tsx`) creates a **session**, renders **`TableView`**, maps **table intents** to **`GameAction`s**, and optionally tracks **multi-round match** scoring (points or chip-style bankrolls).
-- **No backend**; state is in-memory React state, with **house rules** persisted in **`localStorage`**.
+- **No backend**; state is in-memory React state, with **house rules** and **resume-from-refresh** preferences persisted in **`localStorage`** (see `src/data/houseRules.ts`, `src/data/sessionPersistence.ts`).
 
 ---
 
@@ -31,6 +31,7 @@ This document summarizes how the **card-game** repository is structured, how gam
 | `src/data/manifests.ts` | **`GAME_SOURCES`**, **`DECK_SOURCES`**, **`GAME_IDS`** — Vite `?raw` imports wiring ids to YAML strings. |
 | `src/data/rulesSources.ts` | **`RULES_SOURCES`**, **`rulesTextForGame`**, **`RulesGameId`** — maps each **`GAME_IDS`** entry to `src/rules/*.md` raw markdown. |
 | `src/data/houseRules.ts` | **`localStorage`** persistence for per-game **house rules**; **`createSessionOptionsHouseRules`** merges into **`CreateSessionOptions`**; **`GAMES_WITH_DISCARD_RECYCLE_OPTION`** controls which games show the “reshuffle discard when draw empty” toggle; **`effectiveReshuffleDiscardWhenDrawEmpty`** resolves manifest default + stored preference + session options. |
+| `src/data/sessionPersistence.ts` | **`localStorage`** for **last selected game**, **AI count/difficulties**, optional **solo in-progress snapshot**, and **multiplayer room credentials + snapshots** (resume after refresh; see **`docs/architecture.md`** §3.4). |
 | `src/decks/*.yaml` | Deck definitions: `standard-52`, `skyjo`, `uno`, `thirty-one-32`, `euchre-24`, `durak-36`, `pinochle-24`, `canasta-108`, `sequence-race-112`, `example-custom`. |
 | `src/games/<id>/` | Per-title **`*.yaml` manifest** + **`index.ts`** module (some **game ids** share one **`module`** id). |
 | `src/games/*/index.ts` | Implements **`GameModule`**: **`setup`**, **`getLegalActions`**, **`applyAction`**, **`selectAiAction`**, **`statusText`**, optional **`extractMatchRoundScores`** / **`isMatchRoundFinished`**. |
@@ -230,7 +231,7 @@ purpose).
 
 - `VERSION` holds the current semver tag (must match `package.json#version`).
 - Bump together when shipping a release; CI does not enforce this yet.
-- Breaking wire changes must bump `PROTOCOL_VERSION` in `src/net/protocol.ts`.
+- Breaking wire changes must bump `PROTOCOL_VERSION` in `src/net/protocol.ts` (current **4**: signaling includes **`host-disconnected`** / **`host-rejoined`** so clients survive a host signaling reconnect; deploy **site + WebSocket Lambda** together).
 
 ---
 

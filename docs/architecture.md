@@ -131,6 +131,12 @@ flowchart LR
 3. The **WebSocket Lambda** (`lambda/src/websocket.ts`) looks up the target connection in **DynamoDB** and uses **API Gateway Management API** `PostToConnection` to deliver the envelope — that is the **“signaling relay”**.
 4. Once ICE + DTLS succeed, **`RTCDataChannel`** is **peer-to-peer** (host ↔ each client). **Game state** does not flow through Lambda.
 
+### 3.4 Tab refresh, persistence, and host signaling reconnect
+
+The **shell** persists **selected game**, **AI preferences**, optional **solo table snapshots**, and **multiplayer room tokens + snapshots** in **`localStorage`** (`src/data/sessionPersistence.ts`). After a **solo** refresh, the UI offers **resume or discard**. **Host** and **client** can **auto-rejoin** the same room while the room JWT is still valid.
+
+When the **host’s signaling connection** disconnects (for example the host refreshes the page), the WebSocket Lambda notifies clients with **`host-disconnected`** (including a grace interval in milliseconds) instead of immediately emitting **`peer-left`** for the host. Clients **keep the signaling WebSocket**, tear down the **DataChannel**, and open a new WebRTC session when the Lambda broadcasts **`host-rejoined`** after the host’s next `hello`. Optional Lambda env **`HOST_DISCONNECT_GRACE_MS`** defaults to **60000** (clamped between **5000** and **120000**). **`RoomHost`** keeps a **`peerId` → seat** map so a refreshed client reclaims the same seat. Bump **`PROTOCOL_VERSION`** in `src/net/protocol.ts` when changing signaling wire types, and deploy **site + WebSocket Lambda** together.
+
 **Why Management API endpoint matters:** `PostToConnection` must target the **execute-api** URL for the WebSocket API (see comment in `lambda/src/websocket.ts`). Custom domains for clients are fine; the **server-side** post URL is special — details in **[`deploy/terraform/aws/README.md`](../deploy/terraform/aws/README.md)**.
 
 ---

@@ -23,6 +23,10 @@ export interface RoomClientOptions {
   onAck?: (nonce: string, ok: boolean, error: string | undefined) => void
   /** Host closed the room or disconnected; stop signaling and data channel. */
   onHostEnded?: () => void
+  /** Host signaling dropped briefly (e.g. tab refresh); DataChannel will be rebuilt after {@link onHostRejoined}. */
+  onHostDisconnected?: (info: { gracePeriodMs: number }) => void
+  /** Host is reachable again on signaling; open a new WebRTC session. */
+  onHostRejoined?: () => void
   /** Server closed the room (e.g. idle); stop signaling and data channel. */
   onRoomClosing?: () => void
   /** Host broadcast room chat line. */
@@ -35,6 +39,7 @@ export interface RoomClientOptions {
 export class RoomClient {
   private signaling: SignalingClient
   private link: PeerLink | null = null
+  private hostReconnectTimer: ReturnType<typeof setTimeout> | null = null
   private readonly opts: RoomClientOptions
 
   constructor(opts: RoomClientOptions) {
@@ -53,6 +58,26 @@ export class RoomClient {
           this.ensureLink()
         } else if (msg.type === 'relay' && msg.to === opts.clientPeerId) {
           this.ensureLink().acceptSignal(msg.payload)
+        } else if (msg.type === 'host-disconnected') {
+          this.clearHostReconnectTimer()
+          this.link?.close()
+          this.link = null
+          const rawGrace = (msg as { gracePeriodMs?: unknown }).gracePeriodMs
+          const gracePeriodMs =
+            typeof rawGrace === 'number' && Number.isFinite(rawGrace) && rawGrace > 0 ? rawGrace : 60_000
+          this.opts.onHostDisconnected?.({ gracePeriodMs })
+          this.hostReconnectTimer = setTimeout(() => {
+            this.hostReconnectTimer = null
+            this.handleHostEnded()
+          }, gracePeriodMs)
+        } else if (msg.type === 'host-rejoined') {
+          this.clearHostReconnectTimer()
+          if (this.link) {
+            this.link.close()
+            this.link = null
+          }
+          this.opts.onHostRejoined?.()
+          this.ensureLink()
         } else if (msg.type === 'peer-left' && msg.peerId === opts.hostPeerId) {
           this.handleHostEnded()
         }
@@ -81,7 +106,15 @@ export class RoomClient {
     return this.link
   }
 
+  private clearHostReconnectTimer(): void {
+    if (this.hostReconnectTimer != null) {
+      clearTimeout(this.hostReconnectTimer)
+      this.hostReconnectTimer = null
+    }
+  }
+
   private handleHostEnded(): void {
+    this.clearHostReconnectTimer()
     this.link?.close()
     this.link = null
     this.signaling.close()
@@ -108,6 +141,7 @@ export class RoomClient {
   }
 
   close(): void {
+    this.clearHostReconnectTimer()
     this.link?.close()
     this.link = null
     this.signaling.close()

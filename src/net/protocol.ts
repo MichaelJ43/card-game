@@ -8,7 +8,7 @@
  * host sends back. Incrementing {@link PROTOCOL_VERSION} is a breaking change.
  */
 
-export const PROTOCOL_VERSION = 3
+export const PROTOCOL_VERSION = 4
 
 /** Room codes are 6 uppercase alphanumeric chars, ambiguous glyphs dropped. */
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -74,6 +74,19 @@ export interface SignalingPeerLeft {
   peerId: string
 }
 
+/** Host signaling socket dropped; clients keep signaling open and may rebuild WebRTC after {@link SignalingHostRejoined}. */
+export interface SignalingHostDisconnected {
+  type: 'host-disconnected'
+  hostPeerId: string
+  gracePeriodMs: number
+}
+
+/** Host re-bound to the room after a disconnect; clients should open a new DataChannel offer. */
+export interface SignalingHostRejoined {
+  type: 'host-rejoined'
+  hostPeerId: string
+}
+
 /** Server is tearing down the room (e.g. host idle timeout); close signaling and UI session. */
 export interface SignalingRoomClosing {
   type: 'room-closing'
@@ -99,6 +112,8 @@ export type SignalingMessage =
   | SignalingRelay
   | SignalingPeerJoined
   | SignalingPeerLeft
+  | SignalingHostDisconnected
+  | SignalingHostRejoined
   | SignalingRoomClosing
   | SignalingError
 
@@ -234,6 +249,8 @@ export function isSignalingMessage(value: unknown): value is SignalingMessage {
     t === 'relay' ||
     t === 'peer-joined' ||
     t === 'peer-left' ||
+    t === 'host-disconnected' ||
+    t === 'host-rejoined' ||
     t === 'room-closing' ||
     t === 'error'
   )

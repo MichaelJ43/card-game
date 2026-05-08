@@ -6,7 +6,21 @@ import { aiPlayerMenuLabel, playerSeatLabel } from './core/playerLabels'
 import { parseGameManifestYaml } from './core/loadYaml'
 import { createSession, startNextMatchRound, type CreateSessionOptions, type GameSession } from './session'
 import { buildDefaultSeatProfiles } from './session/seatProfiles'
-import { createSessionOptionsHouseRules } from './data/houseRules'
+import {
+  clearSoloSession,
+  patchMultiplayerClient,
+  patchMultiplayerHost,
+  readAiPrefs,
+  readMultiplayerSession,
+  readSelectedGameId,
+  readSoloSession,
+  writeAiPrefs,
+  writeSelectedGameId,
+  writeSoloSession,
+} from './data/sessionPersistence'
+import {
+  createSessionOptionsHouseRules,
+} from './data/houseRules'
 import { GAME_IDS, GAME_SOURCES } from './data/manifests'
 import { rulesTextForGame, type RulesGameId } from './data/rulesSources'
 import {
@@ -33,7 +47,14 @@ import {
   type PeerHostChatLine,
   type PeerHostSnapshot,
 } from './net/protocol'
-import { parseSessionSnapshot, serializeSessionSnapshotForViewer } from './net/sessionSnapshot'
+import {
+  isSessionSnapshotWire,
+  parseLocalSessionSnapshot,
+  parseSessionSnapshot,
+  serializeSessionSnapshot,
+  serializeSessionSnapshotForViewer,
+  type SessionSnapshotWire,
+} from './net/sessionSnapshot'
 import { ChatToastStack } from './ui/ChatToastStack'
 import { MultiplayerPanel } from './ui/MultiplayerPanel'
 import { openChatPopoutWindow } from './ui/openChatPopout'
@@ -366,12 +387,37 @@ function defaultAiCountForGame(gameId: (typeof GAME_IDS)[number]): number {
   return parseGameManifestYaml(raw).players.ai
 }
 
+function initialAppShellState(): {
+  gameId: (typeof GAME_IDS)[number]
+  aiOpponents: number
+  aiDifficulties: AiDifficulty[]
+} {
+  const gameId = readSelectedGameId() ?? 'blackjack'
+  const prefs = readAiPrefs(gameId)
+  const defAi = defaultAiCountForGame(gameId)
+  const aiOpponents = gameSupportsConfigurableAi(gameId)
+    ? prefs?.aiCount != null
+      ? clampAiOpponentCount(gameId, prefs.aiCount)
+      : defAi
+    : defAi
+  const diffSeatCount = gameSupportsConfigurableAi(gameId) ? aiOpponents : defAi
+  const aiDifficulties = normalizeAiDifficultiesForCount(diffSeatCount, prefs?.aiDifficulties ?? ['medium'])
+  return { gameId, aiOpponents, aiDifficulties }
+}
+
 function App() {
-  const [gameId, setGameId] = useState<(typeof GAME_IDS)[number]>('blackjack')
-  const [aiOpponents, setAiOpponents] = useState(1)
-  const [aiDifficulties, setAiDifficulties] = useState<AiDifficulty[]>(['medium'])
+  const shell = initialAppShellState()
+  const [gameId, setGameId] = useState<(typeof GAME_IDS)[number]>(shell.gameId)
+  const [aiOpponents, setAiOpponents] = useState(shell.aiOpponents)
+  const [aiDifficulties, setAiDifficulties] = useState(shell.aiDifficulties)
   const [session, setSession] = useState<GameSession | null>(null)
   const [joinedAsClient, setJoinedAsClient] = useState(false)
+  const [soloResumeOffer, setSoloResumeOffer] = useState(() => readSoloSession())
+  const [mpResumeTick, setMpResumeTick] = useState(0)
+  // Bump `mpResumeTick` in `onMultiplayerTeardown` so we re-read `localStorage` after leaving a room (stale object otherwise).
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional tick trigger, not a missing dep on readMultiplayerSession
+  const multiplayerAutoResume = useMemo(() => readMultiplayerSession(), [mpResumeTick])
+  const [mpClientHostPhase, setMpClientHostPhase] = useState<'idle' | 'disconnected' | 'rejoined'>('idle')
 
   const roomHostRef = useRef<RoomHost | null>(null)
   const roomClientRef = useRef<RoomClient | null>(null)
@@ -389,6 +435,30 @@ function App() {
   const [hostClientRoster, setHostClientRoster] = useState<HostedPeer[]>([])
   /** True while this browser is an active room host (not ref-driven — avoids reading refs during render). */
   const [multiplayerHostActive, setMultiplayerHostActive] = useState(false)
+
+  useEffect(() => {
+    writeSelectedGameId(gameId)
+  }, [gameId])
+
+  useEffect(() => {
+    writeAiPrefs(gameId, { aiCount: aiOpponents, aiDifficulties })
+  }, [gameId, aiOpponents, aiDifficulties])
+
+  useEffect(() => {
+    if (!session || session.net) return
+    if (joinedAsClient || multiplayerHostActive) return
+    const wire = serializeSessionSnapshot(session)
+    if (wire) writeSoloSession(wire)
+  }, [session, joinedAsClient, multiplayerHostActive])
+
+  useEffect(() => {
+    if (!multiplayerHostActive || !session || session.net) return
+    const wire = serializeSessionSnapshot(session)
+    const host = roomHostRef.current
+    if (wire && host) {
+      patchMultiplayerHost({ wire, seatBindings: host.getSeatBindings() })
+    }
+  }, [session, multiplayerHostActive])
 
   const [llmCaps, setLlmCaps] = useState<AiCapabilitiesResponse | null>(null)
   const [llmTableAiEnabled, setLlmTableAiEnabled] = useState(false)
@@ -454,6 +524,12 @@ function App() {
 
   const onlineClientShell = joinedAsClient || !!session?.net
   const networkSpectator = !!session?.net?.spectator
+  const showSoloResumeCard =
+    !session &&
+    !onlineClientShell &&
+    !multiplayerHostActive &&
+    soloResumeOffer &&
+    soloResumeOffer.wire.gameId === gameId
   /** Open chat whenever in a room; joined clients can open before the first deal. Spectators stay disabled. */
   const multiplayerChatEnabled =
     multiplayerHostActive || (joinedAsClient && (!session?.net || !session.net.spectator))
@@ -622,11 +698,22 @@ function App() {
 
   const onGameIdChange = useCallback((id: (typeof GAME_IDS)[number]) => {
     setGameId(id)
-    setAiOpponents((prev) => clampAiOpponentCount(id, prev))
+    const prefs = readAiPrefs(id)
+    const defAi = defaultAiCountForGame(id)
+    const nextOpp = gameSupportsConfigurableAi(id)
+      ? prefs?.aiCount != null
+        ? clampAiOpponentCount(id, prefs.aiCount)
+        : defAi
+      : defAi
+    const diffSeatCount = gameSupportsConfigurableAi(id) ? nextOpp : defAi
+    setAiOpponents(nextOpp)
+    setAiDifficulties(normalizeAiDifficultiesForCount(diffSeatCount, prefs?.aiDifficulties ?? ['medium']))
     setSession(null)
     setGfAwaitingOpponent(false)
     setGfRank('A')
     setSkyjoDumpStep('idle')
+    clearSoloSession()
+    setSoloResumeOffer(null)
   }, [])
 
   const startOrNewDeal = useCallback(() => {
@@ -660,6 +747,8 @@ function App() {
     setSkyjoDumpStep('idle')
     setGfAwaitingOpponent(false)
     setGfRank('A')
+    clearSoloSession()
+    setSoloResumeOffer(null)
   }, [session, networkSpectator, onlineClientShell])
 
   const onHostStarted = useCallback((host: RoomHost) => {
@@ -694,6 +783,10 @@ function App() {
     setGfAwaitingOpponent(false)
     setGfRank('A')
     setSkyjoDumpStep('idle')
+    setMpClientHostPhase('idle')
+    if (isSessionSnapshotWire(snap.state)) {
+      patchMultiplayerClient({ lastWire: snap.state })
+    }
   }, [joinedAsClient])
 
   const onRemoteSetDisplayName = useCallback((msg: PeerClientSetDisplayName, fromPeerId: string) => {
@@ -925,14 +1018,42 @@ function App() {
     } catch {
       // ignore
     }
+    setMpClientHostPhase('idle')
     chatPopoutRef.current = null
     clientRemoteSeatRef.current = null
     clientDealAnalyticsEmittedRef.current = false
+    setMpResumeTick((t) => t + 1)
   }, [clearMainChatToasts])
 
   const onHostingRosterChange = useCallback((peers?: HostedPeer[]) => {
     if (peers) setHostClientRoster(peers)
+    const h = roomHostRef.current
+    if (h) patchMultiplayerHost({ seatBindings: h.getSeatBindings() })
     pushSnapshotRef.current()
+  }, [])
+
+  const onSeatBindingsPersist = useCallback((bindings: Record<string, number>) => {
+    patchMultiplayerHost({ seatBindings: bindings })
+  }, [])
+
+  const onAutoResumeHostApplied = useCallback((wire: SessionSnapshotWire | null) => {
+    if (wire) {
+      const s = parseLocalSessionSnapshot(wire)
+      if (s) setSession(s)
+    } else {
+      setSession(null)
+    }
+  }, [])
+
+  const onAutoResumeClientApplied = useCallback((lastWire: SessionSnapshotWire | null) => {
+    if (lastWire) {
+      const s = parseSessionSnapshot(lastWire)
+      if (s) setSession(s)
+    }
+  }, [])
+
+  const onClientHostReconnectPhase = useCallback((phase: 'disconnected' | 'rejoined') => {
+    setMpClientHostPhase(phase === 'disconnected' ? 'disconnected' : 'rejoined')
   }, [])
 
   const onNextMatchRound = useCallback(() => {
@@ -1846,6 +1967,43 @@ function App() {
       </header>
 
       <main className="m43-main m43-main--wide app__main">
+      {joinedAsClient && mpClientHostPhase !== 'idle' && (
+        <p className="app__status app__status--banner" role="status">
+          {mpClientHostPhase === 'disconnected'
+            ? 'Host disconnected—waiting for them to reconnect. You can keep this tab open.'
+            : 'Host is back—re-establishing the table connection…'}
+        </p>
+      )}
+
+      {showSoloResumeCard && (
+        <section className="app__resumeBanner" aria-label="Resume saved game">
+          <p className="app__resumeBannerText">You have a saved solo game for this title. Resume where you left off, or discard it.</p>
+          <div className="app__resumeBannerActions">
+            <button
+              type="button"
+              className="app__btnSecondary app__btnToolbar"
+              onClick={() => {
+                const s = parseLocalSessionSnapshot(soloResumeOffer!.wire)
+                if (s) setSession(s)
+                setSoloResumeOffer(null)
+              }}
+            >
+              Resume saved game
+            </button>
+            <button
+              type="button"
+              className="app__btnSecondary app__btnToolbar"
+              onClick={() => {
+                clearSoloSession()
+                setSoloResumeOffer(null)
+              }}
+            >
+              Discard
+            </button>
+          </div>
+        </section>
+      )}
+
       {gameSupportsOnlineMultiplayer(gameId) && (
         <MultiplayerPanel
           gameId={gameId}
@@ -1865,6 +2023,11 @@ function App() {
           onHostingRosterChange={onHostingRosterChange}
           onTeardown={onMultiplayerTeardown}
           onPeerAck={onPeerAck}
+          autoResume={multiplayerAutoResume}
+          onAutoResumeHostApplied={onAutoResumeHostApplied}
+          onAutoResumeClientApplied={onAutoResumeClientApplied}
+          onSeatBindingsPersist={onSeatBindingsPersist}
+          onClientHostReconnectPhase={onClientHostReconnectPhase}
           nameplate={
             multiplayerNameplate
               ? { ...multiplayerNameplate, onCommit: handleNameplateCommit }

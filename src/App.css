@@ -255,6 +255,35 @@
   line-height: 1.4;
 }
 
+.app__status--banner {
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.5rem;
+  background: var(--accent-bg, rgba(192, 132, 252, 0.12));
+  border: 1px solid var(--accent-border, rgba(192, 132, 252, 0.35));
+}
+
+.app__resumeBanner {
+  margin: 0 0 1.25rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.65rem;
+  background: var(--match-cumulative-surface, rgba(30, 41, 59, 0.55));
+  border: 1px solid var(--accent-border, rgba(148, 163, 184, 0.35));
+  box-shadow: var(--shadow);
+}
+
+.app__resumeBannerText {
+  margin: 0 0 0.65rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  opacity: 0.92;
+}
+
+.app__resumeBannerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 /* Cumulative scoreboard: theme tokens from index.css (light + dark readable) */
 .matchCumulative {
   font-size: 0.82rem;

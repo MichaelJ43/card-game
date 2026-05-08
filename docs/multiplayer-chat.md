@@ -23,7 +23,7 @@ Chat reuses the existing **game** DataChannel between host and clients:
 - **Client → host:** `PeerClientChatSend` (`type: 'chatSend'`, `seat`, `text`).
 - **Host → all clients:** `PeerHostChatLine` (`type: 'chatLine'`, `id`, `seat`, `senderLabel`, `text`, `ts`).
 
-These types are part of the `PeerMessage` union in `src/net/protocol.ts`. A protocol bump ships with the feature (`PROTOCOL_VERSION`).
+These types are part of the `PeerMessage` union in `src/net/protocol.ts`. A protocol bump ships with the feature (`PROTOCOL_VERSION`, currently **4** — includes signaling **`host-disconnected`** / **`host-rejoined`** for host tab refresh).
 
 ## Popout window and `postMessage`
 

@@ -1,6 +1,29 @@
 import type { APIGatewayProxyWebsocketEventV2 } from 'aws-lambda'
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { managementApiEndpoint } from './websocket'
+import { getHostDisconnectGraceMs, managementApiEndpoint } from './websocket'
+
+describe('getHostDisconnectGraceMs', () => {
+  const prev = process.env.HOST_DISCONNECT_GRACE_MS
+
+  afterEach(() => {
+    if (prev === undefined) delete process.env.HOST_DISCONNECT_GRACE_MS
+    else process.env.HOST_DISCONNECT_GRACE_MS = prev
+  })
+
+  it('defaults to 60_000', () => {
+    delete process.env.HOST_DISCONNECT_GRACE_MS
+    expect(getHostDisconnectGraceMs()).toBe(60_000)
+  })
+
+  it('clamps to 5_000…120_000', () => {
+    process.env.HOST_DISCONNECT_GRACE_MS = '2000'
+    expect(getHostDisconnectGraceMs()).toBe(60_000)
+    process.env.HOST_DISCONNECT_GRACE_MS = '30000'
+    expect(getHostDisconnectGraceMs()).toBe(30_000)
+    process.env.HOST_DISCONNECT_GRACE_MS = '200000'
+    expect(getHostDisconnectGraceMs()).toBe(60_000)
+  })
+})
 
 describe('managementApiEndpoint', () => {
   const prevRegion = process.env.AWS_REGION
