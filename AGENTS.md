@@ -33,14 +33,15 @@ This document summarizes how the **card-game** repository is structured, how gam
 | `src/ai/tableAiMove.ts` | **`pickTableAiAction`**: Gemini vs heuristics; builds expanded LLM context. |
 | `src/ai/soloTableAiSchedule.ts` | **`computeSoloAiTick`**: unified solo AI turn scheduling (delay + stale key). |
 | `src/llm/roleAwareObservation.ts` | Default **role-aware** table text for LLM prompts. |
-| `scripts/gen-ai-heuristic-catalog.mjs` | Build **`src/llm/generated/heuristic-catalog.json`** from `selectAiAction` JSDoc (`npm run gen:ai-catalog`, also runs on **`npm run build`**). |
+| `scripts/gen-ai-heuristic-catalog.mjs` | Build **`src/llm/generated/heuristic-catalog.json`** from exported **`*SelectAiAction`** JSDoc in **`opponent.ts`** (fallback: `selectAiAction` on **`index.ts`**). Runs via **`npm run gen:ai-catalog`** and **`npm run build`**. |
 | `src/data/manifests.ts` | **`GAME_SOURCES`**, **`DECK_SOURCES`**, **`GAME_IDS`** — Vite `?raw` imports wiring ids to YAML strings. |
 | `src/data/rulesSources.ts` | **`RULES_SOURCES`**, **`rulesTextForGame`**, **`RulesGameId`** — maps each **`GAME_IDS`** entry to `src/rules/*.md` raw markdown. |
 | `src/data/houseRules.ts` | **`localStorage`** persistence for per-game **house rules**; **`createSessionOptionsHouseRules`** merges into **`CreateSessionOptions`**; **`GAMES_WITH_DISCARD_RECYCLE_OPTION`** controls which games show the “reshuffle discard when draw empty” toggle; **`effectiveReshuffleDiscardWhenDrawEmpty`** resolves manifest default + stored preference + session options. |
 | `src/data/sessionPersistence.ts` | **`localStorage`** for **last selected game**, **AI count/difficulties**, optional **solo in-progress snapshot**, and **multiplayer room credentials + snapshots** (resume after refresh; see **`docs/architecture.md`** §3.4). |
 | `src/decks/*.yaml` | Deck definitions: `standard-52`, `skyjo`, `uno`, `thirty-one-32`, `euchre-24`, `durak-36`, `pinochle-24`, `canasta-108`, `sequence-race-112`, `example-custom`. |
-| `src/games/<id>/` | Per-title **`*.yaml` manifest** + **`index.ts`** module (some **game ids** share one **`module`** id). Larger titles may split **`logic.ts`** / **`opponent.ts`** / **`llm.ts`** (see **`uno`**). |
-| `src/games/*/index.ts` | Implements **`GameModule`**: **`setup`**, **`getLegalActions`**, **`applyAction`**, **`selectAiAction`**, **`statusText`**, optional **`extractMatchRoundScores`** / **`isMatchRoundFinished`**. |
+| `src/games/<id>/` | Per-title **`*.yaml` manifest** + TypeScript module. Most games use a **multi-file layout**: **`types.ts`** (game state), **`helpers.ts`** (zones, scoring, legal-move helpers), **`logic.ts`** (**`setup`** / **`getLegalActions`** / **`applyAction`** / **`statusText`** / match hooks), **`opponent.ts`** (exported **`*SelectAiAction`** for AI + heuristic-catalog JSDoc), and a thin **`index.ts`** that composes **`GameModule`**, calls **`registerGameModule`**, and re-exports any types the shell imports (e.g. **`SkyjoGameState`**). Add **`llm.ts`** only when a title needs extra LLM presentation helpers. Some **game ids** share one **`module`** id (e.g. **`switch`** → **`crazy-eights`**). |
+| `src/games/*/index.ts` | Composes **`GameModule`** and **`registerGameModule`**; delegates to **`logic`** / **`opponent`** when split. |
+| `src/net/sessionSnapshot.ts` | **`serializeSessionSnapshot`** (full wire, optional **`moveLedger`**) vs **`serializeSessionSnapshotForViewer`** (per-seat redacted table/gameState; **`moveLedger` omitted** for peers — host-only). |
 | `src/rules/*.md` | **In-app rules** copy (shown in **Rules** modal); structured with `#` title, `##` sections, numbered lists where possible. |
 | `src/ui/TableView.tsx` | Renders zones (stack / spread / grid), **pending column** for Skyjo, **`onTableIntent`**, **active turn** highlight. |
 | `src/ui/tableIntent.ts` | **`TableIntent`** types (`card`, `stack`, `zone`) + pointer modifiers. |
@@ -192,7 +193,7 @@ Agents changing rules behavior should update **both** the module logic and **`sr
 
 ## Adding a new game (checklist)
 
-1. Add **`src/games/<id>/<id>.yaml`** and **`src/games/<id>/index.ts`** implementing **`GameModule`** + **`registerGameModule`**.
+1. Add **`src/games/<id>/<id>.yaml`** and implement **`GameModule`** + **`registerGameModule`**. Prefer the **`types` / `helpers` / `logic` / `opponent` / thin `index`** split used by other titles (see **`src/games/<id>/`** row above); put JSDoc for heuristic catalog on the exported **`*SelectAiAction`** in **`opponent.ts`**.
 2. Wire **`GAME_SOURCES`** and (if new) **`DECK_SOURCES`** in **`src/data/manifests.ts`** with `?raw` imports.
 3. Add **`src/rules/<id>.md`** and an entry in **`RULES_SOURCES`** (`src/data/rulesSources.ts`); extend **`GameHouseRules`** / panel only if new options are needed. For **draw + discard** games that should support “shuffle discard into draw when draw is empty,” wire **`src/core/discardRecycle.ts`**, set **`discardRecycleWhenDrawEmpty`** on the manifest, register the id in **`GAMES_WITH_DISCARD_RECYCLE_OPTION`**, and mirror the **`GameHouseRulesPanel`** + **`createSession`** pattern used by Skyjo / Uno.
 4. Update **`App.tsx`** if the shell must handle intents, custom buttons, or special UI (copy patterns from similar games).
@@ -245,7 +246,9 @@ purpose).
 
 - Star topology: player 0 (local browser) is the **host** and authoritative
   game runner. Clients (seats 1..N) send intents and render host-provided
-  snapshots.
+  snapshots. **`serializeSessionSnapshotForViewer`** strips hidden cards for each
+  seat and **does not send `moveLedger`** over the DataChannel (ledger stays
+  host-local for solo LLM / resume paths that use the full snapshot).
 - Signaling: short-lived room JWT from a Lambda HTTP API + API Gateway
   WebSocket Lambda that relays `SignalingRelay { to, from, payload }` envelopes.
 - Transport: WebRTC DataChannels (single ordered channel `game`).
