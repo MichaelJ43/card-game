@@ -21,13 +21,19 @@ This document summarizes how the **card-game** repository is structured, how gam
 | `src/core/` | **`GameModule`** contract, **`TableState`**, **`GameAction`**, **`MatchState`**, deck/build helpers, **`registerGameModule`**, shuffle, YAML parsing entry points. |
 | `src/core/discardRecycle.ts` | When the draw pile is empty, optionally **shuffle the discard pile into a new draw pile**; **`isDeckDrawAvailableAfterOptionalRecycle`** for legal-action checks without mutating the table. Used by games with both **`draw`** and **`discard`** when **`reshuffleDiscardWhenDrawEmpty`** is on. |
 | `src/core/types.ts` | Shared types: **`CardInstance`**, **`CardTemplate`**, zones, **`GameManifestYaml`**, **`MatchManifestYaml`**, **`GameAction`** variants. |
-| `src/core/gameModule.ts` | **`GameModuleContext`** (manifest, templates, rng, `matchCumulativeScores`, optional **`reshuffleDiscardWhenDrawEmpty`**, other house-rule flags for modules). |
+| `src/core/gameModule.ts` | **`GameModuleContext`** and **`GameModule`**: `setup`, `getLegalActions`, `applyAction`, `selectAiAction`, optional match hooks, optional **`buildLlmObservation`** / **`describeLegalChoice`** / **`summarizeLedgerAction`** for cloud AI. |
 | `src/core/match.ts` | **`MatchState`**, **`applyFinishedRound`**, **`createInitialMatchState`**, end condition **`anyAtOrAbove`**, **`winnerIs`**: `lowest` \| `highest`. |
 | `src/core/table.ts` | **`createEmptyTable`**, **`cloneTable`**, **`moveTop`**, zone helpers. |
 | `src/core/registry.ts` | **`registerGameModule`** / **`getGameModule`** — modules self-register on import. |
 | `src/core/aiContext.ts` | **`AiDifficulty`**: `easy` \| `medium` \| `hard` \| `expert`; **`SelectAiContext`** (difficulty + optional match fields for Skyjo AI). |
 | `src/core/aiPlaystyle.ts` | Small helpers: **`aiIsExpert`**, **`aiIsHardOrExpert`** for tier checks in `selectAiAction`. |
 | `docs/ai-behavior.md` | **Table AI**: what each **difficulty** does, which games use **`SelectAiContext`**, and which modules ignore it. |
+| `docs/features/table-ai-llm.md` | **LLM table AI**: role-aware observation, `/ai/move` payload, move ledger, heuristic catalog generation. |
+| `docs/features/table-card-motion.md` | **FLIP** card motion: `data-card-instance`, solo `App` capture/`useLayoutEffect` hook. |
+| `src/ai/tableAiMove.ts` | **`pickTableAiAction`**: Gemini vs heuristics; builds expanded LLM context. |
+| `src/ai/soloTableAiSchedule.ts` | **`computeSoloAiTick`**: unified solo AI turn scheduling (delay + stale key). |
+| `src/llm/roleAwareObservation.ts` | Default **role-aware** table text for LLM prompts. |
+| `scripts/gen-ai-heuristic-catalog.mjs` | Build **`src/llm/generated/heuristic-catalog.json`** from `selectAiAction` JSDoc (`npm run gen:ai-catalog`, also runs on **`npm run build`**). |
 | `src/data/manifests.ts` | **`GAME_SOURCES`**, **`DECK_SOURCES`**, **`GAME_IDS`** — Vite `?raw` imports wiring ids to YAML strings. |
 | `src/data/rulesSources.ts` | **`RULES_SOURCES`**, **`rulesTextForGame`**, **`RulesGameId`** — maps each **`GAME_IDS`** entry to `src/rules/*.md` raw markdown. |
 | `src/data/houseRules.ts` | **`localStorage`** persistence for per-game **house rules**; **`createSessionOptionsHouseRules`** merges into **`CreateSessionOptions`**; **`GAMES_WITH_DISCARD_RECYCLE_OPTION`** controls which games show the “reshuffle discard when draw empty” toggle; **`effectiveReshuffleDiscardWhenDrawEmpty`** resolves manifest default + stored preference + session options. |

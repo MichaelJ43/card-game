@@ -68,4 +68,22 @@ export interface GameModule<TGame = unknown> {
   extractMatchRoundScoreCellNotes?(gameState: TGame): (string | null)[] | null
   /** True when this game state represents a completed round ready to merge into cumulative scores. */
   isMatchRoundFinished?(gameState: TGame): boolean
+  /**
+   * Optional: role-aware observation text/JSON for cloud LLM moves (viewer = `viewerPlayerIndex`).
+   * Omit to use the framework default role-aware table digest.
+   */
+  buildLlmObservation?(
+    table: TableState,
+    gameState: TGame,
+    viewerPlayerIndex: number,
+  ): string
+  /** Optional: human-readable label for a legal choice (else JSON slice). */
+  describeLegalChoice?(
+    table: TableState,
+    gameState: TGame,
+    action: GameAction,
+    viewerPlayerIndex: number,
+  ): string | undefined
+  /** Optional: short line for the move ledger; default uses action type + payload snippet. */
+  summarizeLedgerAction?(action: GameAction): string | undefined
 }

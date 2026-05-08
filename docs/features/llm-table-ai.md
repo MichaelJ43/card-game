@@ -2,6 +2,8 @@
 
 This document describes the **implemented** cloud “smarter AI” path for **solo / local** tables (not online host/client shells). It is separate from the built-in heuristic `selectAiAction` in each game module.
 
+**Behavior, prompt fields, move ledger, and per-game hooks** are documented in [table-ai-llm.md](table-ai-llm.md). **Card motion** when the table updates is documented in [table-card-motion.md](table-card-motion.md).
+
 ## Architecture
 
 - **Browser**: the “Smarter AI” toolbar is shown **only when** the viewer has a valid **shared platform auth session** (`sap_session` HttpOnly cookie, see [shared-api-platform `docs/auth-and-dashboard.md`](https://github.com/MichaelJ43/shared-api-platform/blob/main/docs/auth-and-dashboard.md)). The SPA calls card-game **`GET /ai/capabilities`** and **`POST /ai/session`** with **`credentials: 'include'`** so that cookie reaches the card-game HTTP API.

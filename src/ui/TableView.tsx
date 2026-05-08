@@ -43,6 +43,8 @@ export interface TableViewProps {
     card: CardInstance | null
     /** Highlights pending column during a multi-step dump & flip flow */
     skyjoDumpStep?: SkyjoDumpUiStep
+    /** Framework name for the same UX (preferred for new games). */
+    dumpSelectFlip?: boolean
   }
   /**
    * Highlights the zone whose id is `{zoneIdPrefix}:{playerIndex}` for the current turn
@@ -202,7 +204,11 @@ export function TableView({
           const tmpl = table.templates[card.templateId]
           const inner = <CardView card={card} template={tmpl} showFace={showFace} />
           return (
-            <div key={card.instanceId} className="tableView__cardSlot tableView__cardSlot--enter">
+            <div
+              key={card.instanceId}
+              className="tableView__cardSlot tableView__cardSlot--enter"
+              data-card-instance={card.instanceId}
+            >
               <div
                 className="tableView__cardSlotPose"
                 style={{
@@ -280,6 +286,7 @@ export function TableView({
                 <div
                   key={card.instanceId}
                   className={`tableView__cardSlot tableView__cardSlot--enter${isPrepTarget ? ' tableView__cardSlot--prepTarget' : ''}`}
+                  data-card-instance={card.instanceId}
                 >
                   <div className="tableView__cardSlotPose" style={poseStyle}>
                     {cardInteractive ? (
@@ -308,7 +315,8 @@ export function TableView({
     const cfg = pendingStacksColumn
     const c = cfg?.card ?? null
     const tmpl = c ? table.templates[c.templateId] : undefined
-    const step = cfg?.skyjoDumpStep ?? 'idle'
+    const step: SkyjoDumpUiStep =
+      cfg?.dumpSelectFlip === true || cfg?.skyjoDumpStep === 'selectFlip' ? 'selectFlip' : cfg?.skyjoDumpStep ?? 'idle'
     return (
       <div className="tableView__stackCol tableView__stackCol--pending">
         <section
@@ -321,7 +329,10 @@ export function TableView({
           </header>
           <div className="tableView__cards tableView__cards--pendingSlot">
             {c ? (
-              <div className="tableView__cardSlot tableView__cardSlot--enter">
+              <div
+                className="tableView__cardSlot tableView__cardSlot--enter"
+                data-card-instance={c.instanceId}
+              >
                 <div className="tableView__cardSlotPose">
                   <CardView card={c} template={tmpl} showFace />
                 </div>

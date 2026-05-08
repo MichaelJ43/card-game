@@ -58,7 +58,16 @@ export async function requestLlmMove(
     moduleId: string
     playerIndex: number
     difficulty: string
+    /** Legacy / short summary; server prefers `observation` when present. */
     tableDigest: string
+    /** Role-aware table observation for this seat. */
+    observation: string
+    rulesDigest: string
+    houseRules: Record<string, unknown>
+    match: Record<string, unknown> | null
+    moveHistory: unknown[]
+    /** Extracted heuristic / opponent logic catalog for this game. */
+    heuristicCatalog: string
     choices: { index: number; label: string }[]
   },
 ): Promise<{

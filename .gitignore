@@ -15,6 +15,9 @@ dist-ssr
 # Operator-only notes (kept out of the repo on purpose).
 AWS_SETUP.md
 
+# Local refactor backlog (copy from REFACTOR_BACKLOG.example.md).
+REFACTOR_BACKLOG.local.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
