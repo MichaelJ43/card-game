@@ -32,8 +32,9 @@ The Lambda assembles the user prompt in [`buildTableAiUserPrompt`](../../lambda/
 
 ## Move ledger
 
-- On each successful **local** apply (human or AI), the shell appends one ledger row (`human`, `heuristic`, or `llm`).
-- This lets the model notice patterns (e.g. another seat consistently using LLM vs human timing).
+- On each successful apply on the **authoritative browser** (solo table, or multiplayer **host** applying local + remote intents), the shell appends one ledger row (`human`, `heuristic`, or `llm`).
+- **Multiplayer clients** never receive `moveLedger` on viewer snapshots—we trust the host only; history exists for host-side LLM context and solo `localStorage` resume (full snapshot serialization).
+- This lets the solo/host LLM notice patterns when `moveHistory` is populated.
 - Optional module hook **`summarizeLedgerAction`** shortens the stored line; otherwise a type + payload snippet is used.
 
 ## Per-game overrides
