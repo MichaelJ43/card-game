@@ -218,6 +218,53 @@ jobs:
           echo "- WS API: ${{ steps.tf.outputs.ws_api_url }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Terraform state key: \`${TF_STATE_KEY}\`" >> "$GITHUB_STEP_SUMMARY"
 
+  live-tests:
+    name: Live tests (preview)
+    needs: deploy
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      PREVIEW_BASE_URL: https://pr-${{ github.event.pull_request.number }}.cardgame.michaelj43.dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for preview site
+        run: |
+          set -euo pipefail
+          url="${PREVIEW_BASE_URL}/"
+          echo "Waiting for ${url}"
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null -w "%{http_code}" "$url" | grep -q '^200$'; then
+              echo "Preview is up (attempt ${i})"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Preview URL did not return 200 in time"
+          exit 1
+
+      - name: Live visual tests
+        run: npm run test:live:ci
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-pr-${{ github.event.pull_request.number }}
+          path: playwright-report/
+          retention-days: 14
+
   teardown:
     name: Teardown preview
     if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
