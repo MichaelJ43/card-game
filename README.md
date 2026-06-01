@@ -66,6 +66,14 @@ Lint:
 npm run lint
 ```
 
+Unit tests (Vitest):
+
+```bash
+npm run test:ci
+```
+
+**Live visual tests** (Playwright; lobby shell screenshots and layout) run on PR previews in CI. Locally: `npm run test:live` (see [`docs/features/live-tests.md`](docs/features/live-tests.md)). **Security / Dependabot** automation is described in [`docs/features/security-automation.md`](docs/features/security-automation.md).
+
 ## Available games
 
 Pick a game from the in-app **Game** menu. Each row links to a short note in [`docs/games/`](docs/games/).

@@ -11,6 +11,10 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ci": "vitest run",
+    "build:e2e": "VITE_MULTIPLAYER_HTTP_URL=https://e2e.example.com VITE_MULTIPLAYER_WS_URL=wss://e2e.example.com npm run build",
+    "test:live": "playwright test",
+    "test:live:ci": "playwright test",
+    "test:live:update": "playwright test --update-snapshots",
     "gen:sounds": "node scripts/generate-tone-wavs.mjs"
   },
   "dependencies": {
@@ -31,6 +35,7 @@
     "globals": "^17.4.0",
     "ts-morph": "^27.0.2",
     "typescript": "~6.0.2",
+    "@playwright/test": "^1.58.2",
     "typescript-eslint": "^8.58.0",
     "vite": "^8.0.16",
     "vitest": "^4.1.5"

@@ -1,0 +1,48 @@
+name: Security notify
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: read
+
+jobs:
+  notify-cursor:
+    name: Notify Cursor automation
+    runs-on: ubuntu-latest
+    if: ${{ secrets.CURSOR_AUTOMATION_WEBHOOK != '' && secrets.CURSOR_AUTOMATION_API_KEY != '' }}
+    steps:
+      - name: Collect open GHAS alerts
+        id: alerts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+          dependabot="$(gh api "/repos/${REPO}/dependabot/alerts?state=open&per_page=30" --jq '[.[] | {number, severity: .security_advisory.severity, package: .security_vulnerability.package.name, url: .html_url}]' 2>/dev/null || echo '[]')"
+          code_scanning="$(gh api "/repos/${REPO}/code-scanning/alerts?state=open&per_page=30" --jq '[.[] | {number, rule: .rule.id, severity: .rule.severity, url: .html_url}]' 2>/dev/null || echo '[]')"
+          secret_scanning="$(gh api "/repos/${REPO}/secret-scanning/alerts?state=open&per_page=30" --jq '[.[] | {number, secret_type: .secret_type, url: .html_url}]' 2>/dev/null || echo '[]')"
+          payload="$(jq -n \
+            --arg repo "$REPO" \
+            --argjson dependabot "$dependabot" \
+            --argjson code_scanning "$code_scanning" \
+            --argjson secret_scanning "$secret_scanning" \
+            '{repository: $repo, dependabot: $dependabot, code_scanning: $code_scanning, secret_scanning: $secret_scanning, source: "security-notify"}')"
+          echo "payload<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$payload" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: POST Cursor automation webhook
+        env:
+          CURSOR_AUTOMATION_WEBHOOK: ${{ secrets.CURSOR_AUTOMATION_WEBHOOK }}
+          CURSOR_AUTOMATION_API_KEY: ${{ secrets.CURSOR_AUTOMATION_API_KEY }}
+          PAYLOAD: ${{ steps.alerts.outputs.payload }}
+        run: |
+          set -euo pipefail
+          curl -fsS -X POST "$CURSOR_AUTOMATION_WEBHOOK" \
+            -H "Authorization: Bearer ${CURSOR_AUTOMATION_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"
