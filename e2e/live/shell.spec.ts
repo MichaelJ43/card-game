@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 
 // Single baseline for local macOS and Linux CI runners.
-test.beforeEach((_fixtures, testInfo) => {
+test.beforeEach(({ browserName: _browserName }, testInfo) => {
   testInfo.snapshotSuffix = ''
 })
 import { waitForShellReady, setSelectedGame } from './helpers/preview'

@@ -7,7 +7,7 @@ This repo uses **GitHub Advanced Security** features, **GitHub Actions** gates, 
 | Piece | Purpose |
 |-------|---------|
 | [`.github/dependabot.yml`](../../.github/dependabot.yml) | Weekly npm updates (site + `lambda/`) |
-| [`.github/workflows/codeql.yml`](../../.github/workflows/codeql.yml) | Code scanning on PRs and `main` |
+| GitHub CodeQL default setup | Code scanning on PRs and `main` without a competing advanced workflow |
 | [`.github/workflows/security-merge.yml`](../../.github/workflows/security-merge.yml) | Auto-merge **Dependabot** PRs for **patch/minor** only |
 | [`.github/workflows/security-notify.yml`](../../.github/workflows/security-notify.yml) | Daily webhook to Cursor (optional secrets) |
 | [Live tests](./live-tests.md) | Visual regression on PR preview URLs |
@@ -18,14 +18,14 @@ In **Settings → Code security and analysis**, enable:
 
 - Dependabot alerts and security updates  
 - Secret scanning (and push protection, recommended)  
-- Code scanning (uses CodeQL workflow above)
+- Code scanning with **default setup** (do not also add an advanced CodeQL workflow)
 
 ### Branch protection on `main`
 
 Require status checks before merge:
 
 - **CI** (lint, unit tests, build, Lambda)  
-- **Analyze** (CodeQL)  
+- **CodeQL**
 - **Live tests (preview)** (on PRs that run preview deploy)
 
 ## Merge policy

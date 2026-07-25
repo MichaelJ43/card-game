@@ -305,7 +305,7 @@ sweeper process.
 ### GitHub Actions
 
 - `.github/workflows/ci.yml` — lint, test (site + lambda), build on every PR/push.
-- `.github/workflows/codeql.yml` — CodeQL code scanning on PRs and `main`.
+- GitHub CodeQL default setup provides code scanning on PRs and `main`.
 - `.github/workflows/security-merge.yml` — auto-merge Dependabot patch/minor PRs when checks pass.
 - `.github/workflows/security-notify.yml` — optional daily webhook to Cursor Automations (secrets required).
 - `.github/workflows/preview.yml` — PR preview deploy; includes **Live tests (preview)** (Playwright vs preview URL).
