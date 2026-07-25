@@ -13,10 +13,26 @@ jobs:
   notify-cursor:
     name: Notify Cursor automation
     runs-on: ubuntu-latest
-    if: ${{ secrets.CURSOR_AUTOMATION_WEBHOOK != '' && secrets.CURSOR_AUTOMATION_API_KEY != '' }}
     steps:
+      # The secrets context is not available to job-level or step-level `if`,
+      # so the optional webhook is resolved into a step output instead.
+      - name: Check webhook configuration
+        id: config
+        env:
+          CURSOR_AUTOMATION_WEBHOOK: ${{ secrets.CURSOR_AUTOMATION_WEBHOOK }}
+          CURSOR_AUTOMATION_API_KEY: ${{ secrets.CURSOR_AUTOMATION_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${CURSOR_AUTOMATION_WEBHOOK}" ] && [ -n "${CURSOR_AUTOMATION_API_KEY}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Cursor automation secrets are unset; skipping the alert sweep."
+          fi
+
       - name: Collect open GHAS alerts
         id: alerts
+        if: steps.config.outputs.configured == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -36,6 +52,7 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: POST Cursor automation webhook
+        if: steps.config.outputs.configured == 'true'
         env:
           CURSOR_AUTOMATION_WEBHOOK: ${{ secrets.CURSOR_AUTOMATION_WEBHOOK }}
           CURSOR_AUTOMATION_API_KEY: ${{ secrets.CURSOR_AUTOMATION_API_KEY }}
