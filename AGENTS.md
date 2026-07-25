@@ -307,8 +307,7 @@ sweeper process.
 - GitHub CodeQL default setup provides code scanning on PRs and `main`.
 - `.github/workflows/security-merge.yml` — auto-merge Dependabot patch/minor PRs when checks pass.
 - `.github/workflows/security-notify.yml` — optional daily webhook to Cursor Automations (secrets required).
-- `.github/workflows/preview.yml` — PR preview deploy; includes **Live tests (preview)** (Playwright vs preview URL).
-- `.github/workflows/live-baselines.yml` — manual; recaptures Playwright screenshot baselines on the CI runner and pushes them to the branch.
+- `.github/workflows/preview.yml` — PR preview deploy; includes **Live tests (preview)** (Playwright vs preview URL), which uploads a report plus candidate screenshot baselines when it fails.
 - `.github/workflows/deploy.yml` — OIDC-assumed role; optionally builds a fresh
   relay AMI when `packer/relay-coturn.pkr.hcl` changed, applies Terraform,
   builds the site with endpoint URLs baked in, syncs to S3 and invalidates

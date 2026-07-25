@@ -44,11 +44,11 @@ Add **Live tests (preview)** as a required check on `main` when you enable branc
 
 ## Updating snapshots
 
-1. Make the intentional UI change and let the PR preview deploy.
-2. Run the **[`Live baselines`](../../.github/workflows/live-baselines.yml)** workflow from the
-   branch, passing the preview URL (for example `https://pr-123.cardgame.michaelj43.dev`).
-3. It rewrites `e2e/live/*-snapshots/` on the CI runner and pushes the refreshed baselines
-   to the branch.
+1. Make the intentional UI change and push; **Live tests (preview)** fails on the drift.
+2. Download the run's **`playwright-snapshots-pr-<n>`** artifact — the same job recaptures
+   baselines on the runner after a failure.
+3. Compare against the **`playwright-report-pr-<n>`** artifact to confirm the diff was
+   intended, then commit the files into `e2e/live/*-snapshots/`.
 4. Note the visual change in the PR description.
 
 Dynamic regions are excluded rather than baselined: the cloud AI bar (`.app__llmBar`)

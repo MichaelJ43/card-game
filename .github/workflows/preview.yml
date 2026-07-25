@@ -265,6 +265,21 @@ jobs:
           path: playwright-report/
           retention-days: 14
 
+      # Baselines belong to this runner image, so a failing run also publishes the
+      # screenshots it would have accepted. Review them, then commit if the change
+      # was intended.
+      - name: Capture candidate baselines
+        if: failure()
+        run: npx playwright test --update-snapshots || true
+
+      - name: Upload candidate baselines
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-snapshots-pr-${{ github.event.pull_request.number }}
+          path: e2e/live/**/*-snapshots/
+          retention-days: 14
+
   teardown:
     name: Teardown preview
     if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'
