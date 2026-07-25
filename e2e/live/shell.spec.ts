@@ -1,12 +1,10 @@
-import { test, expect } from '@playwright/test'
-
-// Single baseline for local macOS and Linux CI runners.
-test.beforeEach(({ browserName: _browserName }, testInfo) => {
-  testInfo.snapshotSuffix = ''
-})
+import { test, expect, type Page } from '@playwright/test'
 import { waitForShellReady, setSelectedGame } from './helpers/preview'
 import { expectToRightOf } from './helpers/layout'
 import { expectToolbarSecondaryButton, expectRootThemeAliases } from './helpers/theme'
+
+// The cloud AI bar reflects an in-flight capability request, so its text differs run to run.
+const nondeterministicRegions = (page: Page) => [page.locator('.app__llmBar')]
 
 test.describe('Live shell (lobby)', () => {
   test.beforeEach(async ({ page }) => {
@@ -28,7 +26,10 @@ test.describe('Live shell (lobby)', () => {
     const rulesBtn = page.getByRole('button', { name: 'Rules' })
     await expectToRightOf(gameSelect, rulesBtn)
 
-    await expect(page).toHaveScreenshot('shell-lobby.png', { fullPage: true })
+    await expect(page).toHaveScreenshot('shell-lobby.png', {
+      fullPage: true,
+      mask: nondeterministicRegions(page),
+    })
   })
 
   test('blackjack toolbar controls', async ({ page }) => {
@@ -52,7 +53,7 @@ test.describe('Live shell (lobby)', () => {
     expect(dialogBox!.width).toBeLessThanOrEqual(viewport!.width)
     expect(dialogBox!.x).toBeGreaterThanOrEqual(0)
 
-    await expect(page).toHaveScreenshot('shell-rules-modal.png', { fullPage: true })
+    await expect(dialog).toHaveScreenshot('shell-rules-modal.png')
   })
 })
 

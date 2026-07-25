@@ -12,6 +12,9 @@ export default defineConfig({
   reporter: process.env.CI
     ? [['github'], ['html', { open: 'never', outputFolder: 'playwright-report' }]]
     : 'list',
+  // Baselines are captured on the Linux CI runner. Font metrics differ enough on other
+  // platforms to reflow prose, so local runs assert layout and theming but skip pixels.
+  ignoreSnapshots: !process.env.CI,
   use: {
     baseURL,
     viewport: { width: 1280, height: 720 },
@@ -28,7 +31,7 @@ export default defineConfig({
   ],
   expect: {
     toHaveScreenshot: {
-      // Slight tolerance for font rasterization differences between Linux CI and local macOS.
+      // Slight tolerance for antialiasing differences between runner images.
       maxDiffPixelRatio: 0.02,
       animations: 'disabled',
     },

@@ -14,7 +14,6 @@
     "build:e2e": "VITE_MULTIPLAYER_HTTP_URL=https://e2e.example.com VITE_MULTIPLAYER_WS_URL=wss://e2e.example.com npm run build",
     "test:live": "playwright test",
     "test:live:ci": "playwright test",
-    "test:live:update": "playwright test --update-snapshots",
     "gen:sounds": "node scripts/generate-tone-wavs.mjs"
   },
   "dependencies": {

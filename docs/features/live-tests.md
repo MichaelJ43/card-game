@@ -22,12 +22,14 @@ npx playwright install chromium   # once per machine
 # Local: builds with placeholder multiplayer URLs, starts preview, runs tests
 npm run test:live
 
-# Refresh baselines after an intentional UI change
-npm run test:live:update
-
 # CI / preview (PREVIEW_BASE_URL required)
 PREVIEW_BASE_URL=https://pr-123.cardgame.michaelj43.dev npm run test:live:ci
 ```
+
+Screenshot baselines are captured on the **Linux CI runner**. Font metrics differ enough
+on macOS to reflow paragraphs, so `ignoreSnapshots` skips screenshot assertions when `CI`
+is unset: local runs still check layout, roles, and theme tokens, and CI does the pixel
+comparison.
 
 `build:e2e` sets placeholder `VITE_MULTIPLAYER_*` URLs so Host/Join controls render locally without AWS.
 
@@ -42,10 +44,15 @@ Add **Live tests (preview)** as a required check on `main` when you enable branc
 
 ## Updating snapshots
 
-1. Make the intentional UI change.
-2. Run `npm run test:live:update` locally (or against a stable preview URL with `PREVIEW_BASE_URL` set).
-3. Commit changed files under `e2e/live/*-snapshots/`.
+1. Make the intentional UI change and let the PR preview deploy.
+2. Run the **[`Live baselines`](../../.github/workflows/live-baselines.yml)** workflow from the
+   branch, passing the preview URL (for example `https://pr-123.cardgame.michaelj43.dev`).
+3. It rewrites `e2e/live/*-snapshots/` on the CI runner and pushes the refreshed baselines
+   to the branch.
 4. Note the visual change in the PR description.
+
+Dynamic regions are excluded rather than baselined: the cloud AI bar (`.app__llmBar`)
+resolves asynchronously, so it is masked in full-page screenshots.
 
 Shared **m43** CSS from `static.michaelj43.dev` can change appearance without app code changes; refresh baselines if that CDN update was deliberate.
 

@@ -1,0 +1,56 @@
+name: Live baselines
+
+on:
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: Deployed site to screenshot (e.g. https://pr-78.cardgame.michaelj43.dev)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: live-baselines-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: Refresh snapshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      # Screenshot assertions report as failures while baselines are being written,
+      # so the following commit step decides whether the run produced anything.
+      - name: Capture snapshots
+        continue-on-error: true
+        env:
+          PREVIEW_BASE_URL: ${{ inputs.preview_url }}
+        run: npx playwright test --update-snapshots
+
+      - name: Commit snapshots
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain e2e/live)" ]; then
+            echo "Baselines already match ${{ inputs.preview_url }}."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e/live
+          git commit -m "test(live): refresh screenshot baselines from CI runner"
+          git push origin "HEAD:${{ github.ref_name }}"
