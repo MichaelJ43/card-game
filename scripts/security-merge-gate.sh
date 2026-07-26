@@ -23,8 +23,9 @@ if [ "$review_decision" = "CHANGES_REQUESTED" ]; then
   exit 0
 fi
 
-if [ "$author" != "dependabot[bot]" ]; then
-  echo "Author is not dependabot[bot]; skip auto-merge (human review for security-fix PRs)."
+# gh GraphQL reports app/dependabot; REST / event payloads use dependabot[bot].
+if [[ "$author" != "dependabot[bot]" && "$author" != "app/dependabot" ]]; then
+  echo "Author is not Dependabot ($author); skip auto-merge (human review for security-fix PRs)."
   exit 0
 fi
 
