@@ -212,7 +212,11 @@ npm run lint     # eslint
 npm run preview  # serve production build
 npm run test     # vitest (watch)
 npm run test:ci  # vitest run (used in CI)
+npm run test:live       # Playwright shell/visual tests (local preview via playwright.config webServer)
+npm run test:live:ci    # same runner (set PREVIEW_BASE_URL for PR preview in CI)
 ```
+
+**Live visual tests** and **security automation** are documented in [`docs/features/live-tests.md`](docs/features/live-tests.md) and [`docs/features/security-automation.md`](docs/features/security-automation.md).
 
 Backend (AWS Lambda signaling) lives in `lambda/`:
 
@@ -300,6 +304,10 @@ sweeper process.
 ### GitHub Actions
 
 - `.github/workflows/ci.yml` — lint, test (site + lambda), build on every PR/push.
+- GitHub CodeQL default setup provides code scanning on PRs and `main`.
+- `.github/workflows/security-merge.yml` — auto-merge Dependabot patch/minor PRs when checks pass.
+- `.github/workflows/security-notify.yml` — optional daily webhook to Cursor Automations (secrets required).
+- `.github/workflows/preview.yml` — PR preview deploy; includes **Live tests (preview)** (Playwright vs preview URL), which uploads a report plus candidate screenshot baselines when it fails.
 - `.github/workflows/deploy.yml` — OIDC-assumed role; optionally builds a fresh
   relay AMI when `packer/relay-coturn.pkr.hcl` changed, applies Terraform,
   builds the site with endpoint URLs baked in, syncs to S3 and invalidates

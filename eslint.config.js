@@ -20,6 +20,9 @@ export default defineConfig([
       globals: globals.browser,
     },
     rules: {
+      // ESLint 10 enables this in its recommended preset, but it reports
+      // intentional state initialization before branch-specific reassignment.
+      'no-useless-assignment': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
