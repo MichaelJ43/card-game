@@ -32,7 +32,7 @@ Require status checks before merge:
 
 | Source | Auto-merge |
 |--------|------------|
-| Dependabot, patch or minor semver bump | Yes, when all PR checks pass ([`scripts/security-merge-gate.sh`](../../scripts/security-merge-gate.sh)) |
+| Dependabot, patch or minor semver bump | Yes, when all PR checks pass ([`scripts/security-merge-gate.sh`](../../scripts/security-merge-gate.sh); accepts GraphQL `app/dependabot` and REST `dependabot[bot]`) |
 | Dependabot, major bump | No — human review |
 | Cursor/agent PR with label `security-fix` | No — human review |
 | Secret scanning (credential exposure) | No auto-merge; rotate/revoke out of band |
