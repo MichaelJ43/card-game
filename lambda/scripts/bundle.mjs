@@ -7,7 +7,7 @@ import { execSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import archiver from 'archiver'
+import { ZipArchive } from 'archiver'
 import { createWriteStream, existsSync } from 'node:fs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -41,7 +41,7 @@ async function zipPackage(files, zipName, options = {}) {
   const { extraDirs = [] } = options
   const out = resolve(dist, zipName)
   const output = createWriteStream(out)
-  const archive = archiver('zip', { zlib: { level: 9 } })
+  const archive = new ZipArchive({ zlib: { level: 9 } })
   archive.pipe(output)
   for (const f of files) {
     archive.file(resolve(dist, f), { name: f })
